@@ -630,7 +630,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             request.setMaxResults(options.getPageSize());
                             paged = true;
                         } else {
-                            throw new IllegalArgumentException("Invalid pageSize value. Default is 100. Max allowed is 500 (integer, 1-500)");
+                            //throw new IllegalArgumentException("Invalid pageSize value. Default is 100. Max allowed is 500 (integer, 1-500)");
                         }
                     }
                     // Implementation to support the 'OP_PAGED_RESULTS_COOKIE'
