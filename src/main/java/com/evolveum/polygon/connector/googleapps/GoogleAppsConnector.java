@@ -1862,8 +1862,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                     public String handleResult(Directory.Users.Aliases.List request,
                                             Aliases value) {
                                         if (null != value.getAliases()) {
-                                            for (Alias alias : value.getAliases()) {
-                                                result.add(alias.getAlias());
+                                            for (Object alias : value.getAliases()) {
+                                                result.add(((Alias)alias).getAlias());
                                             }
                                         }
                                         return null;

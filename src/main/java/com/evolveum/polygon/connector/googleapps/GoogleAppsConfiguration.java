@@ -110,8 +110,8 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
         this.skuId = skuId;
     }
 
-  @ConfigurationProperty(order = 4, displayMessageKey = "audoadd.display",
-    groupMessageKey = "basic.group", helpMessageKey = "audoadd.help", required = true,
+  @ConfigurationProperty(order = 4, displayMessageKey = "autoaddlic.display",
+    groupMessageKey = "basic.group", helpMessageKey = "autoaddlic.help", required = true,
     confidential = false)
     public Boolean getAutoAddLicense() {
         return autoAddLicense;
