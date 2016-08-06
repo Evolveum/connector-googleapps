@@ -45,8 +45,6 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.licensing.Licensing;
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.identityconnectors.common.logging.Log;
 
 /**

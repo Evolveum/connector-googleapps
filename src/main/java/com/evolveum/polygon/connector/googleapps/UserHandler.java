@@ -69,10 +69,7 @@ import com.google.api.services.admin.directory.model.UserPhoto;
 import com.google.common.base.CharMatcher;
 import com.google.common.escape.Escaper;
 import com.google.common.escape.Escapers;
-import java.util.List;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.exceptions.RetryableException;
 
 /**
  *
