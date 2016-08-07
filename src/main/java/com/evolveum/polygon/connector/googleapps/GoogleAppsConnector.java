@@ -749,8 +749,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     }
 
                     boolean paged = false;
-                    // Groups
-                    if (options.getPageSize() != null && 0 < options.getPageSize()) {
+                    // Groups                    
+                    if (options.getPageSize() >= 1 && options.getPageSize() <= 500) {
                         request.setMaxResults(options.getPageSize());
                         paged = true;
                     }
