@@ -467,7 +467,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 GuardedString.class).setRequired(true).setReadable(false).setReturnedByDefault(
                         false).build());
 
-        builder.addAttributeInfo(AttributeInfoBuilder.build(SUSPENDED_ATTR, Boolean.class));
+        builder.addAttributeInfo(AttributeInfoBuilder.build(SUSPENDED_ATTR));
         builder.addAttributeInfo(AttributeInfoBuilder.define(SUSPENSION_REASON_ATTR).setUpdateable(
                 false).setCreateable(false).build());
         builder.addAttributeInfo(AttributeInfoBuilder.build(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR,
@@ -561,7 +561,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         user.setOrganizations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(ORGANIZATIONS_ATTR)));
         user.setPhones(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(PHONES_ATTR)));
 
-        user.setSuspended(attributes.findBoolean(SUSPENDED_ATTR));
+        user.setSuspended(GoogleAppsUtil.getBooleanValueWithDefault(attributes.find(SUSPENDED_ATTR),null));
         user.setChangePasswordAtNextLogin(attributes
                 .findBoolean(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR));
         user.setIpWhitelisted(attributes.findBoolean(IP_WHITELISTED_ATTR));
