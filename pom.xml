@@ -37,7 +37,7 @@
 
     <groupId>com.evolveum.polygon</groupId>
     <artifactId>connector-googleapps</artifactId>
-    <version>1.4.2.14-SNAPSHOT</version>
+    <version>1.4.2.17</version>
     <packaging>jar</packaging>
 
     <name>GoogleApps Connector</name>
