@@ -59,6 +59,7 @@ import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
+import com.google.api.client.util.ArrayMap;
 import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.IOUtil;
@@ -1724,7 +1725,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     listGroups(service, user.getId())));
         }
 
-        return builder.build();
+        ConnectorObject result = builder.build();
+        return result;
     }
 
     protected ConnectorObject fromGroup(Group group, Set<String> attributesToGet,
@@ -1861,7 +1863,19 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                             Aliases value) {
                                         if (null != value.getAliases()) {
                                             for (Object alias : value.getAliases()) {
-                                                result.add(((Alias)alias).getAlias());
+                                                Alias transformedAlias = null;
+                                                if(alias instanceof ArrayMap){
+                                                    ArrayMap arrMapAlias = (ArrayMap)alias;
+                                                    transformedAlias = new Alias();
+                                                    transformedAlias.setAlias((String)arrMapAlias.get("alias"));
+                                                    transformedAlias.setPrimaryEmail((String)arrMapAlias.get("primaryEmail"));
+                                                    transformedAlias.setEtag((String)arrMapAlias.get("etag"));
+                                                    transformedAlias.setId((String)arrMapAlias.get("id"));
+                                                    transformedAlias.setKind((String)arrMapAlias.get("kind"));
+                                                }else{
+                                                    transformedAlias = (Alias)alias;
+                                                }
+                                                result.add((transformedAlias).getAlias());
                                             }
                                         }
                                         return null;
