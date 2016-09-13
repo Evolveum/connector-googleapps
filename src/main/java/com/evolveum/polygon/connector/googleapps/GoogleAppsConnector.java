@@ -59,6 +59,8 @@ import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.IOUtil;
@@ -1284,8 +1286,13 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             if (null != attributesAccessor.findStringList(ALIASES_ATTR)) {
                 List<String> aliases = new ArrayList(attributesAccessor.findStringList(ALIASES_ATTR));
                 final Directory.Users.Aliases aliasesService = configuration.getDirectory().users().aliases();
-                aliases.removeAll(listAliases(aliasesService, uid.getUidValue()));
-                for (Object member : aliases) {
+                Set<String> currentAliases = listAliases(aliasesService, uid.getUidValue());
+                
+                List<String> aliasesToDel = new ArrayList(currentAliases);
+                aliasesToDel.removeAll(aliases);                   
+                aliases.removeAll(currentAliases); // aliases var now contains values to add
+                
+                for (Object member : aliases) { // ADD alias
                     if (member instanceof String) {
 
                         String id
@@ -1303,6 +1310,37 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                     }
                                 });
 
+                        if (null == id) {
+                            // TODO make warn about failed update
+                        }
+                    } else if (null != member) {
+                        // Delete user and Error or
+                        RetryableException e
+                                = RetryableException.wrap("Invalid attribute value: "
+                                        + String.valueOf(member), uid);
+                        e.initCause(new InvalidAttributeValueException(
+                                "Attribute 'aliases' must be a String list"));
+                        throw e;
+                    }
+                }
+                
+                for (Object member : aliasesToDel) { // DEL alias
+                    if (member instanceof String) {
+
+                        String id
+                                = execute(deleteUserAlias(aliasesService, uid.getUidValue(),
+                                        (String) member),
+                                        new RequestResultHandler<Directory.Users.Aliases.Delete, Alias, String>() {
+                                    public String handleResult(
+                                            final Directory.Users.Aliases.Delete request,
+                                            final Alias value) {
+                                        if (null != value) {
+                                            return value.getId();
+                                        } else {
+                                            return null;
+                                        }
+                                    }
+                                });
                         if (null == id) {
                             // TODO make warn about failed update
                         }
@@ -1848,6 +1886,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
     protected Set<String> listAliases(Directory.Users.Aliases service, String userKey) {
         final Set<String> result = CollectionUtil.newCaseInsensitiveSet();
+        final Gson gson = new GsonBuilder().create();
         try {
 
             Directory.Users.Aliases.List request = service.list(userKey);
@@ -1857,11 +1896,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 nextPageToken
                         = execute(request,
                                 new RequestResultHandler<Directory.Users.Aliases.List, Aliases, String>() {
-                                    public String handleResult(Directory.Users.Aliases.List request,
-                                            Aliases value) {
+                                    public String handleResult(Directory.Users.Aliases.List request, Aliases value) {
                                         if (null != value.getAliases()) {
                                             for (Object alias : value.getAliases()) {
-                                                result.add(((Alias)alias).getAlias());
+                                                String toJson = gson.toJson(alias);
+                                                Alias fromJson = gson.fromJson(toJson, Alias.class);
+                                                result.add(fromJson.getAlias()); // return only alias parameter of json object
                                             }
                                         }
                                         return null;
@@ -1877,13 +1917,13 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         return result;
     }
 
-    protected <G extends AbstractGoogleJsonClientRequest<T>, T, R> R execute(G request,
+    protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
             RequestResultHandler<G, T, R> handler) {
         return execute(Assertions.nullChecked(request, "Google Json ClientRequest"), Assertions
                 .nullChecked(handler, "handler"), -1);
     }
 
-    protected <G extends AbstractGoogleJsonClientRequest<T>, T, R> R execute(G request,
+    protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
             RequestResultHandler<G, T, R> handler, int retry) {
         try {
             if (retry >= 0) {
@@ -1894,7 +1934,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     throw ConnectorException.wrap(e);
                 }
             }
-            return handler.handleResult(request, request.execute());
+            return handler.handleResult(request, (T) request.execute());
         } catch (GoogleJsonResponseException e) {
 
             GoogleJsonError details = e.getDetails();

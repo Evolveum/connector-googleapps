@@ -37,7 +37,7 @@ import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRe
  *
  * @author Laszlo Hordos
  */
-public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientRequest<T>, T, R> {
+public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientRequest, T, R> {
 
     public abstract R handleResult(G request, T value);
 
