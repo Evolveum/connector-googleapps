@@ -1945,6 +1945,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
                             || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
                         logger.info("System should retry");
+                    }else{
+                        //if we are forbidden to do something we should not try again
+                        return handler.handleError(e);
                     }
                 } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
                     if ("notFound".equalsIgnoreCase(errorInfo.getReason())) {
