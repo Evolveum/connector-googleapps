@@ -61,6 +61,7 @@ import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import java.util.HashMap;
 import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.IOUtil;
@@ -752,7 +753,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                     boolean paged = false;
                     // Groups                    
-                    if (options.getPageSize() >= 1 && options.getPageSize() <= 500) {
+                    if (null != options.getPageSize() && options.getPageSize() >= 1 && options.getPageSize() <= 500) {
                         request.setMaxResults(options.getPageSize());
                         paged = true;
                     }
@@ -1461,10 +1462,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 final Directory.Members service = configuration.getDirectory().members();
                 if (members.getValue().isEmpty()) {
                     // Remove all membership
-                    for (Map member : listMembers(service, uidAfterUpdate.getUidValue(), null)) {
+                    for (String member : listMembers(service, uidAfterUpdate.getUidValue(), null)) {
 
-                        execute(deleteMembers(service, uidAfterUpdate.getUidValue(),
-                                (String) member.get(EMAIL_ATTR)),
+                        execute(deleteMembers(service, uidAfterUpdate.getUidValue(), member),
                                 new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
                                     public Object handleResult(Directory.Members.Delete request,
                                             Void value) {
@@ -1478,43 +1478,37 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                 });
                     }
                 } else {
-                    final List<Map<String, String>> activeMembership
+                    final List<String> activeMembership
                             = listMembers(service, uidAfterUpdate.getUidValue(), null);
+                    final List<String> deleteMembers
+                            = new ArrayList<String>();
+                    deleteMembers.addAll(activeMembership);
 
                     final List<Directory.Members.Insert> addMembership
                             = new ArrayList<Directory.Members.Insert>();
                     final List<Directory.Members.Patch> patchMembership
                             = new ArrayList<Directory.Members.Patch>();
-
+                    
+                    
+                    //TODO add other kind of roles but MEMBER
                     for (Object member : members.getValue()) {
-                        if (member instanceof Map) {
+                        if (member instanceof String) {
 
-                            String email = (String) ((Map) member).get(EMAIL_ATTR);
-                            if (null == email) {
-                                continue;
-                            }
-                            String role = (String) ((Map) member).get(ROLE_ATTR);
-                            if (null == role) {
-                                role = "MEMBER";
-                            }
+                            String email = (String)member;
 
                             boolean notMember = true;
-                            for (Map<String, String> a : activeMembership) {
-                                // How to handle ROLE update?
-                                // OWNER -> MANAGER -> MEMBER
-                                if (email.equalsIgnoreCase(a.get(EMAIL_ATTR))) {
-                                    a.put("keep", null);
-                                    if (!role.equalsIgnoreCase(a.get(ROLE_ATTR))) {
-                                        patchMembership.add(updateMembers(service, uidAfterUpdate
-                                                .getUidValue(), email, role));
-                                    }
+                            for (String a : activeMembership) {
+                                if (email.equalsIgnoreCase(a)) {
                                     notMember = false;
+                                    if(deleteMembers.contains(a)){
+                                        deleteMembers.remove(a);
+                                    }
                                     break;
                                 }
                             }
                             if (notMember) {
                                 addMembership.add(createMember(service, uidAfterUpdate
-                                        .getUidValue(), email, role));
+                                        .getUidValue(), email, "MEMBER"));
                             }
                         } else if (null != member) {
                             // throw error/revert?
@@ -1549,12 +1543,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                     }
                                 });
                     }
-
+                    
                     // Delete existing Member object
-                    for (Map a : activeMembership) {
-                        if (!a.containsKey("keep")) {
-                            execute(deleteMembers(service, uidAfterUpdate.getUidValue(), (String) a
-                                    .get(EMAIL_ATTR)),
+                    for (String a : deleteMembers) {
+                            execute(deleteMembers(service, uidAfterUpdate.getUidValue(), a),
                                     new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
                                         public Object handleResult(
                                                 Directory.Members.Delete request, Void value) {
@@ -1566,7 +1558,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                                     return null;
                                                 }
                                     });
-                        }
                     }
                 }
             }
@@ -1757,7 +1748,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        if (null != attributesToGet && attributesToGet.contains(PredefinedAttributes.GROUPS_NAME)) {
+        //TODO do somehow else null != attributesToGet breaks associations functions
+        if (null == attributesToGet || attributesToGet.contains(PredefinedAttributes.GROUPS_NAME)) {
             builder.addAttribute(AttributeBuilder.build(PredefinedAttributes.GROUPS_NAME,
                     listGroups(service, user.getId())));
         }
@@ -1803,16 +1795,32 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        if (null != attributesToGet && attributesToGet.contains(MEMBERS_ATTR)) {
+        //TODO do somehow else null != attributesToGet breaks associations functions
+        if (null == attributesToGet || attributesToGet.contains(MEMBERS_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(MEMBERS_ATTR, listMembers(service, group
                     .getId(), null)));
         }
 
         return builder.build();
     }
+    
+    protected List<String>  listMembers(Directory.Members service, String groupKey, String roles){
+        List<Map<String, String>> allMembers = listAllMembers(service, groupKey, roles);
+        final List<String> resultMembers = new ArrayList<String>();
+        for(Map<String, String> allMember : allMembers){
+            //m.put(EMAIL_ATTR, member.getEmail());
+            //m.put(ROLE_ATTR, member.getRole());
+            String memberRole = allMember.get(ROLE_ATTR);
+            String memberEmail = allMember.get(EMAIL_ATTR);
+            if("MEMBER".equals(memberRole)){
+                resultMembers.add(memberEmail);
+            }
+        }
+        return resultMembers;
+    }
 
-    protected List<Map<String, String>> listMembers(Directory.Members service, String groupKey,
-            String roles) {
+    //TODO dodelat po te listOwners a listManagers a vystavit obdobny attribut
+    protected List<Map<String, String>> listAllMembers(Directory.Members service, String groupKey, String roles) {
         final List<Map<String, String>> result = new ArrayList<Map<String, String>>();
         try {
 
@@ -1945,6 +1953,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
                             || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
                         logger.info("System should retry");
+                    }else{
+                        //if we are forbidden to do something we should not try again
+                        return handler.handleError(e);
                     }
                 } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
                     if ("notFound".equalsIgnoreCase(errorInfo.getReason())) {
