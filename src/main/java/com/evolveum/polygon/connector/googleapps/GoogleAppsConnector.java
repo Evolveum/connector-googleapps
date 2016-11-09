@@ -61,6 +61,7 @@ import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import java.util.HashMap;
 import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.IOUtil;
@@ -752,7 +753,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                     boolean paged = false;
                     // Groups                    
-                    if (options.getPageSize() >= 1 && options.getPageSize() <= 500) {
+                    if (null != options.getPageSize() && options.getPageSize() >= 1 && options.getPageSize() <= 500) {
                         request.setMaxResults(options.getPageSize());
                         paged = true;
                     }
@@ -1487,6 +1488,14 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             = new ArrayList<Directory.Members.Patch>();
 
                     for (Object member : members.getValue()) {
+                        //hack to bypass inexistence of adittional attributes on connection
+                        if(member instanceof String){
+                            String memberString = (String)member;
+                            Map<String, String> memberMap = new HashMap<String, String>();
+                            memberMap.put(EMAIL_ATTR, memberString);
+                            memberMap.put(ROLE_ATTR, "MEMBER");
+                            member = memberMap;
+                        }
                         if (member instanceof Map) {
 
                             String email = (String) ((Map) member).get(EMAIL_ATTR);
@@ -1757,7 +1766,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        if (null != attributesToGet && attributesToGet.contains(PredefinedAttributes.GROUPS_NAME)) {
+        //TODO do somehow else null != attributesToGet breaks associations functions
+        if (null == attributesToGet || attributesToGet.contains(PredefinedAttributes.GROUPS_NAME)) {
             builder.addAttribute(AttributeBuilder.build(PredefinedAttributes.GROUPS_NAME,
                     listGroups(service, user.getId())));
         }
@@ -1803,7 +1813,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        if (null != attributesToGet && attributesToGet.contains(MEMBERS_ATTR)) {
+        //TODO do somehow else null != attributesToGet breaks associations functions
+        if (null == attributesToGet || attributesToGet.contains(MEMBERS_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(MEMBERS_ATTR, listMembers(service, group
                     .getId(), null)));
         }
