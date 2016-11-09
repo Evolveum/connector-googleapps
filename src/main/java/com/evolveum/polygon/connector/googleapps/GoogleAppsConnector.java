@@ -1543,8 +1543,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                     }
                                 });
                     }
-
-                    //TODO search oposite than when adding and find objects to delete
                     
                     // Delete existing Member object
                     for (String a : deleteMembers) {
