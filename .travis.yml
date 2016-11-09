@@ -1,4 +1,4 @@
-sudo: false
+sudo: required
 dist: trusty
 language: java
 
@@ -6,19 +6,18 @@ cache:
   directories:
     - $HOME/.m2
 
-before_install:
-  - wget http://ftp.wayne.edu/apache/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.zip
-  - unzip -qq apache-maven-3.3.9-bin.zip
-  - export M2_HOME=$PWD/apache-maven-3.3.9
-  - export PATH=$M2_HOME/bin:$PATH
-  - export MAVEN_OPTS='-Xmx2g -XX:MaxPermSize=256m'
+#before_install:
+  #- wget http://ftp.wayne.edu/apache/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.zip
+  #- unzip -qq apache-maven-3.3.9-bin.zip
+  #- export M2_HOME=$PWD/apache-maven-3.3.9
+  #- export PATH=$M2_HOME/bin:$PATH
+  #- export MAVEN_OPTS='-Xmx2g'
 
-addons:
-  apt:
-    packages:
-      - oracle-java8-installer # install newest JDK8
+#addons:
+  #apt:
+    #packages:
+      #- oracle-java8-installer # install newest JDK8
 
 jdk:
-  - openjdk7
-  - oraclejdk7
   - oraclejdk8
+  - openjdk8
