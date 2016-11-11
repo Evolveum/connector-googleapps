@@ -33,9 +33,8 @@ import org.identityconnectors.framework.spi.AbstractConfiguration;
 import org.identityconnectors.framework.spi.ConfigurationProperty;
 import org.identityconnectors.framework.spi.StatefulConfiguration;
 
-import com.google.api.client.auth.oauth2.BearerToken;
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
@@ -175,15 +174,15 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
             throw new IllegalArgumentException("Refresh Token cannot be null or empty.");
         }
     }
-    private Credential credential = null;
+    private GoogleCredential credential = null;
 
-    public Credential getGoogleCredential() {
+    public GoogleCredential getGoogleCredential() {
         if (null == credential) {
             synchronized (this) {
                 if (null == credential) {
                     System.setProperty("https.protocols", "TLSv1.2");
                     credential =
-                            new Credential.Builder(BearerToken.authorizationHeaderAccessMethod())
+                            new GoogleCredential.Builder()
                             .setTransport(HTTP_TRANSPORT)
                             .setJsonFactory(JSON_FACTORY)
                             .setTokenServerEncodedUrl(GoogleOAuthConstants.TOKEN_SERVER_URL)
@@ -194,7 +193,7 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
                     try {
                         credential.setRefreshToken(SecurityUtil.decrypt(getRefreshToken())).refreshToken();
                     } catch (IOException ex) {
-                        logger.error("Token refresh error: ", ex);
+                        logger.error("Token refresh error: {0}", ex.getMessage());
                     }
 
                     getRefreshToken().access(new GuardedString.Accessor() {
