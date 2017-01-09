@@ -68,6 +68,11 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     private GuardedString clientSecret = null;
     private GuardedString refreshToken = null;
     private static final Log logger = Log.getLog(GoogleAppsConfiguration.class);
+    /**
+     * caching
+     */
+    private Long maxCacheTTL = null;
+    private Boolean allowCache;
 
     /**
      * Constructor.
@@ -151,6 +156,29 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     public void setRefreshToken(GuardedString refreshToken) {
         this.refreshToken = refreshToken;
     }
+    
+    @ConfigurationProperty(order = 8, displayMessageKey = "allowCache.display",
+    groupMessageKey = "basic.group", helpMessageKey = "allowCache.help", required = true,
+    confidential = false)
+    public Boolean getAllowCache() {
+        return allowCache;
+    }
+
+    public void setAllowCache(Boolean allowCache) {
+        this.allowCache = allowCache;
+    }
+
+    @ConfigurationProperty(order = 9, displayMessageKey = "maxCacheTTL.display",
+    groupMessageKey = "basic.group", helpMessageKey = "maxCacheTTL.help", required = true,
+    confidential = false)
+    public Long getMaxCacheTTL() {
+        return maxCacheTTL;
+    }
+
+    public void setMaxCacheTTL(Long maxCacheTTL) {
+        this.maxCacheTTL = maxCacheTTL;
+    }
+            
 
     /**
      * {@inheritDoc}

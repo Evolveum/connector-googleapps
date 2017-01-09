@@ -59,9 +59,9 @@ import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
+import com.evolveum.polygon.connector.googleapps.cache.UserCache;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import java.util.HashMap;
 import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.IOUtil;
@@ -186,6 +186,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * .
      */
     private GoogleAppsConfiguration configuration;
+    private UserCache userCache;
     private Schema schema = null;
 
     /**
@@ -678,6 +679,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                     String nextPageToken = null;
                     do {
+                        if(StringUtil.isNotBlank(nextPageToken)){
+                            request.setPageToken(nextPageToken);
+                        }
                         nextPageToken
                                 = execute(request,
                                         new RequestResultHandler<Directory.Users.List, Users, String>() {
@@ -767,6 +771,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                     String nextPageToken = null;
                     do {
+                        if(StringUtil.isNotBlank(nextPageToken)){
+                            request.setPageToken(nextPageToken);
+                        }
                         nextPageToken
                                 = execute(request,
                                         new RequestResultHandler<Directory.Groups.List, Groups, String>() {
@@ -858,6 +865,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                     String nextPageToken = null;
                     do {
+                        if(StringUtil.isNotBlank(nextPageToken)){
+                            request.setPageToken(nextPageToken);
+                        }
                         nextPageToken
                                 = execute(request,
                                         new RequestResultHandler<Directory.Members.List, Members, String>() {
@@ -1039,6 +1049,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                     String nextPageToken = null;
                     do {
+                        //TODO license request has no page token property. How to page?
+                        /*if(StringUtil.isNotBlank(nextPageToken)){
+                            request.setPageToken(nextPageToken);
+                        }*/
                         nextPageToken
                                 = execute(request,
                                         new RequestResultHandler<LicensingRequest<LicenseAssignmentList>, LicenseAssignmentList, String>() {
@@ -1637,7 +1651,25 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             builder.setUid(user.getId());
         }
         builder.setName(user.getPrimaryEmail());
-
+        
+        return tryCache(user, builder, attributesToGet, service);
+    }
+    
+    private ConnectorObject tryCache(User user, ConnectorObjectBuilder builder,Set<String> attributesToGet, Directory.Groups service){
+        if(userCache == null){
+            userCache = UserCache.init(configuration);
+        }
+        if(!userCache.getAllowCache()){
+            return getUserFromResource(user, builder, attributesToGet, service);
+        }
+        if(!userCache.isPresent(user.getId())){
+            ConnectorObject resultUser = getUserFromResource(user, builder, attributesToGet, service);
+            userCache.addUser(resultUser);
+        }
+        return userCache.getUser(user.getId());
+    }
+    
+    private ConnectorObject getUserFromResource(User user, ConnectorObjectBuilder builder,Set<String> attributesToGet, Directory.Groups service){
         // Optional
         // If both givenName and familyName are empty then Google didn't return
         // with 'name'
@@ -1748,7 +1780,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        //TODO do somehow else null != attributesToGet breaks associations functions
+        //TODO do somehow else "null != attributesToGet &&" breaks associations functions
         if (null == attributesToGet || attributesToGet.contains(PredefinedAttributes.GROUPS_NAME)) {
             builder.addAttribute(AttributeBuilder.build(PredefinedAttributes.GROUPS_NAME,
                     listGroups(service, user.getId())));
@@ -1795,7 +1827,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        //TODO do somehow else null != attributesToGet breaks associations functions
+        //TODO do somehow else "null != attributesToGet &&" breaks associations functions
         if (null == attributesToGet || attributesToGet.contains(MEMBERS_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(MEMBERS_ATTR, listMembers(service, group
                     .getId(), null)));
@@ -1829,6 +1861,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             String nextPageToken = null;
             do {
+                if(StringUtil.isNotBlank(nextPageToken)){
+                    request.setPageToken(nextPageToken);
+                }
                 nextPageToken
                         = execute(request,
                                 new RequestResultHandler<Directory.Members.List, Members, String>() {
@@ -1869,6 +1904,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             String nextPageToken = null;
             do {
+                if(StringUtil.isNotBlank(nextPageToken)){
+                    request.setPageToken(nextPageToken);
+                }
                 nextPageToken
                         = execute(request,
                                 new RequestResultHandler<Directory.Groups.List, Groups, String>() {
@@ -1876,7 +1914,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                             Groups value) {
                                         if (null != value.getGroups()) {
                                             for (Group group : value.getGroups()) {
-                                                result.add(group.getEmail());
+                                                GoogleAppsConfiguration GAconf = (GoogleAppsConfiguration)getConfiguration();
+                                                String domain = GAconf.getDomain();
+                                                if(group.getEmail().endsWith(domain)){//TODO fix loading crossdomain groups for users
+                                                    result.add(group.getEmail());
+                                                }
                                             }
                                         }
                                         return value.getNextPageToken();
@@ -1901,6 +1943,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             String nextPageToken = null;
             do {
+                //TODO user alias request has no page token, how to page?
+                /*if(StringUtil.isNotBlank(nextPageToken)){
+                    request.setPageToken(nextPageToken);
+                }*/
                 nextPageToken
                         = execute(request,
                                 new RequestResultHandler<Directory.Users.Aliases.List, Aliases, String>() {
@@ -1949,44 +1995,61 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             if (null != details && null != details.getErrors()) {
                 GoogleJsonError.ErrorInfo errorInfo = details.getErrors().get(0);
                 // error: 403
-                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) {
-                    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
-                            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
-                        logger.info("System should retry");
-                    }else{
+                //if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                //    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
+                //            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
+                //        logger.info("System should retry");
+                //        throw RetryableException.wrap(e.getMessage(), e);
+                //    }else{
                         //if we are forbidden to do something we should not try again
-                        return handler.handleError(e);
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
+                //        return handler.handleError(e);
+                //    }
+                //} else 
+                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
                     if ("notFound".equalsIgnoreCase(errorInfo.getReason())) {
                         return handler.handleNotFound(e);
                     }
-                } else if (e.getStatusCode() == 409) {
-                    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
+                //} else if (e.getStatusCode() == 409) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                //    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
                         // Already Exists
-                        handler.handleDuplicate(e);
-                    }
-                } else if (e.getStatusCode() == 400) {
-                    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
+                //        handler.handleDuplicate(e);
+                //    }
+                //} else if (e.getStatusCode() == 400) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                //    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
                         // Already Exists "Invalid Ou Id"
-                    }
+                //    }
                 } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE) {
-                    if ("backendError".equalsIgnoreCase(errorInfo.getReason())) {
-                        throw RetryableException.wrap(e.getMessage(), e);
+                    if ("backendError".equalsIgnoreCase(errorInfo.getReason()) && retry < 5) {
+                        logger.warn("retrying 503 backendError retry number " + retry);
+                        return execute(request, handler, ++retry);
+                    }else{
+                        throw RetryableException.wrap(e.getMessage(), e); 
+                    }
+                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVER_ERROR) {
+                    if ("backendError".equalsIgnoreCase(errorInfo.getReason())
+                           || "internalError".equalsIgnoreCase(errorInfo.getReason()) && retry < 5) {
+                        logger.warn("retrying 500" + errorInfo.getReason() + "retry number " + retry);
+                        return execute(request, handler, ++retry);
+                    }else{
+                        throw RetryableException.wrap(e.getMessage(), e); 
+                    }
+                } else {
+                    if (retry < 5) { //last resort retry. We must right all wrongs!
+                        logger.warn("retrying " + e.getStatusCode() + " " + errorInfo.getReason() + "retry number " + retry);
+                        return execute(request, handler, ++retry);
+                    }else{
+                        if (e.getStatusCode() == 409) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                            if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
+                                // Already Exists
+                                logger.warn("handling duplicate");
+                                handler.handleDuplicate(e);
+                            }
+                        }else{
+                            throw RetryableException.wrap(e.getMessage(), e);
+                        }
                     }
                 }
 
-            }
-
-            // } catch (HttpResponseException e) {
-            if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) {
-                if (retry < 5) {
-                    return execute(request, handler, ++retry);
-                } else {
-                    handler.handleError(e);
-                }
-            } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
-                return handler.handleNotFound(e);
             }
             throw ConnectorException.wrap(e);
         } catch (IOException e) {

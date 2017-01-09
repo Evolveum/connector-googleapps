@@ -92,12 +92,18 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
 
     public Void visitContainsAllValuesFilter(Directory.Groups.List list,
             ContainsAllValuesFilter containsAllValuesFilter) {
+        //TODO needed for removing deleted users from groups
         throw getException();
     }
 
     protected RuntimeException getException() {
         return new UnsupportedOperationException(
                 "Only EqualsFilter(['domain','customer','userKey']) and ContainsFilter('members') are supported");
+    }
+    
+    protected RuntimeException getException(EqualsFilter equalsFilter) {
+        return new UnsupportedOperationException(
+                "filter is:" + equalsFilter + "Only EqualsFilter(['domain','customer','userKey']) and ContainsFilter('members') are supported");
     }
 
     public Void visitEqualsFilter(Directory.Groups.List list, EqualsFilter equalsFilter) {
@@ -123,7 +129,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
                 list.setUserKey(AttributeUtil.getStringValue(equalsFilter.getAttribute()));
             }
         } else {
-            throw getException() ; 
+            throw getException(equalsFilter) ; 
         }
 
         return null;
