@@ -9,29 +9,25 @@ import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.joda.time.DateTime;
 
 /**
+ * Wrapper for the user objects in cache. Contains the user and the time when th user was added into the cache.
  *
  * @author oskar.butovic
  */
 public class UserObjectWrapper {
-    
-    private ConnectorObject userObject;
-    private DateTime timeAdded;
+
+    private final ConnectorObject userObject;
+    private final DateTime timeAdded;
+
+    public UserObjectWrapper(ConnectorObject userObject) {
+        this.userObject = userObject;
+        this.timeAdded = DateTime.now();
+    }
 
     public ConnectorObject getUserObject() {
         return userObject;
     }
 
-    public void setUserObject(ConnectorObject userObject) {
-        this.userObject = userObject;
-    }
-
     public DateTime getTimeAdded() {
         return timeAdded;
     }
-
-    public void setTimeAdded(DateTime timeAdded) {
-        this.timeAdded = timeAdded;
-    }
-    
-    
 }

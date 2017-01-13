@@ -6,113 +6,90 @@
 package com.evolveum.polygon.connector.googleapps.cache;
 
 import com.evolveum.polygon.connector.googleapps.GoogleAppsConfiguration;
-import java.util.HashMap;
-import java.util.Map;
+import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.joda.time.Duration;
 
+import javax.annotation.Nullable;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
+ * Cache of the user objects retrieved from Google Apps Connector.
  *
  * @author oskar.butovic
  */
 public class UserCache {
-    
-    private Map<UserKey, UserObjectWrapper> usersMap;
-    private Duration maxCacheTTL;
-    private Boolean allowCache;
-    
-    public UserCache(){
-        usersMap = new HashMap<UserKey, UserObjectWrapper>();
+
+    private final Log logger;
+    private final Map<String, UserObjectWrapper> usersMap;
+    private final Duration maxCacheTTL;
+    private final boolean allowCache;
+
+    public UserCache(GoogleAppsConfiguration configuration, Log connectorLogger) {
+        usersMap = new HashMap<String, UserObjectWrapper>();
+        logger = connectorLogger;
+        maxCacheTTL = new Duration(configuration.getMaxCacheTTL());
+        allowCache = Boolean.TRUE.equals(configuration.getAllowCache());
+
+        logger.ok("UserCache() - created with allowCache: " + allowCache + ", maxCacheTTL: " + maxCacheTTL.toString());
     }
 
-    public void setMaxCacheTTL(Duration maxCacheTTL) {
-        this.maxCacheTTL = maxCacheTTL;
-    }
-
-    public Duration getMaxCacheTTL() {
-        return maxCacheTTL;
-    }
-
-    public Boolean getAllowCache() {
-        return allowCache;
-    }
-
-    public void setAllowCache(Boolean allowCache) {
-        this.allowCache = allowCache;
-    }
-    
-    
-    
-    public UserKey prepareKey(String uid){
-        UserKey result = new UserKey();
-        result.setUid(uid);
-        return result;
-    }
-    
-    public boolean isPresent(UserKey userKey){
-        boolean result = false;
-        UserObjectWrapper resultWrapper = usersMap.get(userKey);
-        if(resultWrapper != null){
-            
+    /**
+     * Returns the user from cache or null if there is none (or expired).
+     */
+    @Nullable
+    public ConnectorObject getUser(String uid) {
+        if (!allowCache) {
+            return null;
         }
-        return result;
-    } 
-    
-    public boolean isPresent(String uid){
-        boolean result = false;
-        UserKey userKey = prepareKey(uid);
-        cleanup(userKey);
-        result = usersMap.containsKey(userKey);
-        return result;
-    } 
-    
-    public ConnectorObject getUser(String uid){
-        UserKey userKey = prepareKey(uid);
-        return getUser(userKey);
-    }
-    
-    public ConnectorObject getUser(UserKey userKey){
-        cleanup(userKey);
-        UserObjectWrapper resultWrapper = usersMap.get(userKey);
-        if(resultWrapper != null){
+        removeExpired(uid);
+        UserObjectWrapper resultWrapper = usersMap.get(uid);
+        if (resultWrapper != null) {
+            logger.ok("UserCache.getUser() - uid " + uid + " found, time added " + resultWrapper.getTimeAdded());
             return resultWrapper.getUserObject();
-        }else{
+        } else {
+            logger.info("UserCache.getUser() - uid " + uid + " not found");
             return null;
         }
     }
-    
-    public void removeUser(UserKey userKey){
-        usersMap.remove(userKey);
-    }
-    public void addUser(ConnectorObject user){
-        if(!allowCache){
+
+    public void removeUser(String uid) {
+        if (!allowCache) {
             return;
         }
-        UserKey userKey = prepareKey(user.getUid().toString());
-        UserObjectWrapper userWrapper = new UserObjectWrapper();
-        userWrapper.setUserObject(user);
-        usersMap.put(userKey, userWrapper);
-    }
-    
-    public void cleanup(){
-        for(UserKey userKey : usersMap.keySet()){
-            cleanup(userKey);
+        if (usersMap.remove(uid) != null) {
+            logger.ok("UserCache.removeUser() - uid " + uid + " removed");
+        }
+        else {
+            logger.warn("UserCache.removeUser() - uid " + uid + " not found in cache");
         }
     }
-    
-    public void cleanup(UserKey userKey){
-        UserObjectWrapper userWrapper = usersMap.get(userKey);
-        if(userWrapper != null && userWrapper.getTimeAdded().plus(maxCacheTTL).isBeforeNow()){
-            usersMap.remove(userKey);
+
+    public void addUser(ConnectorObject user) {
+        if (!allowCache) {
+            return;
+        }
+        UserObjectWrapper userWrapper = new UserObjectWrapper(user);
+        logger.ok("UserCache.addUser() - uid " + getUid(user) + ", time added " + userWrapper.getTimeAdded());
+        usersMap.put(getUid(user), new UserObjectWrapper(user));
+    }
+
+    private String getUid(ConnectorObject user) {
+        return user.getUid().toString();
+    }
+
+    public void removeAllExpired() {
+        for (String uid : usersMap.keySet()) {
+            removeExpired(uid);
         }
     }
-    
-    public static UserCache init(GoogleAppsConfiguration configuration){
-        UserCache result = new UserCache();
-        Duration maxCacheTTLdur = new Duration(configuration.getMaxCacheTTL());
-        result.setMaxCacheTTL(maxCacheTTLdur);
-        result.setAllowCache(configuration.getAllowCache());
-        return result;
+
+    public void removeExpired(String uid) {
+        UserObjectWrapper userWrapper = usersMap.get(uid);
+        if (userWrapper != null && userWrapper.getTimeAdded().plus(maxCacheTTL).isBeforeNow()) {
+            logger.ok("UserCache.removeExpired() - uid " + uid + " expired, time added " + userWrapper.getTimeAdded());
+            removeUser(uid);
+        }
     }
-    
 }

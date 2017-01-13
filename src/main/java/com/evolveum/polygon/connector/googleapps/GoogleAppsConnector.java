@@ -23,43 +23,17 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
+import com.evolveum.polygon.connector.googleapps.cache.UserCache;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.services.admin.directory.Directory;
-
-import com.google.api.services.admin.directory.model.Alias;
-import com.google.api.services.admin.directory.model.Aliases;
-import com.google.api.services.admin.directory.model.Group;
-import com.google.api.services.admin.directory.model.Groups;
-import com.google.api.services.admin.directory.model.Member;
-import com.google.api.services.admin.directory.model.Members;
-import com.google.api.services.admin.directory.model.OrgUnit;
-import com.google.api.services.admin.directory.model.OrgUnits;
-import com.google.api.services.admin.directory.model.User;
-import com.google.api.services.admin.directory.model.UserMakeAdmin;
-import com.google.api.services.admin.directory.model.UserPhoto;
-import com.google.api.services.admin.directory.model.Users;
+import com.google.api.services.admin.directory.model.*;
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.LicensingRequest;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentList;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.regex.Matcher;
-import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
-import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
-import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
-import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
-import com.evolveum.polygon.connector.googleapps.cache.UserCache;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.identityconnectors.common.Assertions;
@@ -71,40 +45,23 @@ import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.RetryableException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.Attribute;
-import org.identityconnectors.framework.common.objects.AttributeBuilder;
-import org.identityconnectors.framework.common.objects.AttributeUtil;
-import org.identityconnectors.framework.common.objects.AttributesAccessor;
-import org.identityconnectors.framework.common.objects.ConnectorObject;
-import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
-import org.identityconnectors.framework.common.objects.Name;
-import org.identityconnectors.framework.common.objects.ObjectClass;
-import org.identityconnectors.framework.common.objects.ObjectClassInfo;
-import org.identityconnectors.framework.common.objects.OperationOptionInfo;
-import org.identityconnectors.framework.common.objects.OperationOptionInfoBuilder;
-import org.identityconnectors.framework.common.objects.OperationOptions;
-import org.identityconnectors.framework.common.objects.PredefinedAttributes;
-import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.Schema;
-import org.identityconnectors.framework.common.objects.SchemaBuilder;
-import org.identityconnectors.framework.common.objects.SearchResult;
-import org.identityconnectors.framework.common.objects.SortKey;
-import org.identityconnectors.framework.common.objects.Uid;
-import org.identityconnectors.framework.common.objects.filter.AttributeFilter;
-import org.identityconnectors.framework.common.objects.filter.EqualsFilter;
-import org.identityconnectors.framework.common.objects.filter.Filter;
-import org.identityconnectors.framework.common.objects.filter.FilterTranslator;
-import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
+import org.identityconnectors.framework.common.objects.filter.*;
 import org.identityconnectors.framework.spi.Configuration;
 import org.identityconnectors.framework.spi.Connector;
 import org.identityconnectors.framework.spi.ConnectorClass;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
-import org.identityconnectors.framework.spi.operations.CreateOp;
-import org.identityconnectors.framework.spi.operations.DeleteOp;
-import org.identityconnectors.framework.spi.operations.SchemaOp;
-import org.identityconnectors.framework.spi.operations.SearchOp;
-import org.identityconnectors.framework.spi.operations.TestOp;
-import org.identityconnectors.framework.spi.operations.UpdateOp;
+import org.identityconnectors.framework.spi.operations.*;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.regex.Matcher;
+
+import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
+import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
+import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
+import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
 
 /**
  * Main implementation of the GoogleApps Connector.
@@ -207,6 +164,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      */
     public void init(final Configuration configuration) {
         this.configuration = (GoogleAppsConfiguration) configuration;
+        userCache = new UserCache(this.configuration, logger);
     }
 
     /**
@@ -532,6 +490,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 new RequestResultHandler<AbstractGoogleJsonClientRequest<Void>, Void, Void>() {
                     public Void handleResult(AbstractGoogleJsonClientRequest<Void> request,
                             Void value) {
+                        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+                            userCache.removeUser(uid.getUidValue());
+                        }
                         return null;
                     }
 
@@ -1293,6 +1254,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                     public Uid handleResult(Directory.Users.Patch request,
                                             User value) {
                                         logger.ok("User is Updated:{0}", value.getId());
+                                        userCache.removeUser(value.getId());
                                         return new Uid(value.getId(), value.getEtag());
                                     }
                                 });
@@ -1302,11 +1264,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 List<String> aliases = new ArrayList(attributesAccessor.findStringList(ALIASES_ATTR));
                 final Directory.Users.Aliases aliasesService = configuration.getDirectory().users().aliases();
                 Set<String> currentAliases = listAliases(aliasesService, uid.getUidValue());
-                
+
                 List<String> aliasesToDel = new ArrayList(currentAliases);
-                aliasesToDel.removeAll(aliases);                   
+                aliasesToDel.removeAll(aliases);
                 aliases.removeAll(currentAliases); // aliases var now contains values to add
-                
+
                 for (Object member : aliases) { // ADD alias
                     if (member instanceof String) {
 
@@ -1338,7 +1300,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         throw e;
                     }
                 }
-                
+
                 for (Object member : aliasesToDel) { // DEL alias
                     if (member instanceof String) {
 
@@ -1370,7 +1332,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     }
                 }
             }
-          
+
             // groups member
             Attribute groups = attributesAccessor.find(PredefinedAttributes.GROUPS_NAME);
             if (null != groups && null != groups.getValue()) {
@@ -1502,8 +1464,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             = new ArrayList<Directory.Members.Insert>();
                     final List<Directory.Members.Patch> patchMembership
                             = new ArrayList<Directory.Members.Patch>();
-                    
-                    
+
+
                     //TODO add other kind of roles but MEMBER
                     for (Object member : members.getValue()) {
                         if (member instanceof String) {
@@ -1557,7 +1519,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                     }
                                 });
                     }
-                    
+
                     // Delete existing Member object
                     for (String a : deleteMembers) {
                             execute(deleteMembers(service, uidAfterUpdate.getUidValue(), a),
@@ -1651,25 +1613,25 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             builder.setUid(user.getId());
         }
         builder.setName(user.getPrimaryEmail());
-        
-        return tryCache(user, builder, attributesToGet, service);
+
+        return getUserFromCacheOrResource(user, builder, attributesToGet, service);
     }
-    
-    private ConnectorObject tryCache(User user, ConnectorObjectBuilder builder,Set<String> attributesToGet, Directory.Groups service){
-        if(userCache == null){
-            userCache = UserCache.init(configuration);
+
+    private ConnectorObject getUserFromCacheOrResource(User user, ConnectorObjectBuilder builder,
+                                                       Set<String> attributesToGet, Directory.Groups service) {
+        ConnectorObject userResult = userCache.getUser(user.getId());
+        if (userResult != null) {
+            //Returning from the cache
+            return userResult;
         }
-        if(!userCache.getAllowCache()){
-            return getUserFromResource(user, builder, attributesToGet, service);
-        }
-        if(!userCache.isPresent(user.getId())){
-            ConnectorObject resultUser = getUserFromResource(user, builder, attributesToGet, service);
-            userCache.addUser(resultUser);
-        }
-        return userCache.getUser(user.getId());
+        // Fetching from resource and storing into the cache
+        userResult = getUserFromResource(user, builder, attributesToGet, service);
+        userCache.addUser(userResult);
+        return userResult;
     }
-    
-    private ConnectorObject getUserFromResource(User user, ConnectorObjectBuilder builder,Set<String> attributesToGet, Directory.Groups service){
+
+    private ConnectorObject getUserFromResource(User user, ConnectorObjectBuilder builder,
+                                                Set<String> attributesToGet, Directory.Groups service){
         // Optional
         // If both givenName and familyName are empty then Google didn't return
         // with 'name'
@@ -1835,7 +1797,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
         return builder.build();
     }
-    
+
     protected List<String>  listMembers(Directory.Members service, String groupKey, String roles){
         List<Map<String, String>> allMembers = listAllMembers(service, groupKey, roles);
         final List<String> resultMembers = new ArrayList<String>();
@@ -2023,7 +1985,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         logger.warn("retrying 503 backendError retry number " + retry);
                         return execute(request, handler, ++retry);
                     }else{
-                        throw RetryableException.wrap(e.getMessage(), e); 
+                        throw RetryableException.wrap(e.getMessage(), e);
                     }
                 } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVER_ERROR) {
                     if ("backendError".equalsIgnoreCase(errorInfo.getReason())
@@ -2031,7 +1993,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         logger.warn("retrying 500" + errorInfo.getReason() + "retry number " + retry);
                         return execute(request, handler, ++retry);
                     }else{
-                        throw RetryableException.wrap(e.getMessage(), e); 
+                        throw RetryableException.wrap(e.getMessage(), e);
                     }
                 } else {
                     if (retry < 5) { //last resort retry. We must right all wrongs!
