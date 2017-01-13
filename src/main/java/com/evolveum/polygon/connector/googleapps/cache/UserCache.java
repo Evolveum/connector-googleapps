@@ -21,18 +21,27 @@ import java.util.Map;
  */
 public class UserCache {
 
+    private static UserCache instance;
+
     private final Log logger;
     private final Map<String, UserObjectWrapper> usersMap;
     private final Duration maxCacheTTL;
     private final boolean allowCache;
 
-    public UserCache(GoogleAppsConfiguration configuration, Log connectorLogger) {
+    private UserCache(GoogleAppsConfiguration configuration, Log connectorLogger) {
         usersMap = new HashMap<String, UserObjectWrapper>();
         logger = connectorLogger;
         maxCacheTTL = new Duration(configuration.getMaxCacheTTL());
         allowCache = Boolean.TRUE.equals(configuration.getAllowCache());
 
         logger.ok("UserCache() - created with allowCache: " + allowCache + ", maxCacheTTL: " + maxCacheTTL.toString());
+    }
+
+    public static UserCache getInstance(GoogleAppsConfiguration configuration, Log connectorLogger) {
+        if (instance == null) {
+            instance = new UserCache(configuration, connectorLogger);
+        }
+        return instance;
     }
 
     /**
@@ -76,7 +85,7 @@ public class UserCache {
     }
 
     private String getUid(ConnectorObject user) {
-        return user.getUid().toString();
+        return user.getUid().getUidValue();
     }
 
     public void removeAllExpired() {
