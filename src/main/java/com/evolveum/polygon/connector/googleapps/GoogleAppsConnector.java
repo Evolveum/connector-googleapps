@@ -23,7 +23,7 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
-import com.evolveum.polygon.connector.googleapps.cache.UserCache;
+import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
@@ -142,7 +142,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * .
      */
     private GoogleAppsConfiguration configuration;
-    private UserCache userCache;
+    private ConnectorObjectsCache objectsCache;
     private Schema schema = null;
 
     /**
@@ -162,7 +162,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      */
     public void init(final Configuration configuration) {
         this.configuration = (GoogleAppsConfiguration) configuration;
-        userCache = UserCache.getInstance(this.configuration, logger);
+        objectsCache = ConnectorObjectsCache.getInstance(this.configuration, logger);
     }
 
     /**
@@ -488,9 +488,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 new RequestResultHandler<AbstractGoogleJsonClientRequest<Void>, Void, Void>() {
                     public Void handleResult(AbstractGoogleJsonClientRequest<Void> request,
                                              Void value) {
-                        if (ObjectClass.ACCOUNT.equals(objectClass)) {
-                            userCache.removeUser(uid.getUidValue());
-                        }
                         return null;
                     }
 
@@ -498,6 +495,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         throw new UnknownUidException(uid, objectClass);
                     }
                 });
+
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            objectsCache.removeUser(uid.getUidValue());
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            objectsCache.removeGroup(uid.getUidValue());
+        }
     }
 
     /**
@@ -899,6 +902,13 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
     private void executeGroupReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
         try {
+            // Try the cache first
+            ConnectorObject cachedGroup = objectsCache.getGroup(uid.getUidValue());
+            if (cachedGroup != null) {
+                handler.handle(cachedGroup);
+                return;
+            }
+
             Directory.Groups.Get request
                     = configuration.getDirectory().groups().get(uid.getUidValue());
             request.setFields(getFields(options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
@@ -907,8 +917,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     new RequestResultHandler<Directory.Groups.Get, Group, Boolean>() {
                         public Boolean handleResult(final Directory.Groups.Get request,
                                                     final Group value) {
-                            return handler.handle(fromGroup(value, attributesToGet,
-                                    configuration.getDirectory().members()));
+                            ConnectorObject group = fromGroup(value, attributesToGet,
+                                    configuration.getDirectory().members());
+                            objectsCache.addGroup(group);
+                            return handler.handle(group);
                         }
 
                         public Boolean handleNotFound(IOException e) {
@@ -987,7 +999,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     private void executeAccountReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
         try {
             // Try the cache first
-            ConnectorObject cachedUser = userCache.getUser(uid.getUidValue());
+            ConnectorObject cachedUser = objectsCache.getUser(uid.getUidValue());
             if (cachedUser != null) {
                 handler.handle(cachedUser);
                 return;
@@ -1004,7 +1016,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                                     final User value) {
                             ConnectorObject user = fromUser(value, attributesToGet,
                                     configuration.getDirectory().groups());
-                            userCache.addUser(user);
+                            objectsCache.addUser(user);
                             return handler.handle(user);
                         }
 
@@ -1288,7 +1300,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             public Uid handleResult(Directory.Users.Patch request,
                                                     User value) {
                                 logger.ok("User is Updated:{0}", value.getId());
-                                userCache.removeUser(value.getId());
                                 return new Uid(value.getId(), value.getEtag());
                             }
                         });
@@ -1635,12 +1646,17 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             throw new UnsupportedOperationException("Update of type"
                     + objectClass.getObjectClassValue() + " is not supported");
         }
+
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            objectsCache.markUserAsUpdatedNow(uidAfterUpdate.getUidValue());
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            objectsCache.markGroupAsUpdatedNow(uidAfterUpdate.getUidValue());
+        }
         return uidAfterUpdate;
     }
 
     protected ConnectorObject fromUser(User user, Set<String> attributesToGet,
                                        Directory.Groups service) {
-        final long startTime = System.currentTimeMillis();
         ConnectorObjectBuilder builder = new ConnectorObjectBuilder();
         if (null != user.getEtag()) {
             builder.setUid(new Uid(user.getId(), user.getEtag()));
@@ -1650,7 +1666,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         builder.setName(user.getPrimaryEmail());
 
         ConnectorObject connectorObject = getUserFromResource(user, builder, attributesToGet, service);
-        logger.info("fromUser() - finished in " + timeFrom(startTime));
         return connectorObject;
     }
 

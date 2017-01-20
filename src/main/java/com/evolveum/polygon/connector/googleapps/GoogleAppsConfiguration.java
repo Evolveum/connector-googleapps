@@ -71,7 +71,8 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     /**
      * caching
      */
-    private Long maxCacheTTL = null;
+    private Long maxCacheTTL = 300000L;
+    private Long ignoreCacheAfterUpdateTTL = 5000L;
     private Boolean allowCache;
 
     /**
@@ -169,8 +170,8 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     }
 
     @ConfigurationProperty(order = 9, displayMessageKey = "maxCacheTTL.display",
-    groupMessageKey = "basic.group", helpMessageKey = "maxCacheTTL.help", required = true,
-    confidential = false)
+            groupMessageKey = "basic.group", helpMessageKey = "maxCacheTTL.help", required = true,
+            confidential = false)
     public Long getMaxCacheTTL() {
         return maxCacheTTL;
     }
@@ -178,7 +179,18 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     public void setMaxCacheTTL(Long maxCacheTTL) {
         this.maxCacheTTL = maxCacheTTL;
     }
-            
+
+    @ConfigurationProperty(order = 10, displayMessageKey = "ignoreCacheAfterUpdateTTL.display",
+            groupMessageKey = "basic.group", helpMessageKey = "ignoreCacheAfterUpdateTTL.help", required = true,
+            confidential = false)
+    public Long getIgnoreCacheAfterUpdateTTL() {
+        return ignoreCacheAfterUpdateTTL;
+    }
+
+    public void setIgnoreCacheAfterUpdateTTL(Long ignoreCacheAfterUpdateTTL) {
+        this.ignoreCacheAfterUpdateTTL = ignoreCacheAfterUpdateTTL;
+    }
+
 
     /**
      * {@inheritDoc}
