@@ -23,45 +23,19 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
+import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.services.admin.directory.Directory;
-
-import com.google.api.services.admin.directory.model.Alias;
-import com.google.api.services.admin.directory.model.Aliases;
-import com.google.api.services.admin.directory.model.Group;
-import com.google.api.services.admin.directory.model.Groups;
-import com.google.api.services.admin.directory.model.Member;
-import com.google.api.services.admin.directory.model.Members;
-import com.google.api.services.admin.directory.model.OrgUnit;
-import com.google.api.services.admin.directory.model.OrgUnits;
-import com.google.api.services.admin.directory.model.User;
-import com.google.api.services.admin.directory.model.UserMakeAdmin;
-import com.google.api.services.admin.directory.model.UserPhoto;
-import com.google.api.services.admin.directory.model.Users;
+import com.google.api.services.admin.directory.model.*;
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.LicensingRequest;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentList;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.regex.Matcher;
-import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
-import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
-import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
-import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import java.util.HashMap;
 import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.IOUtil;
@@ -71,44 +45,26 @@ import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.RetryableException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.Attribute;
-import org.identityconnectors.framework.common.objects.AttributeBuilder;
-import org.identityconnectors.framework.common.objects.AttributeUtil;
-import org.identityconnectors.framework.common.objects.AttributesAccessor;
-import org.identityconnectors.framework.common.objects.ConnectorObject;
-import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
-import org.identityconnectors.framework.common.objects.Name;
-import org.identityconnectors.framework.common.objects.ObjectClass;
-import org.identityconnectors.framework.common.objects.ObjectClassInfo;
-import org.identityconnectors.framework.common.objects.OperationOptionInfo;
-import org.identityconnectors.framework.common.objects.OperationOptionInfoBuilder;
-import org.identityconnectors.framework.common.objects.OperationOptions;
-import org.identityconnectors.framework.common.objects.PredefinedAttributes;
-import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.Schema;
-import org.identityconnectors.framework.common.objects.SchemaBuilder;
-import org.identityconnectors.framework.common.objects.SearchResult;
-import org.identityconnectors.framework.common.objects.SortKey;
-import org.identityconnectors.framework.common.objects.Uid;
-import org.identityconnectors.framework.common.objects.filter.AttributeFilter;
-import org.identityconnectors.framework.common.objects.filter.EqualsFilter;
-import org.identityconnectors.framework.common.objects.filter.Filter;
-import org.identityconnectors.framework.common.objects.filter.FilterTranslator;
-import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
+import org.identityconnectors.framework.common.objects.filter.*;
 import org.identityconnectors.framework.spi.Configuration;
 import org.identityconnectors.framework.spi.Connector;
 import org.identityconnectors.framework.spi.ConnectorClass;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
-import org.identityconnectors.framework.spi.operations.CreateOp;
-import org.identityconnectors.framework.spi.operations.DeleteOp;
-import org.identityconnectors.framework.spi.operations.SchemaOp;
-import org.identityconnectors.framework.spi.operations.SearchOp;
-import org.identityconnectors.framework.spi.operations.TestOp;
-import org.identityconnectors.framework.spi.operations.UpdateOp;
+import org.identityconnectors.framework.spi.operations.*;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.regex.Matcher;
+
+import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
+import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
+import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
+import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
 
 /**
  * Main implementation of the GoogleApps Connector.
- *
  */
 @ConnectorClass(displayNameKey = "GoogleApps.connector.display",
         configurationClass = GoogleAppsConfiguration.class)
@@ -186,6 +142,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * .
      */
     private GoogleAppsConfiguration configuration;
+    private ConnectorObjectsCache objectsCache;
     private Schema schema = null;
 
     /**
@@ -201,11 +158,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * Callback method to receive the {@link Configuration}.
      *
      * @param configuration the new {@link Configuration}
-     * @see
-     * org.identityconnectors.framework.spi.Connector#init(org.identityconnectors.framework.spi.Configuration)
+     * @see org.identityconnectors.framework.spi.Connector#init(org.identityconnectors.framework.spi.Configuration)
      */
     public void init(final Configuration configuration) {
         this.configuration = (GoogleAppsConfiguration) configuration;
+        objectsCache = ConnectorObjectsCache.getInstance(this.configuration, logger);
     }
 
     /**
@@ -228,20 +185,20 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * {@inheritDoc}
      */
     public Uid create(final ObjectClass objectClass, final Set<Attribute> createAttributes,
-            final OperationOptions options) {
+                      final OperationOptions options) {
         final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
 
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
 
             Uid uid
                     = execute(createUser(configuration.getDirectory().users(), accessor),
-                            new RequestResultHandler<Directory.Users.Insert, User, Uid>() {
-                                public Uid handleResult(final Directory.Users.Insert request,
-                                        final User value) {
-                                    logger.ok("New User is created:{0}", value.getId());
-                                    return new Uid(value.getId(), value.getEtag());
-                                }
-                            });
+                    new RequestResultHandler<Directory.Users.Insert, User, Uid>() {
+                        public Uid handleResult(final Directory.Users.Insert request,
+                                                final User value) {
+                            logger.ok("New User is created:{0}", value.getId());
+                            return new Uid(value.getId(), value.getEtag());
+                        }
+                    });
 
             List<Object> aliases = accessor.findList(ALIASES_ATTR);
             if (null != aliases) {
@@ -252,18 +209,18 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                         String id
                                 = execute(createUserAlias(aliasesService, uid.getUidValue(),
-                                                (String) member),
-                                        new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
-                                            public String handleResult(
-                                                    final Directory.Users.Aliases.Insert request,
-                                                    final Alias value) {
-                                                        if (null != value) {
-                                                            return value.getId();
-                                                        } else {
-                                                            return null;
-                                                        }
-                                                    }
-                                        });
+                                (String) member),
+                                new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
+                                    public String handleResult(
+                                            final Directory.Users.Aliases.Insert request,
+                                            final Alias value) {
+                                        if (null != value) {
+                                            return value.getId();
+                                        } else {
+                                            return null;
+                                        }
+                                    }
+                                });
 
                         if (null == id) {
                             // TODO make warn about failed update
@@ -272,7 +229,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         // Delete user and Error or
                         RetryableException e
                                 = RetryableException.wrap("Invalid attribute value: "
-                                        + String.valueOf(member), uid);
+                                + String.valueOf(member), uid);
                         e.initCause(new InvalidAttributeValueException(
                                 "Attribute 'aliases' must be a String list"));
                         throw e;
@@ -287,18 +244,18 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                     String id
                             = execute(createUpdateUserPhoto(configuration.getDirectory().users()
-                                            .photos(), uid.getUidValue(), (byte[]) photoObject),
-                                    new RequestResultHandler<Directory.Users.Photos.Update, UserPhoto, String>() {
-                                        public String handleResult(
-                                                final Directory.Users.Photos.Update request,
-                                                final UserPhoto value) {
-                                                    if (null != value) {
-                                                        return value.getId();
-                                                    } else {
-                                                        return null;
-                                                    }
-                                                }
-                                    });
+                                    .photos(), uid.getUidValue(), (byte[]) photoObject),
+                            new RequestResultHandler<Directory.Users.Photos.Update, UserPhoto, String>() {
+                                public String handleResult(
+                                        final Directory.Users.Photos.Update request,
+                                        final UserPhoto value) {
+                                    if (null != value) {
+                                        return value.getId();
+                                    } else {
+                                        return null;
+                                    }
+                                }
+                            });
 
                     if (null == id) {
                         // TODO make warn about failed update
@@ -308,7 +265,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     // Delete group and Error or
                     RetryableException e
                             = RetryableException.wrap("Invalid attribute value: "
-                                    + String.valueOf(photoObject), uid);
+                            + String.valueOf(photoObject), uid);
                     e.initCause(new InvalidAttributeValueException(
                             "Attribute 'photo' must be a single Map value"));
                     throw e;
@@ -328,7 +285,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                 content),
                                 new RequestResultHandler<Directory.Users.MakeAdmin, Void, Void>() {
                                     public Void handleResult(Directory.Users.MakeAdmin request,
-                                            Void value) {
+                                                             Void value) {
                                         return null;
                                     }
                                 });
@@ -348,7 +305,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                 configuration.getProductId(), configuration.getSkuId(), AttributeUtil.getAsStringValue(accessor.find("__NAME__"))),
                         new RequestResultHandler<Licensing.LicenseAssignments.Insert, LicenseAssignment, Uid>() {
                             public Uid handleResult(final Licensing.LicenseAssignments.Insert request,
-                                    final LicenseAssignment value) {
+                                                    final LicenseAssignment value) {
                                 logger.ok("LicenseAssignment is Created:{0}/{1}/{2}", value
                                         .getProductId(), value.getSkuId(), value.getUserId());
                                 return generateLicenseAssignmentId(value);
@@ -373,13 +330,13 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             // @formatter:on
             Uid uid
                     = execute(createGroup(configuration.getDirectory().groups(), accessor),
-                            new RequestResultHandler<Directory.Groups.Insert, Group, Uid>() {
-                                public Uid handleResult(final Directory.Groups.Insert request,
-                                        final Group value) {
-                                    logger.ok("New Group is created:{0}", value.getId());
-                                    return new Uid(value.getId(), value.getEtag());
-                                }
-                            });
+                    new RequestResultHandler<Directory.Groups.Insert, Group, Uid>() {
+                        public Uid handleResult(final Directory.Groups.Insert request,
+                                                final Group value) {
+                            logger.ok("New Group is created:{0}", value.getId());
+                            return new Uid(value.getId(), value.getEtag());
+                        }
+                    });
             List<Object> members = accessor.findList(MEMBERS_ATTR);
             if (null != members) {
                 final Directory.Members membersService = configuration.getDirectory().members();
@@ -391,17 +348,17 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
                         String id
                                 = execute(createMember(membersService, uid.getUidValue(), email, role),
-                                        new RequestResultHandler<Directory.Members.Insert, Member, String>() {
-                                            public String handleResult(
-                                                    final Directory.Members.Insert request,
-                                                    final Member value) {
-                                                        if (null != value) {
-                                                            return value.getEmail();
-                                                        } else {
-                                                            return null;
-                                                        }
-                                                    }
-                                        });
+                                new RequestResultHandler<Directory.Members.Insert, Member, String>() {
+                                    public String handleResult(
+                                            final Directory.Members.Insert request,
+                                            final Member value) {
+                                        if (null != value) {
+                                            return value.getEmail();
+                                        } else {
+                                            return null;
+                                        }
+                                    }
+                                });
 
                         if (null == id) {
                             // TODO make warn about failed update
@@ -410,7 +367,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         // Delete group and Error or
                         RetryableException e
                                 = RetryableException.wrap("Invalid attribute value: "
-                                        + String.valueOf(member), uid);
+                                + String.valueOf(member), uid);
                         e.initCause(new InvalidAttributeValueException(
                                 "Attribute 'members' must be a Map list"));
                         throw e;
@@ -424,7 +381,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             return execute(createMember(configuration.getDirectory().members(), accessor),
                     new RequestResultHandler<Directory.Members.Insert, Member, Uid>() {
                         public Uid handleResult(final Directory.Members.Insert request,
-                                final Member value) {
+                                                final Member value) {
                             logger.ok("New Member is created:{0}/{1}", request.getGroupKey(), value
                                     .getEmail());
                             return generateMemberId(request.getGroupKey(), value);
@@ -435,7 +392,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             return execute(createOrgunit(configuration.getDirectory().orgunits(), accessor),
                     new RequestResultHandler<Directory.Orgunits.Insert, OrgUnit, Uid>() {
                         public Uid handleResult(final Directory.Orgunits.Insert request,
-                                final OrgUnit value) {
+                                                final OrgUnit value) {
                             logger.ok("New OrgUnit is created:{0}", value.getName());
                             return generateOrgUnitId(value);
                         }
@@ -460,7 +417,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             accessor),
                     new RequestResultHandler<Licensing.LicenseAssignments.Insert, LicenseAssignment, Uid>() {
                         public Uid handleResult(final Licensing.LicenseAssignments.Insert request,
-                                final LicenseAssignment value) {
+                                                final LicenseAssignment value) {
                             logger.ok("LicenseAssignment is Created:{0}/{1}/{2}", value
                                     .getProductId(), value.getSkuId(), value.getUserId());
                             return generateLicenseAssignmentId(value);
@@ -510,11 +467,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             } else if (ORG_UNIT.equals(objectClass)) {
                 request
                         = configuration.getDirectory().orgunits().delete(MY_CUSTOMER_ID,
-                                CollectionUtil.newList(uid.getUidValue()));
+                        CollectionUtil.newList(uid.getUidValue()));
             } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
                 request
                         = deleteLicenseAssignment(configuration.getLicensing().licenseAssignments(),
-                                uid.getUidValue());
+                        uid.getUidValue());
             }
         } catch (IOException e) {
             throw ConnectorException.wrap(e);
@@ -530,7 +487,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         execute(request,
                 new RequestResultHandler<AbstractGoogleJsonClientRequest<Void>, Void, Void>() {
                     public Void handleResult(AbstractGoogleJsonClientRequest<Void> request,
-                            Void value) {
+                                             Void value) {
                         return null;
                     }
 
@@ -538,6 +495,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         throw new UnknownUidException(uid, objectClass);
                     }
                 });
+
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            objectsCache.removeUser(uid.getUidValue());
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            objectsCache.removeGroup(uid.getUidValue());
+        }
     }
 
     /**
@@ -582,7 +545,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * {@inheritDoc}
      */
     public FilterTranslator<Filter> createFilterTranslator(ObjectClass objectClass,
-            OperationOptions options) {
+                                                           OperationOptions options) {
         return new FilterTranslator<Filter>() {
             public List<Filter> translate(Filter filter) {
                 return CollectionUtil.newList(filter);
@@ -594,519 +557,56 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * {@inheritDoc}
      */
     public void executeQuery(ObjectClass objectClass, Filter query, final ResultsHandler handler,
-            OperationOptions options) {
-
+                             OperationOptions options) {
+        final long startTime = System.currentTimeMillis();
         final Set<String> attributesToGet = getAttributesToGet(objectClass, options);
         Uid uid = null;
         if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Uid) {
             // Read request
             uid = (Uid) ((EqualsFilter) query).getAttribute();
         }
+        logger.info("executeQuery() - objectClass: " + objectClass +
+                ", uid: " + (uid == null ? "null" : uid.getUidValue()));
 
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
-
             if (null == uid) {
                 // Search request
-
-                try {
-                    Directory.Users.List request = configuration.getDirectory().users().list();
-                    if (null != query) {
-                        StringBuilder queryBuilder = query.accept(new UserHandler(), request);
-                        if (null != queryBuilder) {
-                            String queryString = queryBuilder.toString();
-                            logger.ok("Executing Query: {0}", queryString);
-                            request.setQuery(queryString);
-                        }
-                        if (null == request.getDomain() && null == request.getCustomer()) {
-                            request.setCustomer(MY_CUSTOMER_ID);
-                        }
-                    } else {
-                        request.setCustomer(MY_CUSTOMER_ID);
-                    }
-
-                    // Implementation to support the 'OP_PAGE_SIZE'
-                    boolean paged = false;
-                    if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                        if (options.getPageSize() >= 1 && options.getPageSize() <= 500) {
-                            request.setMaxResults(options.getPageSize());
-                            paged = true;
-                        } else {
-                            //throw new IllegalArgumentException("Invalid pageSize value. Default is 100. Max allowed is 500 (integer, 1-500)");
-                        }
-                    }
-                    // Implementation to support the 'OP_PAGED_RESULTS_COOKIE'
-                    request.setPageToken(options.getPagedResultsCookie());
-
-                    // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-                    String fields = getFields(options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR);
-                    if (null != fields) {
-                        request.setFields("nextPageToken,users(" + fields + ")");
-                    }
-
-                    if (options.getOptions().get(SHOW_DELETED_PARAM) instanceof Boolean) {
-                        request.setShowDeleted(options.getOptions().get(SHOW_DELETED_PARAM)
-                                .toString());
-                    }
-
-                    // Implementation to support the 'OP_SORT_KEYS'
-                    if (null != options.getSortKeys()) {
-                        for (SortKey sortKey : options.getSortKeys()) {
-                            String orderBy = null;
-                            if (sortKey.getField().equalsIgnoreCase(EMAIL_ATTR)
-                                    || sortKey.getField().equalsIgnoreCase(PRIMARY_EMAIL_ATTR)
-                                    || sortKey.getField().equalsIgnoreCase(ALIASES_ATTR)
-                                    || sortKey.getField().equalsIgnoreCase(ALIAS_ATTR)) {
-                                orderBy = EMAIL_ATTR;
-                            } else if (sortKey.getField().equalsIgnoreCase(GIVEN_NAME_ATTR)) {
-                                orderBy = GIVEN_NAME_ATTR;
-                            } else if (sortKey.getField().equalsIgnoreCase(FAMILY_NAME_ATTR)) {
-                                orderBy = FAMILY_NAME_ATTR;
-                            } else {
-                                logger.ok("Unsupported SortKey:{0}", sortKey);
-                                continue;
-                            }
-
-                            request.setOrderBy(orderBy);
-                            if (sortKey.isAscendingOrder()) {
-                                request.setSortOrder(ASCENDING_ORDER);
-                            } else {
-                                request.setSortOrder(DESCENDING_ORDER);
-                            }
-                            break;
-                        }
-                    }
-
-                    String nextPageToken = null;
-                    do {
-                        nextPageToken
-                                = execute(request,
-                                        new RequestResultHandler<Directory.Users.List, Users, String>() {
-                                            public String handleResult(
-                                                    final Directory.Users.List request,
-                                                    final Users value) {
-                                                        if (null != value.getUsers()) {
-                                                            for (User group : value.getUsers()) {
-                                                                handler.handle(fromUser(group,
-                                                                                attributesToGet, configuration
-                                                                                .getDirectory().groups()));
-                                                            }
-                                                        }
-                                                        return value.getNextPageToken();
-                                                    }
-                                        });
-                        request.setPageToken(nextPageToken);
-                    } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-                    if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                        logger.info("Paged Search was requested and next token is:{0}",
-                                nextPageToken);
-                        ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                                nextPageToken, 0));
-                    }
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#List");
-                    throw ConnectorException.wrap(e);
-                }
-
+                executeAccountSearchQuery(query, handler, options, attributesToGet);
             } else {
                 // Read request
-
-                try {
-                    Directory.Users.Get request
-                            = configuration.getDirectory().users().get(uid.getUidValue());
-                    request.setFields(getFields(options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR));
-
-                    execute(request,
-                            new RequestResultHandler<Directory.Users.Get, User, Boolean>() {
-                                public Boolean handleResult(final Directory.Users.Get request,
-                                        final User value) {
-                                    return handler.handle(fromUser(value, attributesToGet,
-                                                    configuration.getDirectory().groups()));
-                                }
-
-                                public Boolean handleNotFound(IOException e) {
-                                    // Do nothing if not found
-                                    return true;
-                                }
-                            });
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#Get");
-                    throw ConnectorException.wrap(e);
-                }
+                executeAccountReadQuery(uid, handler, options, attributesToGet);
             }
-
         } else if (ObjectClass.GROUP.equals(objectClass)) {
             if (null == uid) {
                 // Search request
-
-                try {
-                    // userKey excludes the customer and domain!!
-
-                    Directory.Groups.List request = configuration.getDirectory().groups().list();
-                    if (null != query) {
-                        query.accept(new GroupHandler(), request);
-                    } else {
-                        request.setCustomer(MY_CUSTOMER_ID);
-                    }
-
-                    boolean paged = false;
-                    // Groups                    
-                    if (null != options.getPageSize() && options.getPageSize() >= 1 && options.getPageSize() <= 500) {
-                        request.setMaxResults(options.getPageSize());
-                        paged = true;
-                    }
-                    request.setPageToken(options.getPagedResultsCookie());
-
-                    // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-                    String fields = getFields(options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
-                    if (null != fields) {
-                        request.setFields("nextPageToken,groups(" + fields + ")");
-                    }
-
-                    String nextPageToken = null;
-                    do {
-                        nextPageToken
-                                = execute(request,
-                                        new RequestResultHandler<Directory.Groups.List, Groups, String>() {
-                                            public String handleResult(
-                                                    final Directory.Groups.List request,
-                                                    final Groups value) {
-                                                        if (null != value.getGroups()) {
-                                                            for (Group group : value.getGroups()) {
-                                                                handler.handle(fromGroup(group,
-                                                                                attributesToGet, configuration
-                                                                                .getDirectory().members()));
-                                                            }
-                                                        }
-                                                        return value.getNextPageToken();
-                                                    }
-                                        });
-                        request.setPageToken(nextPageToken);
-                    } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-                    if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                        logger.info("Paged Search was requested");
-                        ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                                nextPageToken, 0));
-                    }
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#List");
-                    throw ConnectorException.wrap(e);
-                }
-
+                executeGroupSearchQuery(query, handler, options, attributesToGet);
             } else {
                 // Read request
-
-                try {
-                    Directory.Groups.Get request
-                            = configuration.getDirectory().groups().get(uid.getUidValue());
-                    request.setFields(getFields(options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
-
-                    execute(request,
-                            new RequestResultHandler<Directory.Groups.Get, Group, Boolean>() {
-                                public Boolean handleResult(final Directory.Groups.Get request,
-                                        final Group value) {
-                                    return handler.handle(fromGroup(value, attributesToGet,
-                                                    configuration.getDirectory().members()));
-                                }
-
-                                public Boolean handleNotFound(IOException e) {
-                                    // Do nothing if not found
-                                    return true;
-                                }
-                            });
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#Get");
-                    throw ConnectorException.wrap(e);
-                }
+                executeGroupReadQuery(uid, handler, options, attributesToGet);
             }
         } else if (MEMBER.equals(objectClass)) {
             if (null == uid) {
                 // Search request
-                // TODO support AND role
-                try {
-
-                    String groupKey = null;
-
-                    if (query instanceof EqualsFilter
-                            && ((EqualsFilter) query).getAttribute().is(GROUP_KEY_ATTR)) {
-                        groupKey
-                                = AttributeUtil.getStringValue(((AttributeFilter) query)
-                                        .getAttribute());
-                    } else {
-                        throw new UnsupportedOperationException(
-                                "Only EqualsFilter('groupKey') is supported");
-                    }
-
-                    if (StringUtil.isBlank(groupKey)) {
-                        throw new InvalidAttributeValueException("The 'groupKey' can not be blank.");
-                    }
-                    Directory.Members.List request
-                            = configuration.getDirectory().members().list(groupKey);
-
-                    boolean paged = false;
-                    // Groups
-                    if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                        request.setMaxResults(options.getPageSize());
-                        paged = true;
-                    }
-                    request.setPageToken(options.getPagedResultsCookie());
-
-                    String nextPageToken = null;
-                    do {
-                        nextPageToken
-                                = execute(request,
-                                        new RequestResultHandler<Directory.Members.List, Members, String>() {
-                                            public String handleResult(
-                                                    final Directory.Members.List request,
-                                                    final Members value) {
-                                                        if (null != value.getMembers()) {
-                                                            for (Member group : value.getMembers()) {
-                                                                handler.handle(fromMember(request
-                                                                                .getGroupKey(), group));
-                                                            }
-                                                        }
-                                                        return value.getNextPageToken();
-                                                    }
-                                        });
-                        request.setPageToken(nextPageToken);
-                    } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-                    if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                        logger.info("Paged Search was requested");
-                        ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                                nextPageToken, 0));
-                    }
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#List");
-                    throw ConnectorException.wrap(e);
-                }
-
+                executeMemberSearchQuery(query, handler, options);
             } else {
                 // Read request
-
-                try {
-                    String[] ids = uid.getUidValue().split("/");
-                    if (ids.length != 2) {
-                        // TODO fix the exception
-                        throw new InvalidAttributeValueException("Unrecognised UID format");
-                    }
-
-                    Directory.Members.Get request
-                            = configuration.getDirectory().members().get(ids[0], ids[1]);
-
-                    execute(request,
-                            new RequestResultHandler<Directory.Members.Get, Member, Boolean>() {
-                                public Boolean handleResult(Directory.Members.Get request,
-                                        Member value) {
-                                    return handler.handle(fromMember(request.getGroupKey(), value));
-                                }
-
-                                public Boolean handleNotFound(IOException e) {
-                                    // Do nothing if not found
-                                    return true;
-                                }
-                            });
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#Get");
-                    throw ConnectorException.wrap(e);
-                }
+                executeMemberReadQuery(uid, handler);
             }
         } else if (ORG_UNIT.equals(objectClass)) {
             if (null == uid) {
                 // Search request
-
-                try {
-                    Directory.Orgunits.List request
-                            = configuration.getDirectory().orgunits().list(MY_CUSTOMER_ID);
-                    if (null != query) {
-                        if (query instanceof StartsWithFilter
-                                && AttributeUtil.namesEqual(ORG_UNIT_PATH_ATTR,
-                                        ((StartsWithFilter) query).getName())) {
-                            request.setOrgUnitPath(((StartsWithFilter) query).getValue());
-                        } else {
-                            throw new UnsupportedOperationException(
-                                    "Only StartsWithFilter('orgUnitPath') is supported");
-                        }
-                    } else {
-                        request.setOrgUnitPath("/");
-                    }
-
-                    String scope = options.getScope();
-                    if (OperationOptions.SCOPE_OBJECT.equalsIgnoreCase(scope)
-                            || OperationOptions.SCOPE_ONE_LEVEL.equalsIgnoreCase(scope)) {
-                        request.setType("children");
-                    } else {
-                        request.setType("all");
-                    }
-
-                    // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-                    String fields = getFields(options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR);
-                    if (null != fields) {
-                        request.setFields("organizationUnits(" + fields + ")");
-                    }
-
-                    execute(request,
-                            new RequestResultHandler<Directory.Orgunits.List, OrgUnits, Void>() {
-                                public Void handleResult(final Directory.Orgunits.List request,
-                                        final OrgUnits value) {
-                                    if (null != value.getOrganizationUnits()) {
-                                        for (OrgUnit group : value.getOrganizationUnits()) {
-                                            handler.handle(fromOrgunit(group, attributesToGet));
-                                        }
-                                    }
-                                    return null;
-                                }
-                            });
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize OrgUnits#List");
-                    throw ConnectorException.wrap(e);
-                }
-
+                executeOrgUnitSearchQuery(query, handler, options, attributesToGet);
             } else {
                 // Read request
-
-                try {
-                    Directory.Orgunits.Get request
-                            = configuration.getDirectory().orgunits().get(MY_CUSTOMER_ID,
-                                    Arrays.asList(uid.getUidValue()));
-                    request.setFields(getFields(options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR));
-
-                    execute(request,
-                            new RequestResultHandler<Directory.Orgunits.Get, OrgUnit, Boolean>() {
-                                public Boolean handleResult(Directory.Orgunits.Get request,
-                                        OrgUnit value) {
-                                    return handler.handle(fromOrgunit(value, attributesToGet));
-                                }
-
-                                public Boolean handleNotFound(IOException e) {
-                                    // Do nothing if not found
-                                    return true;
-                                }
-                            });
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize OrgUnits#Get");
-                    throw ConnectorException.wrap(e);
-                }
+                executeOrgUnitReadQuery(uid, handler, options, attributesToGet);
             }
         } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
             if (null == uid) {
                 // Search request
-
-                try {
-
-                    String productId = "";
-                    String skuId = "";
-
-                    boolean paged = false;
-
-                    LicensingRequest<LicenseAssignmentList> request = null;
-
-                    if (StringUtil.isBlank(productId)) {
-                        // TODO iterate over the three productids
-                        throw new ConnectorException("productId is required");
-                    } else if (StringUtil.isBlank(skuId)) {
-                        Licensing.LicenseAssignments.ListForProduct r
-                                = configuration.getLicensing().licenseAssignments().listForProduct(
-                                        productId, MY_CUSTOMER_ID);
-
-                        if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                            r.setMaxResults(Long.valueOf(options.getPageSize()));
-                            paged = true;
-                        }
-                        r.setPageToken(options.getPagedResultsCookie());
-                        request = r;
-                    } else {
-                        Licensing.LicenseAssignments.ListForProductAndSku r
-                                = configuration.getLicensing().licenseAssignments()
-                                .listForProductAndSku(productId, skuId, MY_CUSTOMER_ID);
-
-                        if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                            r.setMaxResults(Long.valueOf(options.getPageSize()));
-                            paged = true;
-                        }
-                        r.setPageToken(options.getPagedResultsCookie());
-                        request = r;
-                    }
-
-                    String nextPageToken = null;
-                    do {
-                        nextPageToken
-                                = execute(request,
-                                        new RequestResultHandler<LicensingRequest<LicenseAssignmentList>, LicenseAssignmentList, String>() {
-                                            public String handleResult(LicensingRequest request,
-                                                    final LicenseAssignmentList value) {
-                                                if (null != value.getItems()) {
-                                                    for (LicenseAssignment resource : value
-                                                    .getItems()) {
-                                                        handler.handle(fromLicenseAssignment(resource));
-                                                    }
-                                                }
-                                                return value.getNextPageToken();
-                                            }
-                                        });
-                        if (request instanceof Licensing.LicenseAssignments.ListForProduct) {
-                            ((Licensing.LicenseAssignments.ListForProduct) request).setPageToken(nextPageToken);
-                        } else {
-                            ((Licensing.LicenseAssignments.ListForProductAndSku) request).setPageToken(nextPageToken);
-                        }
-                    } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-                    if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                        logger.info("Paged Search was requested");
-                        ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                                nextPageToken, 0));
-                    }
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#List");
-                    throw ConnectorException.wrap(e);
-                }
-
+                executeLicenseAssignmentSearchQuery(handler, options);
             } else {
                 // Read request
-
-                try {
-
-                    Matcher name = LICENSE_NAME_PATTERN.matcher(uid.getUidValue());
-                    if (!name.matches()) {
-                        return;
-                    }
-
-                    String productId = name.group(0);
-                    String skuId = name.group(1);
-                    String userId = name.group(2);
-
-                    Licensing.LicenseAssignments.Get request
-                            = configuration.getLicensing().licenseAssignments().get(productId, skuId,
-                                    userId);
-
-                    execute(request,
-                            new RequestResultHandler<Licensing.LicenseAssignments.Get, LicenseAssignment, Boolean>() {
-                                public Boolean handleResult(
-                                        Licensing.LicenseAssignments.Get request,
-                                        LicenseAssignment value) {
-                                            return handler.handle(fromLicenseAssignment(value));
-                                        }
-
-                                        public Boolean handleNotFound(IOException e) {
-                                            // Do nothing if not found
-                                            return true;
-                                        }
-                            });
-
-                } catch (IOException e) {
-                    logger.warn(e, "Failed to initialize Groups#Get");
-                    throw ConnectorException.wrap(e);
-                }
+                executeLicenseAssignmentReadQuery(uid, handler);
             }
         } else {
             logger.warn("Search of type {0} is not supported", configuration.getConnectorMessages()
@@ -1115,6 +615,527 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     + objectClass.getObjectClassValue() + " is not supported");
         }
 
+        logger.info("executeQuery() - finished in " + timeFrom(startTime));
+    }
+
+    private void executeLicenseAssignmentReadQuery(Uid uid, final ResultsHandler handler) {
+        try {
+            Matcher name = LICENSE_NAME_PATTERN.matcher(uid.getUidValue());
+            if (!name.matches()) {
+                return;
+            }
+
+            String productId = name.group(0);
+            String skuId = name.group(1);
+            String userId = name.group(2);
+
+            Licensing.LicenseAssignments.Get request
+                    = configuration.getLicensing().licenseAssignments().get(productId, skuId,
+                    userId);
+
+            execute(request,
+                    new RequestResultHandler<Licensing.LicenseAssignments.Get, LicenseAssignment, Boolean>() {
+                        public Boolean handleResult(
+                                Licensing.LicenseAssignments.Get request,
+                                LicenseAssignment value) {
+                            return handler.handle(fromLicenseAssignment(value));
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeLicenseAssignmentSearchQuery(final ResultsHandler handler, OperationOptions options) {
+        try {
+
+            String productId = "";
+            String skuId = "";
+
+            boolean paged = false;
+
+            LicensingRequest<LicenseAssignmentList> request = null;
+
+            if (StringUtil.isBlank(productId)) {
+                // TODO iterate over the three productids
+                throw new ConnectorException("productId is required");
+            } else if (StringUtil.isBlank(skuId)) {
+                Licensing.LicenseAssignments.ListForProduct r
+                        = configuration.getLicensing().licenseAssignments().listForProduct(
+                        productId, MY_CUSTOMER_ID);
+
+                if (options.getPageSize() != null && 0 < options.getPageSize()) {
+                    r.setMaxResults(Long.valueOf(options.getPageSize()));
+                    paged = true;
+                }
+                r.setPageToken(options.getPagedResultsCookie());
+                request = r;
+            } else {
+                Licensing.LicenseAssignments.ListForProductAndSku r
+                        = configuration.getLicensing().licenseAssignments()
+                        .listForProductAndSku(productId, skuId, MY_CUSTOMER_ID);
+
+                if (options.getPageSize() != null && 0 < options.getPageSize()) {
+                    r.setMaxResults(Long.valueOf(options.getPageSize()));
+                    paged = true;
+                }
+                r.setPageToken(options.getPagedResultsCookie());
+                request = r;
+            }
+
+            String nextPageToken = null;
+            do {
+                //TODO license request has no page token property. How to page?
+                /*if(StringUtil.isNotBlank(nextPageToken)){
+                    request.setPageToken(nextPageToken);
+                }*/
+                nextPageToken
+                        = execute(request,
+                        new RequestResultHandler<LicensingRequest<LicenseAssignmentList>, LicenseAssignmentList, String>() {
+                            public String handleResult(LicensingRequest request,
+                                                       final LicenseAssignmentList value) {
+                                if (null != value.getItems()) {
+                                    for (LicenseAssignment resource : value
+                                            .getItems()) {
+                                        handler.handle(fromLicenseAssignment(resource));
+                                    }
+                                }
+                                return value.getNextPageToken();
+                            }
+                        });
+                if (request instanceof Licensing.LicenseAssignments.ListForProduct) {
+                    ((Licensing.LicenseAssignments.ListForProduct) request).setPageToken(nextPageToken);
+                } else {
+                    ((Licensing.LicenseAssignments.ListForProductAndSku) request).setPageToken(nextPageToken);
+                }
+            } while (!paged && StringUtil.isNotBlank(nextPageToken));
+
+            if (paged && StringUtil.isNotBlank(nextPageToken)) {
+                logger.info("Paged Search was requested");
+                ((SearchResultsHandler) handler).handleResult(new SearchResult(
+                        nextPageToken, 0));
+            }
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#List");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeOrgUnitReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            Directory.Orgunits.Get request
+                    = configuration.getDirectory().orgunits().get(MY_CUSTOMER_ID,
+                    Arrays.asList(uid.getUidValue()));
+            request.setFields(getFields(options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR));
+
+            execute(request,
+                    new RequestResultHandler<Directory.Orgunits.Get, OrgUnit, Boolean>() {
+                        public Boolean handleResult(Directory.Orgunits.Get request,
+                                                    OrgUnit value) {
+                            return handler.handle(fromOrgunit(value, attributesToGet));
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize OrgUnits#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeOrgUnitSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            Directory.Orgunits.List request
+                    = configuration.getDirectory().orgunits().list(MY_CUSTOMER_ID);
+            if (null != query) {
+                if (query instanceof StartsWithFilter
+                        && AttributeUtil.namesEqual(ORG_UNIT_PATH_ATTR,
+                        ((StartsWithFilter) query).getName())) {
+                    request.setOrgUnitPath(((StartsWithFilter) query).getValue());
+                } else {
+                    throw new UnsupportedOperationException(
+                            "Only StartsWithFilter('orgUnitPath') is supported");
+                }
+            } else {
+                request.setOrgUnitPath("/");
+            }
+
+            String scope = options.getScope();
+            if (OperationOptions.SCOPE_OBJECT.equalsIgnoreCase(scope)
+                    || OperationOptions.SCOPE_ONE_LEVEL.equalsIgnoreCase(scope)) {
+                request.setType("children");
+            } else {
+                request.setType("all");
+            }
+
+            // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
+            String fields = getFields(options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR);
+            if (null != fields) {
+                request.setFields("organizationUnits(" + fields + ")");
+            }
+
+            execute(request,
+                    new RequestResultHandler<Directory.Orgunits.List, OrgUnits, Void>() {
+                        public Void handleResult(final Directory.Orgunits.List request,
+                                                 final OrgUnits value) {
+                            if (null != value.getOrganizationUnits()) {
+                                for (OrgUnit group : value.getOrganizationUnits()) {
+                                    handler.handle(fromOrgunit(group, attributesToGet));
+                                }
+                            }
+                            return null;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize OrgUnits#List");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeMemberReadQuery(Uid uid, final ResultsHandler handler) {
+        try {
+            String[] ids = uid.getUidValue().split("/");
+            if (ids.length != 2) {
+                // TODO fix the exception
+                throw new InvalidAttributeValueException("Unrecognised UID format");
+            }
+
+            Directory.Members.Get request
+                    = configuration.getDirectory().members().get(ids[0], ids[1]);
+
+            execute(request,
+                    new RequestResultHandler<Directory.Members.Get, Member, Boolean>() {
+                        public Boolean handleResult(Directory.Members.Get request,
+                                                    Member value) {
+                            return handler.handle(fromMember(request.getGroupKey(), value));
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeMemberSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options) {
+        // TODO support AND role
+        try {
+
+            String groupKey = null;
+
+            if (query instanceof EqualsFilter
+                    && ((EqualsFilter) query).getAttribute().is(GROUP_KEY_ATTR)) {
+                groupKey
+                        = AttributeUtil.getStringValue(((AttributeFilter) query)
+                        .getAttribute());
+            } else {
+                throw new UnsupportedOperationException(
+                        "Only EqualsFilter('groupKey') is supported");
+            }
+
+            if (StringUtil.isBlank(groupKey)) {
+                throw new InvalidAttributeValueException("The 'groupKey' can not be blank.");
+            }
+            Directory.Members.List request
+                    = configuration.getDirectory().members().list(groupKey);
+
+            boolean paged = false;
+            // Groups
+            if (options.getPageSize() != null && 0 < options.getPageSize()) {
+                request.setMaxResults(options.getPageSize());
+                paged = true;
+            }
+            request.setPageToken(options.getPagedResultsCookie());
+
+            String nextPageToken = null;
+            do {
+                if (StringUtil.isNotBlank(nextPageToken)) {
+                    request.setPageToken(nextPageToken);
+                }
+                nextPageToken
+                        = execute(request,
+                        new RequestResultHandler<Directory.Members.List, Members, String>() {
+                            public String handleResult(
+                                    final Directory.Members.List request,
+                                    final Members value) {
+                                if (null != value.getMembers()) {
+                                    for (Member group : value.getMembers()) {
+                                        handler.handle(fromMember(request
+                                                .getGroupKey(), group));
+                                    }
+                                }
+                                return value.getNextPageToken();
+                            }
+                        });
+                request.setPageToken(nextPageToken);
+            } while (!paged && StringUtil.isNotBlank(nextPageToken));
+
+            if (paged && StringUtil.isNotBlank(nextPageToken)) {
+                logger.info("Paged Search was requested");
+                ((SearchResultsHandler) handler).handleResult(new SearchResult(
+                        nextPageToken, 0));
+            }
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#List");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeGroupReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            // Try the cache first
+            ConnectorObject cachedGroup = objectsCache.getGroup(uid.getUidValue());
+            if (cachedGroup != null) {
+                handler.handle(cachedGroup);
+                return;
+            }
+
+            Directory.Groups.Get request
+                    = configuration.getDirectory().groups().get(uid.getUidValue());
+            request.setFields(getFields(options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
+
+            execute(request,
+                    new RequestResultHandler<Directory.Groups.Get, Group, Boolean>() {
+                        public Boolean handleResult(final Directory.Groups.Get request,
+                                                    final Group value) {
+                            ConnectorObject group = fromGroup(value, attributesToGet,
+                                    configuration.getDirectory().members());
+                            objectsCache.addGroup(group);
+                            return handler.handle(group);
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeGroupSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            // userKey excludes the customer and domain!!
+
+            Directory.Groups.List request = configuration.getDirectory().groups().list();
+            if (null != query) {
+                query.accept(new GroupHandler(), request);
+            } else {
+                request.setCustomer(MY_CUSTOMER_ID);
+            }
+
+            boolean paged = false;
+            // Groups
+            if (null != options.getPageSize() && options.getPageSize() >= 1 && options.getPageSize() <= 500) {
+                request.setMaxResults(options.getPageSize());
+                paged = true;
+            }
+            request.setPageToken(options.getPagedResultsCookie());
+
+            // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
+            String fields = getFields(options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
+            if (null != fields) {
+                request.setFields("nextPageToken,groups(" + fields + ")");
+            }
+
+            String nextPageToken = null;
+            do {
+                if (StringUtil.isNotBlank(nextPageToken)) {
+                    request.setPageToken(nextPageToken);
+                }
+                nextPageToken
+                        = execute(request,
+                        new RequestResultHandler<Directory.Groups.List, Groups, String>() {
+                            public String handleResult(
+                                    final Directory.Groups.List request,
+                                    final Groups value) {
+                                if (null != value.getGroups()) {
+                                    for (Group group : value.getGroups()) {
+                                        handler.handle(fromGroup(group,
+                                                attributesToGet, configuration
+                                                        .getDirectory().members()));
+                                    }
+                                }
+                                return value.getNextPageToken();
+                            }
+                        });
+                request.setPageToken(nextPageToken);
+            } while (!paged && StringUtil.isNotBlank(nextPageToken));
+
+            if (paged && StringUtil.isNotBlank(nextPageToken)) {
+                logger.info("Paged Search was requested");
+                ((SearchResultsHandler) handler).handleResult(new SearchResult(
+                        nextPageToken, 0));
+            }
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#List");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeAccountReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            // Try the cache first
+            ConnectorObject cachedUser = objectsCache.getUser(uid.getUidValue());
+            if (cachedUser != null) {
+                handler.handle(cachedUser);
+                return;
+            }
+
+            // No success in cache, do the remote call
+            Directory.Users.Get request
+                    = configuration.getDirectory().users().get(uid.getUidValue());
+            request.setFields(getFields(options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR));
+
+            execute(request,
+                    new RequestResultHandler<Directory.Users.Get, User, Boolean>() {
+                        public Boolean handleResult(final Directory.Users.Get request,
+                                                    final User value) {
+                            ConnectorObject user = fromUser(value, attributesToGet,
+                                    configuration.getDirectory().groups());
+                            objectsCache.addUser(user);
+                            return handler.handle(user);
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private void executeAccountSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            Directory.Users.List request = configuration.getDirectory().users().list();
+            if (null != query) {
+                StringBuilder queryBuilder = query.accept(new UserHandler(), request);
+                if (null != queryBuilder) {
+                    String queryString = queryBuilder.toString();
+                    logger.ok("Executing Query: {0}", queryString);
+                    request.setQuery(queryString);
+                }
+                if (null == request.getDomain() && null == request.getCustomer()) {
+                    request.setCustomer(MY_CUSTOMER_ID);
+                }
+            } else {
+                request.setCustomer(MY_CUSTOMER_ID);
+            }
+
+            // Implementation to support the 'OP_PAGE_SIZE'
+            boolean paged = false;
+            if (options.getPageSize() != null && 0 < options.getPageSize()) {
+                if (options.getPageSize() >= 1 && options.getPageSize() <= 500) {
+                    request.setMaxResults(options.getPageSize());
+                    paged = true;
+                } else {
+                    //throw new IllegalArgumentException("Invalid pageSize value. Default is 100. Max allowed is 500 (integer, 1-500)");
+                }
+            }
+            // Implementation to support the 'OP_PAGED_RESULTS_COOKIE'
+            request.setPageToken(options.getPagedResultsCookie());
+
+            // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
+            String fields = getFields(options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR);
+            if (null != fields) {
+                request.setFields("nextPageToken,users(" + fields + ")");
+            }
+
+            if (options.getOptions().get(SHOW_DELETED_PARAM) instanceof Boolean) {
+                request.setShowDeleted(options.getOptions().get(SHOW_DELETED_PARAM)
+                        .toString());
+            }
+
+            // Implementation to support the 'OP_SORT_KEYS'
+            if (null != options.getSortKeys()) {
+                for (SortKey sortKey : options.getSortKeys()) {
+                    String orderBy = null;
+                    if (sortKey.getField().equalsIgnoreCase(EMAIL_ATTR)
+                            || sortKey.getField().equalsIgnoreCase(PRIMARY_EMAIL_ATTR)
+                            || sortKey.getField().equalsIgnoreCase(ALIASES_ATTR)
+                            || sortKey.getField().equalsIgnoreCase(ALIAS_ATTR)) {
+                        orderBy = EMAIL_ATTR;
+                    } else if (sortKey.getField().equalsIgnoreCase(GIVEN_NAME_ATTR)) {
+                        orderBy = GIVEN_NAME_ATTR;
+                    } else if (sortKey.getField().equalsIgnoreCase(FAMILY_NAME_ATTR)) {
+                        orderBy = FAMILY_NAME_ATTR;
+                    } else {
+                        logger.ok("Unsupported SortKey:{0}", sortKey);
+                        continue;
+                    }
+
+                    request.setOrderBy(orderBy);
+                    if (sortKey.isAscendingOrder()) {
+                        request.setSortOrder(ASCENDING_ORDER);
+                    } else {
+                        request.setSortOrder(DESCENDING_ORDER);
+                    }
+                    break;
+                }
+            }
+
+            String nextPageToken = null;
+            do {
+                if (StringUtil.isNotBlank(nextPageToken)) {
+                    request.setPageToken(nextPageToken);
+                }
+                nextPageToken
+                        = execute(request,
+                        new RequestResultHandler<Directory.Users.List, Users, String>() {
+                            public String handleResult(
+                                    final Directory.Users.List request,
+                                    final Users value) {
+                                if (null != value.getUsers()) {
+                                    for (User user : value.getUsers()) {
+                                        handler.handle(fromUser(user,
+                                                attributesToGet, configuration
+                                                        .getDirectory().groups()));
+                                    }
+                                }
+                                return value.getNextPageToken();
+                            }
+                        });
+                request.setPageToken(nextPageToken);
+            } while (!paged && StringUtil.isNotBlank(nextPageToken));
+
+            if (paged && StringUtil.isNotBlank(nextPageToken)) {
+                logger.info("Paged Search was requested and next token is:{0}",
+                        nextPageToken);
+                ((SearchResultsHandler) handler).handleResult(new SearchResult(
+                        nextPageToken, 0));
+            }
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#List");
+            throw ConnectorException.wrap(e);
+        }
     }
 
     protected Set<String> getAttributesToGet(ObjectClass objectClass, OperationOptions options) {
@@ -1263,7 +1284,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * {@inheritDoc}
      */
     public Uid update(ObjectClass objectClass, Uid uid, Set<Attribute> replaceAttributes,
-            OperationOptions options) {
+                      OperationOptions options) {
         final AttributesAccessor attributesAccessor = new AttributesAccessor(replaceAttributes);
 
         Uid uidAfterUpdate = uid;
@@ -1271,35 +1292,35 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             final Directory.Users.Patch patch
                     = updateUser(configuration.getDirectory().users(), uid,
-                            attributesAccessor);
+                    attributesAccessor);
             if (null != patch) {
                 uidAfterUpdate
                         = execute(patch,
-                                new RequestResultHandler<Directory.Users.Patch, User, Uid>() {
-                                    public Uid handleResult(Directory.Users.Patch request,
-                                            User value) {
-                                        logger.ok("User is Updated:{0}", value.getId());
-                                        return new Uid(value.getId(), value.getEtag());
-                                    }
-                                });
+                        new RequestResultHandler<Directory.Users.Patch, User, Uid>() {
+                            public Uid handleResult(Directory.Users.Patch request,
+                                                    User value) {
+                                logger.ok("User is Updated:{0}", value.getId());
+                                return new Uid(value.getId(), value.getEtag());
+                            }
+                        });
             }
             // aliases
             if (null != attributesAccessor.findStringList(ALIASES_ATTR)) {
                 List<String> aliases = new ArrayList(attributesAccessor.findStringList(ALIASES_ATTR));
                 final Directory.Users.Aliases aliasesService = configuration.getDirectory().users().aliases();
                 Set<String> currentAliases = listAliases(aliasesService, uid.getUidValue());
-                
+
                 List<String> aliasesToDel = new ArrayList(currentAliases);
-                aliasesToDel.removeAll(aliases);                   
+                aliasesToDel.removeAll(aliases);
                 aliases.removeAll(currentAliases); // aliases var now contains values to add
-                
+
                 for (Object member : aliases) { // ADD alias
                     if (member instanceof String) {
 
                         String id
                                 = execute(createUserAlias(aliasesService, uid.getUidValue(),
-                                        (String) member),
-                                        new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
+                                (String) member),
+                                new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
                                     public String handleResult(
                                             final Directory.Users.Aliases.Insert request,
                                             final Alias value) {
@@ -1318,20 +1339,20 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         // Delete user and Error or
                         RetryableException e
                                 = RetryableException.wrap("Invalid attribute value: "
-                                        + String.valueOf(member), uid);
+                                + String.valueOf(member), uid);
                         e.initCause(new InvalidAttributeValueException(
                                 "Attribute 'aliases' must be a String list"));
                         throw e;
                     }
                 }
-                
+
                 for (Object member : aliasesToDel) { // DEL alias
                     if (member instanceof String) {
 
                         String id
                                 = execute(deleteUserAlias(aliasesService, uid.getUidValue(),
-                                        (String) member),
-                                        new RequestResultHandler<Directory.Users.Aliases.Delete, Alias, String>() {
+                                (String) member),
+                                new RequestResultHandler<Directory.Users.Aliases.Delete, Alias, String>() {
                                     public String handleResult(
                                             final Directory.Users.Aliases.Delete request,
                                             final Alias value) {
@@ -1349,14 +1370,14 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         // Delete user and Error or
                         RetryableException e
                                 = RetryableException.wrap("Invalid attribute value: "
-                                        + String.valueOf(member), uid);
+                                + String.valueOf(member), uid);
                         e.initCause(new InvalidAttributeValueException(
                                 "Attribute 'aliases' must be a String list"));
                         throw e;
                     }
                 }
             }
-          
+
             // groups member
             Attribute groups = attributesAccessor.find(PredefinedAttributes.GROUPS_NAME);
             if (null != groups && null != groups.getValue()) {
@@ -1369,7 +1390,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         execute(deleteMembers(service, groupKey, uidAfterUpdate.getUidValue()),
                                 new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
                                     public Object handleResult(Directory.Members.Delete request,
-                                            Void value) {
+                                                               Void value) {
                                         return null;
                                     }
 
@@ -1383,7 +1404,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 } else {
                     final Set<String> activeGroups
                             = listGroups(configuration.getDirectory().groups(), uidAfterUpdate
-                                    .getUidValue());
+                            .getUidValue());
 
                     final List<Directory.Members.Insert> addGroups
                             = new ArrayList<Directory.Members.Insert>();
@@ -1409,7 +1430,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         execute(insert,
                                 new RequestResultHandler<Directory.Members.Insert, Member, Object>() {
                                     public Object handleResult(Directory.Members.Insert request,
-                                            Member value) {
+                                                               Member value) {
                                         return null;
                                     }
 
@@ -1427,14 +1448,14 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                     new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
                                         public Object handleResult(
                                                 Directory.Members.Delete request, Void value) {
-                                                    return null;
-                                                }
+                                            return null;
+                                        }
 
-                                                public Object handleNotFound(IOException e) {
-                                                    // It may be an indirect membership,
-                                                    // not able to delete
-                                                    return null;
-                                                }
+                                        public Object handleNotFound(IOException e) {
+                                            // It may be an indirect membership,
+                                            // not able to delete
+                                            return null;
+                                        }
                                     });
                         }
                     }
@@ -1445,17 +1466,17 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             final Directory.Groups.Patch patch
                     = updateGroup(configuration.getDirectory().groups(), uid.getUidValue(),
-                            attributesAccessor);
+                    attributesAccessor);
             if (null != patch) {
                 uidAfterUpdate
                         = execute(patch,
-                                new RequestResultHandler<Directory.Groups.Patch, Group, Uid>() {
-                                    public Uid handleResult(Directory.Groups.Patch request,
-                                            Group value) {
-                                        logger.ok("Group is Updated:{0}", value.getId());
-                                        return new Uid(value.getId(), value.getEtag());
-                                    }
-                                });
+                        new RequestResultHandler<Directory.Groups.Patch, Group, Uid>() {
+                            public Uid handleResult(Directory.Groups.Patch request,
+                                                    Group value) {
+                                logger.ok("Group is Updated:{0}", value.getId());
+                                return new Uid(value.getId(), value.getEtag());
+                            }
+                        });
             }
             Attribute members = attributesAccessor.find(MEMBERS_ATTR);
             if (null != members && null != members.getValue()) {
@@ -1467,7 +1488,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         execute(deleteMembers(service, uidAfterUpdate.getUidValue(), member),
                                 new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
                                     public Object handleResult(Directory.Members.Delete request,
-                                            Void value) {
+                                                               Void value) {
                                         return null;
                                     }
 
@@ -1488,19 +1509,19 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             = new ArrayList<Directory.Members.Insert>();
                     final List<Directory.Members.Patch> patchMembership
                             = new ArrayList<Directory.Members.Patch>();
-                    
-                    
+
+
                     //TODO add other kind of roles but MEMBER
                     for (Object member : members.getValue()) {
                         if (member instanceof String) {
 
-                            String email = (String)member;
+                            String email = (String) member;
 
                             boolean notMember = true;
                             for (String a : activeMembership) {
                                 if (email.equalsIgnoreCase(a)) {
                                     notMember = false;
-                                    if(deleteMembers.contains(a)){
+                                    if (deleteMembers.contains(a)) {
                                         deleteMembers.remove(a);
                                     }
                                     break;
@@ -1522,7 +1543,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         execute(insert,
                                 new RequestResultHandler<Directory.Members.Insert, Member, Object>() {
                                     public Object handleResult(Directory.Members.Insert request,
-                                            Member value) {
+                                                               Member value) {
                                         return null;
                                     }
 
@@ -1538,26 +1559,26 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         execute(request,
                                 new RequestResultHandler<Directory.Members.Patch, Member, Object>() {
                                     public Object handleResult(Directory.Members.Patch request,
-                                            Member value) {
+                                                               Member value) {
                                         return null;
                                     }
                                 });
                     }
-                    
+
                     // Delete existing Member object
                     for (String a : deleteMembers) {
-                            execute(deleteMembers(service, uidAfterUpdate.getUidValue(), a),
-                                    new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
-                                        public Object handleResult(
-                                                Directory.Members.Delete request, Void value) {
-                                                    return null;
-                                                }
+                        execute(deleteMembers(service, uidAfterUpdate.getUidValue(), a),
+                                new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
+                                    public Object handleResult(
+                                            Directory.Members.Delete request, Void value) {
+                                        return null;
+                                    }
 
-                                                public Object handleNotFound(IOException e) {
-                                                    // Do nothing
-                                                    return null;
-                                                }
-                                    });
+                                    public Object handleNotFound(IOException e) {
+                                        // Do nothing
+                                        return null;
+                                    }
+                                });
                     }
                 }
             }
@@ -1569,17 +1590,17 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 if (ids.length == 2) {
                     final Directory.Members.Patch patch
                             = updateMembers(configuration.getDirectory().members(), ids[0], ids[1],
-                                    role).setFields(EMAIL_ETAG);
+                            role).setFields(EMAIL_ETAG);
                     uidAfterUpdate
                             = execute(patch,
-                                    new RequestResultHandler<Directory.Members.Patch, Member, Uid>() {
-                                        public Uid handleResult(Directory.Members.Patch request,
-                                                Member value) {
-                                            logger.ok("Member is updated:{0}/{1}", request
-                                                    .getGroupKey(), value.getEmail());
-                                            return generateMemberId(request.getGroupKey(), value);
-                                        }
-                                    });
+                            new RequestResultHandler<Directory.Members.Patch, Member, Uid>() {
+                                public Uid handleResult(Directory.Members.Patch request,
+                                                        Member value) {
+                                    logger.ok("Member is updated:{0}/{1}", request
+                                            .getGroupKey(), value.getEmail());
+                                    return generateMemberId(request.getGroupKey(), value);
+                                }
+                            });
                 } else {
                     throw new UnknownUidException("Invalid ID format");
                 }
@@ -1588,36 +1609,36 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             final Directory.Orgunits.Patch patch
                     = updateOrgunit(configuration.getDirectory().orgunits(), uid.getUidValue(),
-                            attributesAccessor);
+                    attributesAccessor);
             if (null != patch) {
                 uidAfterUpdate
                         = execute(patch,
-                                new RequestResultHandler<Directory.Orgunits.Patch, OrgUnit, Uid>() {
-                                    public Uid handleResult(Directory.Orgunits.Patch request,
-                                            OrgUnit value) {
-                                        logger.ok("OrgUnit is updated:{0}", value.getName());
-                                        return generateOrgUnitId(value);
-                                    }
-                                });
+                        new RequestResultHandler<Directory.Orgunits.Patch, OrgUnit, Uid>() {
+                            public Uid handleResult(Directory.Orgunits.Patch request,
+                                                    OrgUnit value) {
+                                logger.ok("OrgUnit is updated:{0}", value.getName());
+                                return generateOrgUnitId(value);
+                            }
+                        });
             }
         } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
 
             final Licensing.LicenseAssignments.Patch patch
                     = updateLicenseAssignment(configuration.getLicensing().licenseAssignments(), uid
-                            .getUidValue(), attributesAccessor);
+                    .getUidValue(), attributesAccessor);
             if (null != patch) {
                 uidAfterUpdate
                         = execute(patch,
-                                new RequestResultHandler<Licensing.LicenseAssignments.Patch, LicenseAssignment, Uid>() {
-                                    public Uid handleResult(
-                                            Licensing.LicenseAssignments.Patch request,
-                                            LicenseAssignment value) {
-                                                logger.ok("LicenseAssignment is Updated:{0}/{1}/{2}", value
-                                                        .getProductId(), value.getSkuId(), value
-                                                        .getUserId());
-                                                return generateLicenseAssignmentId(value);
-                                            }
-                                });
+                        new RequestResultHandler<Licensing.LicenseAssignments.Patch, LicenseAssignment, Uid>() {
+                            public Uid handleResult(
+                                    Licensing.LicenseAssignments.Patch request,
+                                    LicenseAssignment value) {
+                                logger.ok("LicenseAssignment is Updated:{0}/{1}/{2}", value
+                                        .getProductId(), value.getSkuId(), value
+                                        .getUserId());
+                                return generateLicenseAssignmentId(value);
+                            }
+                        });
             }
         } else {
             logger.warn("Update of type {0} is not supported", configuration.getConnectorMessages()
@@ -1625,11 +1646,17 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             throw new UnsupportedOperationException("Update of type"
                     + objectClass.getObjectClassValue() + " is not supported");
         }
+
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            objectsCache.markUserAsUpdatedNow(uidAfterUpdate.getUidValue());
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            objectsCache.markGroupAsUpdatedNow(uidAfterUpdate.getUidValue());
+        }
         return uidAfterUpdate;
     }
 
     protected ConnectorObject fromUser(User user, Set<String> attributesToGet,
-            Directory.Groups service) {
+                                       Directory.Groups service) {
         ConnectorObjectBuilder builder = new ConnectorObjectBuilder();
         if (null != user.getEtag()) {
             builder.setUid(new Uid(user.getId(), user.getEtag()));
@@ -1638,6 +1665,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
         builder.setName(user.getPrimaryEmail());
 
+        ConnectorObject connectorObject = getUserFromResource(user, builder, attributesToGet, service);
+        return connectorObject;
+    }
+
+    private ConnectorObject getUserFromResource(User user, ConnectorObjectBuilder builder,
+                                                Set<String> attributesToGet, Directory.Groups service) {
         // Optional
         // If both givenName and familyName are empty then Google didn't return
         // with 'name'
@@ -1748,7 +1781,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        //TODO do somehow else null != attributesToGet breaks associations functions
+        //TODO do somehow else "null != attributesToGet &&" breaks associations functions
         if (null == attributesToGet || attributesToGet.contains(PredefinedAttributes.GROUPS_NAME)) {
             builder.addAttribute(AttributeBuilder.build(PredefinedAttributes.GROUPS_NAME,
                     listGroups(service, user.getId())));
@@ -1758,7 +1791,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     }
 
     protected ConnectorObject fromGroup(Group group, Set<String> attributesToGet,
-            Directory.Members service) {
+                                        Directory.Members service) {
         ConnectorObjectBuilder builder = new ConnectorObjectBuilder();
         builder.setObjectClass(ObjectClass.GROUP);
 
@@ -1795,7 +1828,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         // Expensive to get
-        //TODO do somehow else null != attributesToGet breaks associations functions
+        //TODO do somehow else "null != attributesToGet &&" breaks associations functions
         if (null == attributesToGet || attributesToGet.contains(MEMBERS_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(MEMBERS_ATTR, listMembers(service, group
                     .getId(), null)));
@@ -1803,16 +1836,16 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
         return builder.build();
     }
-    
-    protected List<String>  listMembers(Directory.Members service, String groupKey, String roles){
+
+    protected List<String> listMembers(Directory.Members service, String groupKey, String roles) {
         List<Map<String, String>> allMembers = listAllMembers(service, groupKey, roles);
         final List<String> resultMembers = new ArrayList<String>();
-        for(Map<String, String> allMember : allMembers){
+        for (Map<String, String> allMember : allMembers) {
             //m.put(EMAIL_ATTR, member.getEmail());
             //m.put(ROLE_ATTR, member.getRole());
             String memberRole = allMember.get(ROLE_ATTR);
             String memberEmail = allMember.get(EMAIL_ATTR);
-            if("MEMBER".equals(memberRole)){
+            if ("MEMBER".equals(memberRole)) {
                 resultMembers.add(memberEmail);
             }
         }
@@ -1821,6 +1854,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
     //TODO dodelat po te listOwners a listManagers a vystavit obdobny attribut
     protected List<Map<String, String>> listAllMembers(Directory.Members service, String groupKey, String roles) {
+        final long startTime = System.currentTimeMillis();
         final List<Map<String, String>> result = new ArrayList<Map<String, String>>();
         try {
 
@@ -1829,23 +1863,26 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             String nextPageToken = null;
             do {
+                if (StringUtil.isNotBlank(nextPageToken)) {
+                    request.setPageToken(nextPageToken);
+                }
                 nextPageToken
                         = execute(request,
-                                new RequestResultHandler<Directory.Members.List, Members, String>() {
-                                    public String handleResult(Directory.Members.List request,
-                                            Members value) {
-                                        if (null != value.getMembers()) {
-                                            for (Member member : value.getMembers()) {
-                                                Map<String, String> m
+                        new RequestResultHandler<Directory.Members.List, Members, String>() {
+                            public String handleResult(Directory.Members.List request,
+                                                       Members value) {
+                                if (null != value.getMembers()) {
+                                    for (Member member : value.getMembers()) {
+                                        Map<String, String> m
                                                 = new LinkedHashMap<String, String>(2);
-                                                m.put(EMAIL_ATTR, member.getEmail());
-                                                m.put(ROLE_ATTR, member.getRole());
-                                                result.add(m);
-                                            }
-                                        }
-                                        return value.getNextPageToken();
+                                        m.put(EMAIL_ATTR, member.getEmail());
+                                        m.put(ROLE_ATTR, member.getRole());
+                                        result.add(m);
                                     }
-                                });
+                                }
+                                return value.getNextPageToken();
+                            }
+                        });
 
             } while (StringUtil.isNotBlank(nextPageToken));
             // } catch (HttpResponseException e){
@@ -1853,7 +1890,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             logger.warn(e, "Failed to initialize Members#Delete");
             throw ConnectorException.wrap(e);
         }
+        logger.info("listAllMembers() - finished in " + timeFrom(startTime));
         return result;
+    }
+
+    private String timeFrom(long startTime) {
+        return (System.currentTimeMillis() - startTime) + " ms";
     }
 
     protected Set<String> listGroups(Directory.Groups service, String userKey) {
@@ -1869,19 +1911,26 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             String nextPageToken = null;
             do {
+                if (StringUtil.isNotBlank(nextPageToken)) {
+                    request.setPageToken(nextPageToken);
+                }
                 nextPageToken
                         = execute(request,
-                                new RequestResultHandler<Directory.Groups.List, Groups, String>() {
-                                    public String handleResult(Directory.Groups.List request,
-                                            Groups value) {
-                                        if (null != value.getGroups()) {
-                                            for (Group group : value.getGroups()) {
-                                                result.add(group.getEmail());
-                                            }
+                        new RequestResultHandler<Directory.Groups.List, Groups, String>() {
+                            public String handleResult(Directory.Groups.List request,
+                                                       Groups value) {
+                                if (null != value.getGroups()) {
+                                    for (Group group : value.getGroups()) {
+                                        GoogleAppsConfiguration GAconf = (GoogleAppsConfiguration) getConfiguration();
+                                        String domain = GAconf.getDomain();
+                                        if (group.getEmail().endsWith(domain)) {//TODO fix loading crossdomain groups for users
+                                            result.add(group.getEmail());
                                         }
-                                        return value.getNextPageToken();
                                     }
-                                });
+                                }
+                                return value.getNextPageToken();
+                            }
+                        });
 
             } while (StringUtil.isNotBlank(nextPageToken));
             // } catch (HttpResponseException e){
@@ -1901,20 +1950,24 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             String nextPageToken = null;
             do {
+                //TODO user alias request has no page token, how to page?
+                /*if(StringUtil.isNotBlank(nextPageToken)){
+                    request.setPageToken(nextPageToken);
+                }*/
                 nextPageToken
                         = execute(request,
-                                new RequestResultHandler<Directory.Users.Aliases.List, Aliases, String>() {
-                                    public String handleResult(Directory.Users.Aliases.List request, Aliases value) {
-                                        if (null != value.getAliases()) {
-                                            for (Object alias : value.getAliases()) {
-                                                String toJson = gson.toJson(alias);
-                                                Alias fromJson = gson.fromJson(toJson, Alias.class);
-                                                result.add(fromJson.getAlias()); // return only alias parameter of json object
-                                            }
-                                        }
-                                        return null;
+                        new RequestResultHandler<Directory.Users.Aliases.List, Aliases, String>() {
+                            public String handleResult(Directory.Users.Aliases.List request, Aliases value) {
+                                if (null != value.getAliases()) {
+                                    for (Object alias : value.getAliases()) {
+                                        String toJson = gson.toJson(alias);
+                                        Alias fromJson = gson.fromJson(toJson, Alias.class);
+                                        result.add(fromJson.getAlias()); // return only alias parameter of json object
                                     }
-                                });
+                                }
+                                return null;
+                            }
+                        });
 
             } while (StringUtil.isNotBlank(nextPageToken));
             // } catch (HttpResponseException e){
@@ -1926,13 +1979,13 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     }
 
     protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
-            RequestResultHandler<G, T, R> handler) {
+                                                                          RequestResultHandler<G, T, R> handler) {
         return execute(Assertions.nullChecked(request, "Google Json ClientRequest"), Assertions
                 .nullChecked(handler, "handler"), -1);
     }
 
     protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
-            RequestResultHandler<G, T, R> handler, int retry) {
+                                                                          RequestResultHandler<G, T, R> handler, int retry) {
         try {
             if (retry >= 0) {
                 long sleep = (long) ((1000 * Math.pow(2, retry)) + nextLong(1000));
@@ -1949,44 +2002,61 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             if (null != details && null != details.getErrors()) {
                 GoogleJsonError.ErrorInfo errorInfo = details.getErrors().get(0);
                 // error: 403
-                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) {
-                    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
-                            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
-                        logger.info("System should retry");
-                    }else{
-                        //if we are forbidden to do something we should not try again
-                        return handler.handleError(e);
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
+                //if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                //    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
+                //            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
+                //        logger.info("System should retry");
+                //        throw RetryableException.wrap(e.getMessage(), e);
+                //    }else{
+                //if we are forbidden to do something we should not try again
+                //        return handler.handleError(e);
+                //    }
+                //} else 
+                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
                     if ("notFound".equalsIgnoreCase(errorInfo.getReason())) {
                         return handler.handleNotFound(e);
                     }
-                } else if (e.getStatusCode() == 409) {
-                    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
-                        // Already Exists
-                        handler.handleDuplicate(e);
-                    }
-                } else if (e.getStatusCode() == 400) {
-                    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
-                        // Already Exists "Invalid Ou Id"
-                    }
+                    //} else if (e.getStatusCode() == 409) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                    //    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
+                    // Already Exists
+                    //        handler.handleDuplicate(e);
+                    //    }
+                    //} else if (e.getStatusCode() == 400) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                    //    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
+                    // Already Exists "Invalid Ou Id"
+                    //    }
                 } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE) {
-                    if ("backendError".equalsIgnoreCase(errorInfo.getReason())) {
+                    if ("backendError".equalsIgnoreCase(errorInfo.getReason()) && retry < 5) {
+                        logger.warn("retrying 503 backendError retry number " + retry);
+                        return execute(request, handler, ++retry);
+                    } else {
                         throw RetryableException.wrap(e.getMessage(), e);
                     }
-                }
-
-            }
-
-            // } catch (HttpResponseException e) {
-            if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) {
-                if (retry < 5) {
-                    return execute(request, handler, ++retry);
+                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVER_ERROR) {
+                    if ("backendError".equalsIgnoreCase(errorInfo.getReason())
+                            || "internalError".equalsIgnoreCase(errorInfo.getReason()) && retry < 5) {
+                        logger.warn("retrying 500" + errorInfo.getReason() + "retry number " + retry);
+                        return execute(request, handler, ++retry);
+                    } else {
+                        throw RetryableException.wrap(e.getMessage(), e);
+                    }
                 } else {
-                    handler.handleError(e);
+                    if (retry < 5) { //last resort retry. We must right all wrongs!
+                        logger.warn("retrying " + e.getStatusCode() + " " + errorInfo.getReason() + "retry number " + retry);
+                        return execute(request, handler, ++retry);
+                    } else {
+                        if (e.getStatusCode() == 409) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                            if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
+                                // Already Exists
+                                logger.warn("handling duplicate");
+                                handler.handleDuplicate(e);
+                            }
+                        } else {
+                            throw RetryableException.wrap(e.getMessage(), e);
+                        }
+                    }
                 }
-            } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
-                return handler.handleNotFound(e);
+
             }
             throw ConnectorException.wrap(e);
         } catch (IOException e) {
@@ -2003,6 +2073,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     protected RuntimeException get(GoogleJsonError.ErrorInfo errorInfo) {
         return null;
     }
+
     private static final Random RANDOM = new Random();
 
     long nextLong(long n) {
