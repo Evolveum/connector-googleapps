@@ -2001,31 +2001,30 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             if (null != details && null != details.getErrors()) {
                 GoogleJsonError.ErrorInfo errorInfo = details.getErrors().get(0);
                 // error: 403
-                //if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
-                //    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
-                //            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
-                //        logger.info("System should retry");
-                //        throw RetryableException.wrap(e.getMessage(), e);
-                //    }else{
-                //if we are forbidden to do something we should not try again
-                //        return handler.handleError(e);
-                //    }
-                //} else 
-                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
+                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) {
+                    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
+                            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
+                        logger.info("System should retry");
+                        throw RetryableException.wrap(e.getMessage(), e);
+                    }else{
+                        //if we are forbidden to do something we should not try again
+                        return handler.handleError(e);
+                    }
+                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
                     if ("notFound".equalsIgnoreCase(errorInfo.getReason())) {
                         return handler.handleNotFound(e);
                     }
-                    //} else if (e.getStatusCode() == 409) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
-                    //    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
-                    // Already Exists
-                    //        handler.handleDuplicate(e);
-                    //    }
-                    //} else if (e.getStatusCode() == 400) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
-                    //    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
-                    // Already Exists "Invalid Ou Id"
-                    //    }
+                } else if (e.getStatusCode() == 409) {
+                    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
+                        // Already Exists
+                        handler.handleDuplicate(e);
+                    }
+                } else if (e.getStatusCode() == 400) {
+                    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
+                        // Already Exists "Invalid Ou Id"
+                    }
                 } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE) {
-                    if ("backendError".equalsIgnoreCase(errorInfo.getReason()) && retry < 5) {
+                    if ("backendError".equalsIgnoreCase(errorInfo.getReason()) && retry < 3) {
                         logger.warn("retrying 503 backendError retry number " + retry);
                         return execute(request, handler, ++retry);
                     } else {
@@ -2033,18 +2032,18 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     }
                 } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVER_ERROR) {
                     if ("backendError".equalsIgnoreCase(errorInfo.getReason())
-                            || "internalError".equalsIgnoreCase(errorInfo.getReason()) && retry < 5) {
+                            || "internalError".equalsIgnoreCase(errorInfo.getReason()) && retry < 3) {
                         logger.warn("retrying 500" + errorInfo.getReason() + "retry number " + retry);
                         return execute(request, handler, ++retry);
                     } else {
                         throw RetryableException.wrap(e.getMessage(), e);
                     }
                 } else {
-                    if (retry < 5) { //last resort retry. We must right all wrongs!
-                        logger.warn("retrying " + e.getStatusCode() + " " + errorInfo.getReason() + "retry number " + retry);
+                    if (retry < 3) { //last resort retry. We must right all wrongs!
+                        logger.warn("retrying " + e.getStatusCode() + " " + errorInfo.getReason() + " retry number " + retry);
                         return execute(request, handler, ++retry);
                     } else {
-                        if (e.getStatusCode() == 409) { //TODO commented out to be retryable finetune later to fast end on nonretryable errors
+                        if (e.getStatusCode() == 409) {
                             if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
                                 // Already Exists
                                 logger.warn("handling duplicate");
@@ -2061,7 +2060,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         } catch (IOException e) {
             // https://developers.google.com/admin-sdk/directory/v1/limits
             // rateLimitExceeded or userRateLimitExceeded
-            if (retry < 5) {
+            if (retry < 3) {
                 return execute(request, handler, ++retry);
             } else {
                 return handler.handleError(e);
