@@ -38,7 +38,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
-import org.identityconnectors.common.IOUtil;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
@@ -1261,7 +1260,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     attributes.add(attribute);
                 }
             }
-            return IOUtil.join(attributes, COMMA);
+            return StringUtil.join(attributes, COMMA);
         }
         return null;
     }
