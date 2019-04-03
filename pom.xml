@@ -31,13 +31,13 @@
     <parent>
         <artifactId>connector-parent</artifactId>
         <groupId>com.evolveum.polygon</groupId>
-        <version>1.4.3.11</version>
-        <relativePath></relativePath>
+        <version>1.5.0.0</version>
+        <relativePath/>
     </parent>
 
     <groupId>com.evolveum.polygon</groupId>
     <artifactId>connector-googleapps</artifactId>
-    <version>1.4.2.19-SNAPSHOT</version>
+    <version>1.4.2.20-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>GoogleApps Connector</name>
