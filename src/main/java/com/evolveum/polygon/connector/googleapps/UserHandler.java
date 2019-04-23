@@ -23,44 +23,6 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.ID_ATTR;
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.PHOTO_ATTR;
-
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
-
-import org.identityconnectors.common.CollectionUtil;
-import org.identityconnectors.common.StringUtil;
-import org.identityconnectors.common.logging.Log;
-import org.identityconnectors.common.security.GuardedString;
-import org.identityconnectors.common.security.SecurityUtil;
-import org.identityconnectors.framework.common.exceptions.ConnectorException;
-import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
-import org.identityconnectors.framework.common.objects.Attribute;
-import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
-import org.identityconnectors.framework.common.objects.AttributeUtil;
-import org.identityconnectors.framework.common.objects.AttributesAccessor;
-import org.identityconnectors.framework.common.objects.Name;
-import org.identityconnectors.framework.common.objects.ObjectClassInfo;
-import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
-import org.identityconnectors.framework.common.objects.OperationalAttributes;
-import org.identityconnectors.framework.common.objects.PredefinedAttributeInfos;
-import org.identityconnectors.framework.common.objects.filter.AndFilter;
-import org.identityconnectors.framework.common.objects.filter.ContainsAllValuesFilter;
-import org.identityconnectors.framework.common.objects.filter.ContainsFilter;
-import org.identityconnectors.framework.common.objects.filter.EndsWithFilter;
-import org.identityconnectors.framework.common.objects.filter.EqualsFilter;
-import org.identityconnectors.framework.common.objects.filter.Filter;
-import org.identityconnectors.framework.common.objects.filter.FilterVisitor;
-import org.identityconnectors.framework.common.objects.filter.GreaterThanFilter;
-import org.identityconnectors.framework.common.objects.filter.GreaterThanOrEqualFilter;
-import org.identityconnectors.framework.common.objects.filter.LessThanFilter;
-import org.identityconnectors.framework.common.objects.filter.LessThanOrEqualFilter;
-import org.identityconnectors.framework.common.objects.filter.NotFilter;
-import org.identityconnectors.framework.common.objects.filter.OrFilter;
-import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
-
 import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.admin.directory.model.Alias;
 import com.google.api.services.admin.directory.model.User;
@@ -69,7 +31,22 @@ import com.google.api.services.admin.directory.model.UserPhoto;
 import com.google.common.base.CharMatcher;
 import com.google.common.escape.Escaper;
 import com.google.common.escape.Escapers;
-import org.identityconnectors.framework.common.objects.Uid;
+import org.identityconnectors.common.CollectionUtil;
+import org.identityconnectors.common.StringUtil;
+import org.identityconnectors.common.logging.Log;
+import org.identityconnectors.common.security.GuardedString;
+import org.identityconnectors.common.security.SecurityUtil;
+import org.identityconnectors.framework.common.exceptions.ConnectorException;
+import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
+import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.filter.*;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.Set;
+
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.ID_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.PHOTO_ATTR;
 
 /**
  *
@@ -319,6 +296,12 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
     }
 
     public StringBuilder visitEndsWithFilter(Directory.Users.List list, EndsWithFilter filter) {
+        return null;
+    }
+
+    @Override
+    public StringBuilder visitEqualsIgnoreCaseFilter(Directory.Users.List list, EqualsIgnoreCaseFilter filter)
+    {
         return null;
     }
 
