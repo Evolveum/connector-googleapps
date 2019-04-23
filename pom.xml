@@ -31,8 +31,8 @@
     <parent>
         <artifactId>connector-parent</artifactId>
         <groupId>com.evolveum.polygon</groupId>
-        <version>1.4.2.18</version>
-        <relativePath></relativePath>
+        <version>1.5.0.0</version>
+        <relativePath/>
     </parent>
 
     <groupId>com.evolveum.polygon</groupId>
