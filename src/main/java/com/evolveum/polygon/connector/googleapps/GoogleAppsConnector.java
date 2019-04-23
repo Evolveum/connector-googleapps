@@ -1260,7 +1260,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     attributes.add(attribute);
                 }
             }
-            return StringUtil.join(attributes, COMMA);
+            return String.join(String.valueOf(COMMA), attributes);
         }
         return null;
     }
