@@ -44,8 +44,8 @@ import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.RetryableException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.Schema;
+import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.*;
 import org.identityconnectors.framework.spi.Configuration;
 import org.identityconnectors.framework.spi.Connector;
@@ -1774,6 +1774,17 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             builder.addAttribute(AttributeBuilder.build(THUMBNAIL_PHOTO_URL_ATTR, user
                     .getThumbnailPhotoUrl()));
         }
+        if (null == attributesToGet || attributesToGet.contains(PHOTO_ATTR))
+        {
+            byte[] decodedePhoto = null;
+            UserPhoto photo = getUserPhoto(user.getId());
+
+            if (null != photo)
+            {
+                decodedePhoto = photo.decodePhotoData();
+            }
+            builder.addAttribute(AttributeBuilder.build(PHOTO_ATTR, decodedePhoto));
+        }
         if (null == attributesToGet || attributesToGet.contains(DELETION_TIME_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(DELETION_TIME_ATTR, null != user
                     .getDeletionTime() ? user.getDeletionTime().toString() : null));
@@ -1787,6 +1798,24 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
 
         return builder.build();
+    }
+
+    private UserPhoto getUserPhoto(String userId)
+    {
+        UserPhoto photo = null;
+        try
+        {
+            photo = configuration.getDirectory().users().photos().get(userId).execute();
+        }
+        catch(GoogleJsonResponseException e)
+        {
+            logger.info("No photo is found for user: " + userId);
+        }
+        catch (IOException e)
+        {
+            logger.info("No photo is found for user: " + userId);
+        }
+        return photo;
     }
 
     protected ConnectorObject fromGroup(Group group, Set<String> attributesToGet,
