@@ -1478,10 +1478,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         });
             }
             Attribute members = attributesAccessor.find(MEMBERS_ATTR);
-            if (null != members && null != members.getValue()) {
+            if (null != members) {
                 final Directory.Members service = configuration.getDirectory().members();
-                if (members.getValue().isEmpty()) {
+                if (null == members.getValue() || members.getValue().isEmpty()) {
                     // Remove all membership
+                    logger.info("Null or empty membership, so removing all members from: " + uid.getUidValue());
                     for (String member : listMembers(service, uidAfterUpdate.getUidValue(), null)) {
 
                         execute(deleteMembers(service, uidAfterUpdate.getUidValue(), member),
