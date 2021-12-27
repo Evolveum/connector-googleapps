@@ -24,9 +24,9 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.api.services.admin.directory.Directory;
-import com.google.api.services.admin.directory.model.Group;
-import com.google.api.services.admin.directory.model.Member;
+import com.google.api.services.directory.Directory;
+import com.google.api.services.directory.model.Group;
+import com.google.api.services.directory.model.Member;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;

@@ -16,3 +16,8 @@ client_secrets.json
 # idea
 .idea
 *.iml
+
+# eclipse
+.settings
+.project
+.classpath

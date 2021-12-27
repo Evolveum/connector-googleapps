@@ -45,9 +45,9 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.store.MemoryDataStoreFactory;
+import com.google.gson.JsonObject;
+
 import java.io.FileWriter;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
 import java.util.Scanner;
 
 /**
@@ -116,20 +116,22 @@ public class Main {
         String clientSecret;
         File file = new File(CLIENTSECRETS_LOCATION);
         FileWriter fileWriter = new FileWriter(file);
-        Scanner user_input = new Scanner(System.in);
-        System.out.print("Enter Client ID: ");
-        clientId = user_input.next();
-        System.out.print("Enter Client Secret: ");
-        clientSecret = user_input.next();
-
-        JSONObject jsonObj = new JSONObject();
-        JSONObject jsonClient = new JSONObject();
-        jsonClient.put("client_id", clientId);
-        jsonClient.put("client_secret", clientSecret);
-        jsonObj.put("installed", jsonClient);
+        
+        try (Scanner user_input = new Scanner(System.in)) {
+            System.out.print("Enter Client ID: ");
+            clientId = user_input.next();
+            System.out.print("Enter Client Secret: ");
+            clientSecret = user_input.next();
+        }
+        
+        JsonObject jsonObj = new JsonObject();
+        JsonObject jsonClient = new JsonObject();
+        jsonClient.addProperty("client_id", clientId);
+        jsonClient.addProperty("client_secret", clientSecret);
+        jsonObj.add("installed", jsonClient);
 
         try {
-            fileWriter.write(jsonObj.toJSONString());
+            fileWriter.write(jsonObj.toString());
 
         } catch (IOException e) {
             e.printStackTrace();
