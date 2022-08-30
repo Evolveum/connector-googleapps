@@ -34,11 +34,10 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AbstractPromptReceiver;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
+import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -46,7 +45,6 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.store.MemoryDataStoreFactory;
 import java.io.FileWriter;
-import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import java.util.Scanner;
 
@@ -172,12 +170,8 @@ public class Main {
                 HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES).setAccessType(
                 "offline").setApprovalPrompt("force").setDataStoreFactory(
                 MemoryDataStoreFactory.getDefaultInstance()).build(),
-                new AbstractPromptReceiver() {
-                    @Override
-                    public String getRedirectUri() throws IOException {
-                        return GoogleOAuthConstants.OOB_REDIRECT_URI;
-                    }
-                }).authorize("user");
+                new LocalServerReceiver()
+                ).authorize("user");
 
         Map<String, Object> configMap = new LinkedHashMap<String, Object>(3);
         configMap.put("clientId", clientSecrets.getDetails().getClientId());
