@@ -53,12 +53,12 @@
         <repository>
             <id>evolveum-nexus-releases</id>
             <name>Internal Releases</name>
-            <url>http://nexus.evolveum.com/nexus/content/repositories/releases/</url>
+            <url>https://nexus.evolveum.com/nexus/content/repositories/releases/</url>
         </repository>
         <repository>
             <id>evolveum-nexus-snapshots</id>
             <name>Internal Releases</name>
-            <url>http://nexus.evolveum.com/nexus/content/repositories/snapshots/</url>
+            <url>https://nexus.evolveum.com/nexus/content/repositories/snapshots/</url>
         </repository>
         <repository>
             <id>google-api-services</id>
@@ -66,7 +66,7 @@
         </repository>
         <repository>
             <id>google-api-services-beta</id>
-            <url>http://google-api-client-libraries.appspot.com/mavenrepo</url>
+            <url>https://google-api-client-libraries.appspot.com/mavenrepo</url>
         </repository>
     </repositories>
 
@@ -108,13 +108,13 @@
             <artifactId>google-api-services-admin-directory</artifactId>
             <version>directory_v1-rev73-1.22.0</version>
         </dependency>
-        
+
         <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-licensing</artifactId>
             <version>v1-rev44-1.22.0</version>
         </dependency>
-        
+
         <dependency>
             <groupId>com.google.http-client</groupId>
             <artifactId>google-http-client-jackson2</artifactId>
@@ -132,19 +132,19 @@
             <artifactId>guava</artifactId>
             <version>20.0</version>
         </dependency>
-   
+
         <dependency>
             <groupId>com.googlecode.json-simple</groupId>
             <artifactId>json-simple</artifactId>
             <version>1.1.1</version>
         </dependency>
-        
+
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.8.0</version>      
+            <version>2.8.0</version>
         </dependency>
-        
+
         <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
