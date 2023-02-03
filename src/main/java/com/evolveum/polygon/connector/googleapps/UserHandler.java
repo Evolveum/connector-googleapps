@@ -40,10 +40,12 @@ import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.*;
+import org.identityconnectors.framework.common.objects.AttributeInfo.Flags;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import java.util.EnumSet;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.ID_ATTR;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.PHOTO_ATTR;
@@ -497,7 +499,21 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         builder.addAttributeInfo(AttributeInfoBuilder.define(PHOTO_ATTR, byte[].class)
                 .setReturnedByDefault(false).build());
 
-        builder.addAttributeInfo(PredefinedAttributeInfos.GROUPS);
+        /* 
+        builder.addAttributeInfo(PredefinedAttributeInfos.GROUPS.setReturnedByDefault(true));
+        AttributeInfoBuilder subjectId = new AttributeInfoBuilder();
+        subjectId.setName("subjectId");
+        subjectId.setNativeName("subject-id");
+        subjectId.setCreateable(true);
+        subjectId.setUpdateable(true);
+        subjectId.setReadable(true);
+        subjectId.setRequired(false);
+        subjectId.setMultiValued(false);
+        attributes.add(subjectId.build());
+        builder.addAttributeInfo(AttributeInfoBuilder.define("groups").setNativeName("__GROUPS__").setMultiValued(true).setReturnedByDefault(true).build());
+        */
+        AttributeInfo GROUPS = AttributeInfoBuilder.build( PredefinedAttributes.GROUPS_NAME, String.class, EnumSet.of(Flags.MULTIVALUED));
+        builder.addAttributeInfo(GROUPS);
 
         return builder.build();
     }

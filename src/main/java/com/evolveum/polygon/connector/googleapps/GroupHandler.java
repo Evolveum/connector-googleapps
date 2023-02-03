@@ -51,6 +51,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
     private static final Log logger = Log.getLog(GroupHandler.class);
 
     public Void visitAndFilter(Directory.Groups.List list, AndFilter andFilter) {
+            logger.warn("Throwing get exception in visitAndFilter");
         throw getException();
     }
 
@@ -58,6 +59,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         if (containsFilter.getAttribute().is(MEMBERS_ATTR)) {
             list.setUserKey(containsFilter.getValue());
         } else {
+            logger.warn("Throwing get exception in visitContainsFilter");
             throw getException();
         }
         return null;
@@ -66,6 +68,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
     public Void visitContainsAllValuesFilter(Directory.Groups.List list,
             ContainsAllValuesFilter containsAllValuesFilter) {
         //TODO needed for removing deleted users from groups
+            logger.warn("Throwing get exception in visitContainsAllValuesFilter");
         throw getException();
     }
 
@@ -199,7 +202,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
 
         // Virtual Attribute
         builder.addAttributeInfo(AttributeInfoBuilder.define(MEMBERS_ATTR).setMultiValued(true)
-                .setReturnedByDefault(false).build());
+                .setReturnedByDefault(true).build());
 
         return builder.build();
     }
