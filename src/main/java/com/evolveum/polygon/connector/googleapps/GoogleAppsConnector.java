@@ -1695,12 +1695,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     .getIsDelegatedAdmin()));
         }
         if (null == attributesToGet || attributesToGet.contains(LAST_LOGIN_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(LAST_LOGIN_TIME_ATTR, user
-                    .getLastLoginTime().toString()));
+            builder.addAttribute(AttributeBuilder.build(LAST_LOGIN_TIME_ATTR, 
+            null != user.getLastLoginTime() ? user.getLastLoginTime().toString() : null));
         }
         if (null == attributesToGet || attributesToGet.contains(CREATION_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(CREATION_TIME_ATTR, user.getCreationTime()
-                    .toString()));
+            builder.addAttribute(AttributeBuilder.build(CREATION_TIME_ATTR,
+            null != user.getCreationTime() ? user.getCreationTime().toString() : null));
         }
         if (null == attributesToGet || attributesToGet.contains(AGREED_TO_TERMS_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(AGREED_TO_TERMS_ATTR, user
