@@ -48,8 +48,8 @@ import org.identityconnectors.framework.common.objects.PredefinedAttributeInfos;
 import org.identityconnectors.framework.common.objects.PredefinedAttributes;
 import org.identityconnectors.framework.common.objects.Uid;
 
-import com.google.api.services.admin.directory.Directory;
-import com.google.api.services.admin.directory.model.OrgUnit;
+import com.google.api.services.directory.Directory;
+import com.google.api.services.directory.model.OrgUnit;
 
 /**
  * OrgunitsHandler is a util class to cover all Organizations Unit related
@@ -194,7 +194,7 @@ public class OrgunitsHandler {
         }
         try {
             // Full path of the organization unit
-            return service.patch(MY_CUSTOMER_ID, CollectionUtil.newList(orgUnitPath), resource)
+            return service.patch(MY_CUSTOMER_ID, orgUnitPath, resource)
                     .setFields(ORG_UNIT_PATH_ETAG);
             // } catch (HttpResponseException e){
         } catch (IOException e) {

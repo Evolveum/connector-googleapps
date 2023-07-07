@@ -23,8 +23,15 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
+import java.net.URI;
 import java.security.GeneralSecurityException;
 
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.directory.Directory;
+import com.google.auth.Credentials;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.UserCredentials;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.common.security.SecurityUtil;
@@ -33,15 +40,11 @@ import org.identityconnectors.framework.spi.AbstractConfiguration;
 import org.identityconnectors.framework.spi.ConfigurationProperty;
 import org.identityconnectors.framework.spi.StatefulConfiguration;
 
-import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.services.admin.directory.Directory;
 import com.google.api.services.licensing.Licensing;
 import java.io.IOException;
 import org.identityconnectors.common.logging.Log;
@@ -214,45 +217,38 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
             throw new IllegalArgumentException("Refresh Token cannot be null or empty.");
         }
     }
-    private GoogleCredential credential = null;
+    private Credentials credentials = null;
 
-    public GoogleCredential getGoogleCredential() {
-        if (null == credential) {
+    public void getGoogleCredential() {
+        if (null == credentials) {
             synchronized (this) {
-                if (null == credential) {
+                if (null == credentials) {
                     System.setProperty("https.protocols", "TLSv1.2");
-                    credential =
-                            new GoogleCredential.Builder()
-                            .setTransport(HTTP_TRANSPORT)
-                            .setJsonFactory(JSON_FACTORY)
-                            .setTokenServerEncodedUrl(GoogleOAuthConstants.TOKEN_SERVER_URL)
-                            .setClientAuthentication(
-                            new ClientParametersAuthentication(getClientId(),
-                            SecurityUtil.decrypt(getClientSecret())))
+                    credentials = UserCredentials.newBuilder()
+                            .setHttpTransportFactory(() -> HTTP_TRANSPORT)
+                            .setTokenServerUri(URI.create(GoogleOAuthConstants.TOKEN_SERVER_URL))
+                            .setClientId(getClientId())
+                            .setClientSecret(SecurityUtil.decrypt(getClientSecret()))
+                            .setRefreshToken(SecurityUtil.decrypt(getRefreshToken()))
                             .build();
+
+                    HttpRequestInitializer requestInitializer = new HttpCredentialsAdapter(credentials);
+
                     try {
-                        credential.setRefreshToken(SecurityUtil.decrypt(getRefreshToken())).refreshToken();
+                        credentials.refresh();
                     } catch (IOException ex) {
                         logger.error("Token refresh error: {0}", ex.getMessage());
                     }
 
-                    getRefreshToken().access(new GuardedString.Accessor() {
-                        @Override
-                        public void access(char[] chars) {
-                            credential.setRefreshToken(new String(chars));
-                        }
-                    });
                     directory =
-                            new Directory.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+                            new Directory.Builder(HTTP_TRANSPORT, JSON_FACTORY, requestInitializer)
                             .setApplicationName("GoogleAppsConnector").build();
                     licensing =
-                            new Licensing.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+                            new Licensing.Builder(HTTP_TRANSPORT, JSON_FACTORY, requestInitializer)
                             .setApplicationName("GoogleAppsConnector").build();
-
                 }
             }
         }
-        return credential;
     }
 
     @Override
@@ -265,7 +261,7 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     /**
      * Global instance of the JSON factory.
      */
-    private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+    private static final JsonFactory JSON_FACTORY = new GsonFactory();
 
     public Directory getDirectory() {
         getGoogleCredential();

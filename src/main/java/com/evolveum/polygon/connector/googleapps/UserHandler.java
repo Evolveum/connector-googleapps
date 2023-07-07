@@ -23,11 +23,11 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.api.services.admin.directory.Directory;
-import com.google.api.services.admin.directory.model.Alias;
-import com.google.api.services.admin.directory.model.User;
-import com.google.api.services.admin.directory.model.UserName;
-import com.google.api.services.admin.directory.model.UserPhoto;
+import com.google.api.services.directory.Directory;
+import com.google.api.services.directory.model.Alias;
+import com.google.api.services.directory.model.User;
+import com.google.api.services.directory.model.UserName;
+import com.google.api.services.directory.model.UserPhoto;
 import com.google.common.base.CharMatcher;
 import com.google.common.escape.Escaper;
 import com.google.common.escape.Escapers;
@@ -208,7 +208,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         String stringValue = AttributeUtil.getAsStringValue(attribute);
         if (StringUtil.isNotBlank(stringValue)) {
             stringValue = STRING_ESCAPER.escape(stringValue);
-            if (CharMatcher.WHITESPACE.matchesAnyOf(stringValue)) {
+            if (CharMatcher.whitespace().matchesAnyOf(stringValue)) {
                 builder.append('\'').append(stringValue);
                 if (null != postfix) {
                     builder.append(postfix);

@@ -42,10 +42,11 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.MemoryDataStoreFactory;
+import com.google.gson.JsonObject;
 import java.io.FileWriter;
-import org.json.simple.JSONObject;
+
 import java.util.Scanner;
 
 /**
@@ -100,7 +101,7 @@ public class Main {
     /**
      * Global instance of the JSON factory.
      */
-    private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+    private static final JsonFactory JSON_FACTORY = new GsonFactory();
 
     public static void main(String[] args) throws Exception {
         System.out.println("-------------------------------------------------------------------------------------------");
@@ -120,14 +121,14 @@ public class Main {
         System.out.print("Enter Client Secret: ");
         clientSecret = user_input.next();
 
-        JSONObject jsonObj = new JSONObject();
-        JSONObject jsonClient = new JSONObject();
-        jsonClient.put("client_id", clientId);
-        jsonClient.put("client_secret", clientSecret);
-        jsonObj.put("installed", jsonClient);
+        JsonObject jsonObj = new JsonObject();
+        JsonObject jsonClient = new JsonObject();
+        jsonClient.addProperty("client_id", clientId);
+        jsonClient.addProperty("client_secret", clientSecret);
+        jsonObj.add("installed", jsonClient);
 
         try {
-            fileWriter.write(jsonObj.toJSONString());
+            fileWriter.write(jsonObj.toString());
 
         } catch (IOException e) {
             e.printStackTrace();
