@@ -28,8 +28,8 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.client.http.HttpStatusCodes;
-import com.google.api.services.admin.directory.Directory;
-import com.google.api.services.admin.directory.model.*;
+import com.google.api.services.directory.Directory;
+import com.google.api.services.directory.model.*;
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.LicensingRequest;
 import com.google.api.services.licensing.model.LicenseAssignment;
@@ -436,7 +436,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      */
     public void delete(final ObjectClass objectClass, final Uid uid, final OperationOptions options) {
 
-        AbstractGoogleJsonClientRequest<Void> request = null;
+        AbstractGoogleJsonClientRequest request = null;
 
         try {
             if (ObjectClass.ACCOUNT.equals(objectClass)) {
@@ -465,8 +465,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 }
             } else if (ORG_UNIT.equals(objectClass)) {
                 request
-                        = configuration.getDirectory().orgunits().delete(MY_CUSTOMER_ID,
-                        CollectionUtil.newList(uid.getUidValue()));
+                        = configuration.getDirectory().orgunits().delete(MY_CUSTOMER_ID, uid.getUidValue());
             } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
                 request
                         = deleteLicenseAssignment(configuration.getLicensing().licenseAssignments(),
@@ -731,8 +730,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     private void executeOrgUnitReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
         try {
             Directory.Orgunits.Get request
-                    = configuration.getDirectory().orgunits().get(MY_CUSTOMER_ID,
-                    Arrays.asList(uid.getUidValue()));
+                    = configuration.getDirectory().orgunits().get(MY_CUSTOMER_ID, uid.getUidValue());
             request.setFields(getFields(options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR));
 
             execute(request,

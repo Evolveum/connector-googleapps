@@ -23,28 +23,37 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
-import java.security.GeneralSecurityException;
-
+import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.directory.Directory;
+import com.google.api.services.directory.DirectoryScopes;
+import com.google.api.services.licensing.Licensing;
+import com.google.api.services.licensing.LicensingScopes;
+import com.google.auth.Credentials;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.auth.oauth2.UserCredentials;
 import org.identityconnectors.common.StringUtil;
+import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.common.security.SecurityUtil;
+import org.identityconnectors.framework.common.exceptions.ConfigurationException;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.spi.AbstractConfiguration;
 import org.identityconnectors.framework.spi.ConfigurationProperty;
 import org.identityconnectors.framework.spi.StatefulConfiguration;
 
-import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.services.admin.directory.Directory;
-import com.google.api.services.licensing.Licensing;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import org.identityconnectors.common.logging.Log;
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 
 /**
  * Extends the {@link AbstractConfiguration} class to provide all the necessary
@@ -66,6 +75,11 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
      */
     private GuardedString clientSecret = null;
     private GuardedString refreshToken = null;
+    /**
+     * Service Account Key in JSON format.
+     */
+    private GuardedString serviceAccountKeyJson = null;
+    private String serviceAccountUser = null;
     private static final Log logger = Log.getLog(GoogleAppsConfiguration.class);
     /**
      * caching
@@ -136,7 +150,7 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     }
 
     @ConfigurationProperty(order = 6, displayMessageKey = "clientsecret.display",
-    groupMessageKey = "basic.group", helpMessageKey = "clientsecret.help", required = true,
+    groupMessageKey = "basic.group", helpMessageKey = "clientsecret.help", required = false,
     confidential = true)
     public GuardedString getClientSecret() {
         return clientSecret;
@@ -147,7 +161,7 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     }
 
     @ConfigurationProperty(order = 7, displayMessageKey = "refreshtoken.display",
-    groupMessageKey = "basic.group", helpMessageKey = "refreshtoken.help", required = true,
+    groupMessageKey = "basic.group", helpMessageKey = "refreshtoken.help", required = false,
     confidential = true)
     public GuardedString getRefreshToken() {
         return refreshToken;
@@ -156,8 +170,30 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     public void setRefreshToken(GuardedString refreshToken) {
         this.refreshToken = refreshToken;
     }
-    
-    @ConfigurationProperty(order = 8, displayMessageKey = "allowCache.display",
+
+    @ConfigurationProperty(order = 8, displayMessageKey = "serviceaccountkeyjson.display",
+            groupMessageKey = "basic.group", helpMessageKey = "serviceaccountkeyjson.help", required = false,
+            confidential = true)
+    public GuardedString getServiceAccountKeyJson() {
+        return serviceAccountKeyJson;
+    }
+
+    public void setServiceAccountKeyJson(GuardedString serviceAccountKeyJson) {
+        this.serviceAccountKeyJson = serviceAccountKeyJson;
+    }
+
+    @ConfigurationProperty(order = 9, displayMessageKey = "serviceaccountdelegateduser.display",
+            groupMessageKey = "basic.group", helpMessageKey = "serviceaccountdelegateduser.help", required = false,
+            confidential = false)
+    public String getServiceAccountUser() {
+        return serviceAccountUser;
+    }
+
+    public void setServiceAccountUser(String serviceAccountUser) {
+        this.serviceAccountUser = serviceAccountUser;
+    }
+
+    @ConfigurationProperty(order = 10, displayMessageKey = "allowCache.display",
     groupMessageKey = "basic.group", helpMessageKey = "allowCache.help", required = true,
     confidential = false)
     public Boolean getAllowCache() {
@@ -168,7 +204,7 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
         this.allowCache = allowCache;
     }
 
-    @ConfigurationProperty(order = 9, displayMessageKey = "maxCacheTTL.display",
+    @ConfigurationProperty(order = 11, displayMessageKey = "maxCacheTTL.display",
             groupMessageKey = "basic.group", helpMessageKey = "maxCacheTTL.help", required = true,
             confidential = false)
     public Long getMaxCacheTTL() {
@@ -179,7 +215,7 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
         this.maxCacheTTL = maxCacheTTL;
     }
 
-    @ConfigurationProperty(order = 10, displayMessageKey = "ignoreCacheAfterUpdateTTL.display",
+    @ConfigurationProperty(order = 12, displayMessageKey = "ignoreCacheAfterUpdateTTL.display",
             groupMessageKey = "basic.group", helpMessageKey = "ignoreCacheAfterUpdateTTL.help", required = true,
             confidential = false)
     public Long getIgnoreCacheAfterUpdateTTL() {
@@ -207,52 +243,59 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
         if (StringUtil.isBlank(clientId)) {
             throw new IllegalArgumentException("Client Id cannot be null or empty.");
         }
-        if (null == clientSecret) {
-            throw new IllegalArgumentException("Client Secret cannot be null or empty.");
-        }
-        if (null == refreshToken) {
-            throw new IllegalArgumentException("Refresh Token cannot be null or empty.");
-        }
     }
-    private GoogleCredential credential = null;
 
-    public GoogleCredential getGoogleCredential() {
-        if (null == credential) {
+    private Credentials credentials = null;
+
+    public void getGoogleCredential() {
+        if (null == credentials) {
             synchronized (this) {
-                if (null == credential) {
+                if (null == credentials) {
                     System.setProperty("https.protocols", "TLSv1.2");
-                    credential =
-                            new GoogleCredential.Builder()
-                            .setTransport(HTTP_TRANSPORT)
-                            .setJsonFactory(JSON_FACTORY)
-                            .setTokenServerEncodedUrl(GoogleOAuthConstants.TOKEN_SERVER_URL)
-                            .setClientAuthentication(
-                            new ClientParametersAuthentication(getClientId(),
-                            SecurityUtil.decrypt(getClientSecret())))
-                            .build();
+
+                    if (getClientSecret() != null) {
+                        // Using OAuth 2.0 client with authorization code flow
+                        credentials = UserCredentials.newBuilder()
+                                .setHttpTransportFactory(() -> HTTP_TRANSPORT)
+                                .setTokenServerUri(URI.create(GoogleOAuthConstants.TOKEN_SERVER_URL))
+                                .setClientId(getClientId())
+                                .setClientSecret(SecurityUtil.decrypt(getClientSecret()))
+                                .setRefreshToken(SecurityUtil.decrypt(getRefreshToken()))
+                                .build();
+                    } else {
+                        // Using Service Account
+                        getServiceAccountKeyJson().access(c -> {
+                            String keyJson = String.valueOf(c);
+                            try (InputStream inputStream = new ByteArrayInputStream(keyJson.getBytes(StandardCharsets.UTF_8))) {
+                                credentials = ServiceAccountCredentials.fromStream(inputStream, () -> HTTP_TRANSPORT)
+                                        .createScoped(DirectoryScopes.ADMIN_DIRECTORY_USER,
+                                                DirectoryScopes.ADMIN_DIRECTORY_GROUP,
+                                                DirectoryScopes.ADMIN_DIRECTORY_GROUP,
+                                                LicensingScopes.APPS_LICENSING)
+                                        .createDelegated(getServiceAccountUser());
+                            } catch (IOException e) {
+                                throw new ConfigurationException("Invalid Service Account Key", e);
+                            }
+                        });
+                    }
+
                     try {
-                        credential.setRefreshToken(SecurityUtil.decrypt(getRefreshToken())).refreshToken();
+                        credentials.refresh();
                     } catch (IOException ex) {
                         logger.error("Token refresh error: {0}", ex.getMessage());
                     }
 
-                    getRefreshToken().access(new GuardedString.Accessor() {
-                        @Override
-                        public void access(char[] chars) {
-                            credential.setRefreshToken(new String(chars));
-                        }
-                    });
+                    HttpRequestInitializer requestInitializer = new HttpCredentialsAdapter(credentials);
+
                     directory =
-                            new Directory.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+                            new Directory.Builder(HTTP_TRANSPORT, JSON_FACTORY, requestInitializer)
                             .setApplicationName("GoogleAppsConnector").build();
                     licensing =
-                            new Licensing.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+                            new Licensing.Builder(HTTP_TRANSPORT, JSON_FACTORY, requestInitializer)
                             .setApplicationName("GoogleAppsConnector").build();
-
                 }
             }
         }
-        return credential;
     }
 
     @Override
@@ -265,7 +308,7 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
     /**
      * Global instance of the JSON factory.
      */
-    private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+    private static final JsonFactory JSON_FACTORY = new GsonFactory();
 
     public Directory getDirectory() {
         getGoogleCredential();
