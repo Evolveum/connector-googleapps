@@ -93,6 +93,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
     public static final String IS_MAILBOX_SETUP_ATTR = "isMailboxSetup";
     public static final String THUMBNAIL_PHOTO_URL_ATTR = "thumbnailPhotoUrl";
     public static final String DELETION_TIME_ATTR = "deletionTime";
+    public static final String LOCATIONS_ATTR = "locations";
 
     private static final Map<String, String> NAME_DICTIONARY;
     private static final Set<String> S;
@@ -475,6 +476,8 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 .setMultiValued(true).build());
         builder.addAttributeInfo(AttributeInfoBuilder.define(ALIASES_ATTR)
                 .setMultiValued(true).build());
+        builder.addAttributeInfo(AttributeInfoBuilder.define(LOCATIONS_ATTR)
+                .setMultiValued(true).build());
 
         builder.addAttributeInfo(AttributeInfoBuilder.define(NON_EDITABLE_ALIASES_ATTR)
                 .setUpdateable(false).setCreateable(false).setMultiValued(true).build());
@@ -559,6 +562,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         user.setAddresses(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(ADDRESSES_ATTR)));
         user.setOrganizations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(ORGANIZATIONS_ATTR)));
         user.setPhones(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(PHONES_ATTR)));
+        user.setLocations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(LOCATIONS_ATTR)));
 
         user.setSuspended(attributes.findBoolean(SUSPENDED_ATTR));
         user.setChangePasswordAtNextLogin(attributes
@@ -709,8 +713,15 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
             if (null == content) {
                 content = new User();
             }
-            //           content.setPhones(phones.getValue());
             content.setPhones(GoogleAppsUtil.getStructAttr(phones));
+        }
+
+        Attribute locations = attributes.find(LOCATIONS_ATTR);
+        if (null != locations) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setLocations(GoogleAppsUtil.getStructAttr(locations));
         }
 
         Attribute orgUnitPath = attributes.find(ORG_UNIT_PATH_ATTR);

@@ -135,6 +135,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public static final String TYPE_ATTR = "type";
     public static final String PRODUCT_ID_SKU_ID_USER_ID = "productId,skuId,userId";
     public static final String PHOTO_ATTR = "__PHOTO__";
+    public static final String LOCATIONS_ATTR = "locations";
+
     /**
      * Place holder for the {@link Configuration} passed into the init() method
      * {@link GoogleAppsConnector#init(org.identityconnectors.framework.spi.Configuration)}
@@ -1742,11 +1744,15 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     .getOrganizations())));
         }
         if (null == attributesToGet || attributesToGet.contains(PHONES_ATTR)) {
-//            builder.addAttribute(AttributeBuilder.build(PHONES_ATTR, (Collection) user.getPhones()));
             builder.addAttribute(AttributeBuilder.build(PHONES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones())));
         }
         if (null == attributesToGet || attributesToGet.contains(ALIASES_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(ALIASES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases())));
+        }
+
+        if (null == attributesToGet || attributesToGet.contains(LOCATIONS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(LOCATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
+                    .getLocations())));
         }
 
         if (null == attributesToGet || attributesToGet.contains(NON_EDITABLE_ALIASES_ATTR)) {
