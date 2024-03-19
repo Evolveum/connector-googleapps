@@ -270,7 +270,6 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
                                 credentials = ServiceAccountCredentials.fromStream(inputStream, () -> HTTP_TRANSPORT)
                                         .createScoped(DirectoryScopes.ADMIN_DIRECTORY_USER,
                                                 DirectoryScopes.ADMIN_DIRECTORY_GROUP,
-                                                DirectoryScopes.ADMIN_DIRECTORY_GROUP,
                                                 LicensingScopes.APPS_LICENSING)
                                         .createDelegated(getServiceAccountUser());
                             } catch (IOException e) {
