@@ -95,7 +95,6 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
     public static final String DELETION_TIME_ATTR = "deletionTime";
     public static final String LOCATIONS_ATTR = "locations";
 
-    public static final String LOCATIONS_ATTR = "locations";
     public static final String ARCHIVED_ATTR = "archived";
 //    public static final String GENDER_ATTR = "gender";
 //    public static final String NOTES_ATTR = "notes";
@@ -459,9 +458,6 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         builder.addAttributeInfo(AttributeInfoBuilder.define(DELETION_TIME_ATTR).setUpdateable(
                 false).setCreateable(false).build());
 
-        builder.addAttributeInfo(AttributeInfoBuilder.define(LOCATIONS_ATTR)
-                .setMultiValued(true).build());
-
         // Virtual Attribute
         builder.addAttributeInfo(AttributeInfoBuilder.define(PHOTO_ATTR, byte[].class)
                 .setReturnedByDefault(false).build());
@@ -558,7 +554,6 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         user.setIncludeInGlobalAddressList(attributes
                 .findBoolean(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR));
 
-        user.setLocations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(LOCATIONS_ATTR)));
         user.setArchived(attributes.findBoolean(ARCHIVED_ATTR));
 
         user.setKeywords(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(KEYWORDS_ATTR)));
@@ -742,14 +737,6 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 }
                 content.setIncludeInGlobalAddressList(booleanValue);
             }
-        }
-
-        Attribute locations = attributes.find(LOCATIONS_ATTR);
-        if (null != locations) {
-            if (null == content) {
-                content = new User();
-            }
-            content.setLocations(GoogleAppsUtil.getStructAttr(locations));
         }
 
         Attribute archived = attributes.find(ARCHIVED_ATTR);
