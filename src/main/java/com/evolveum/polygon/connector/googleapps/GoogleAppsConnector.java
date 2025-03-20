@@ -135,6 +135,18 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public static final String TYPE_ATTR = "type";
     public static final String PRODUCT_ID_SKU_ID_USER_ID = "productId,skuId,userId";
     public static final String PHOTO_ATTR = "__PHOTO__";
+    public static final String LOCATIONS_ATTR = "locations" ;
+    public static final String ARCHIVED_ATTR = "archived";
+//    public static final String GENDER_ATTR = "gender";
+//    public static final String NOTES_ATTR = "notes";
+    public static final String KEYWORDS_ATTR = "keywords";
+    public static final String WEBSITES_ATTR = "websites";
+    public static final String LANGUAGES_ATTR = "languages";
+    public static final String SSH_PUBLIC_KEYS_ATTR = "sshPublicKeys";
+    public static final String RECOVERY_EMAIL_ATTR = "recoveryEmail";
+    public static final String RECOVERY_PHONE_ATTR = "recoveryPhone";
+    public static final String IS_ENROLLED_IN_2SV_ATTR = "isEnrolledIn2Sv";
+    public static final String IS_ENFORCED_IN_2SV_ATTR = "isEnforcedIn2Sv";
     /**
      * Place holder for the {@link Configuration} passed into the init() method
      * {@link GoogleAppsConnector#init(org.identityconnectors.framework.spi.Configuration)}
@@ -722,7 +734,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             }
 
         } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#List");
+            logger.warn(e, "Failed to initialize License#List");
             throw ConnectorException.wrap(e);
         }
     }
@@ -1787,6 +1799,49 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         if (null == attributesToGet || attributesToGet.contains(DELETION_TIME_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(DELETION_TIME_ATTR, null != user
                     .getDeletionTime() ? user.getDeletionTime().toString() : null));
+        }
+
+        if (null == attributesToGet || attributesToGet.contains(LOCATIONS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(LOCATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations())));
+        }
+
+        if (null == attributesToGet || attributesToGet.contains(ARCHIVED_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(ARCHIVED_ATTR, user.getArchived()));
+        }
+
+        // The following two attributes has different format - can't be simply handled as other already existing attributes
+//        if (null == attributesToGet || attributesToGet.contains(GENDER_ATTR)) {
+//            builder.addAttribute(AttributeBuilder.build(GENDER_ATTR, user.getGender().toString()));
+//        }
+//        if (null == attributesToGet || attributesToGet.contains(NOTES_ATTR)) {
+//            builder.addAttribute(AttributeBuilder.build(NOTES_ATTR, user.getNotes().toString()));
+//        }
+        // ---------------------------------------------------------------------------------------------------------------
+        if (null == attributesToGet || attributesToGet.contains(KEYWORDS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(KEYWORDS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getKeywords())));
+        }
+        if (null == attributesToGet || attributesToGet.contains(WEBSITES_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(WEBSITES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getWebsites())));
+        }
+        if (null == attributesToGet || attributesToGet.contains(LANGUAGES_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(LANGUAGES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLanguages())));
+        }
+        if (null == attributesToGet || attributesToGet.contains(SSH_PUBLIC_KEYS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(SSH_PUBLIC_KEYS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getSshPublicKeys())));
+        }
+
+        if (null == attributesToGet || attributesToGet.contains(RECOVERY_EMAIL_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(RECOVERY_EMAIL_ATTR, user.getRecoveryEmail()));
+        }
+        if (null == attributesToGet || attributesToGet.contains(RECOVERY_PHONE_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(RECOVERY_PHONE_ATTR, user.getRecoveryPhone()));
+        }
+
+        if (null == attributesToGet || attributesToGet.contains(IS_ENROLLED_IN_2SV_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(IS_ENROLLED_IN_2SV_ATTR, user.getIsEnrolledIn2Sv()));
+        }
+        if (null == attributesToGet || attributesToGet.contains(IS_ENFORCED_IN_2SV_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(IS_ENFORCED_IN_2SV_ATTR, user.getIsEnforcedIn2Sv()));
         }
 
         // Expensive to get

@@ -94,6 +94,19 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
     public static final String THUMBNAIL_PHOTO_URL_ATTR = "thumbnailPhotoUrl";
     public static final String DELETION_TIME_ATTR = "deletionTime";
 
+    public static final String LOCATIONS_ATTR = "locations";
+    public static final String ARCHIVED_ATTR = "archived";
+//    public static final String GENDER_ATTR = "gender";
+//    public static final String NOTES_ATTR = "notes";
+    public static final String KEYWORDS_ATTR = "keywords";
+    public static final String WEBSITES_ATTR = "websites";
+    public static final String LANGUAGES_ATTR = "languages";
+    public static final String SSH_PUBLIC_KEYS_ATTR = "sshPublicKeys";
+    public static final String RECOVERY_EMAIL_ATTR = "recoveryEmail";
+    public static final String RECOVERY_PHONE_ATTR = "recoveryPhone";
+    public static final String IS_ENROLLED_IN_2SV_ATTR = "isEnrolledIn2Sv";
+    public static final String IS_ENFORCED_IN_2SV_ATTR = "isEnforcedIn2Sv";
+
     private static final Map<String, String> NAME_DICTIONARY;
     private static final Set<String> S;
     private static final Set<String> SW;
@@ -309,118 +322,66 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
 
     // /////////////
     //
-    // USER https://developers.google.com/admin-sdk/directory/v1/reference/users
+    // USER https://developers.google.com/admin-sdk/directory/reference/rest/v1/users
     //
     // /////////////
     public static ObjectClassInfo getUserClassInfo() {
         // @formatter:off
             /*
-         {
-         "kind": "admin#directory#user",
-         "id": string,
-         "etag": etag,
-         "primaryEmail": string,
-         "name": {
-         "givenName": string,
-         "familyName": string,
-         "fullName": string
-         },
-         "isAdmin": boolean,
-         "isDelegatedAdmin": boolean,
-         "lastLoginTime": datetime,
-         "creationTime": datetime,
-         "deletionTime": datetime,
-         "agreedToTerms": boolean,
-         "password": string,
-         "hashFunction": string,
-         "suspended": boolean,
-         "suspensionReason": string,
-         "changePasswordAtNextLogin": boolean,
-         "ipWhitelisted": boolean,
-         "ims": [
-         {
-         "type": string,
-         "customType": string,
-         "protocol": string,
-         "customProtocol": string,
-         "im": string,
-         "primary": boolean
-         }
-         ],
-         "emails": [
-         {
-         "address": string,
-         "type": string,
-         "customType": string,
-         "primary": boolean
-         }
-         ],
-         "externalIds": [
-         {
-         "value": string,
-         "type": string,
-         "customType": string
-         }
-         ],
-         "relations": [
-         {
-         "value": string,
-         "type": string,
-         "customType": string
-         }
-         ],
-         "addresses": [
-         {
-         "type": string,
-         "customType": string,
-         "sourceIsStructured": boolean,
-         "formatted": string,
-         "poBox": string,
-         "extendedAddress": string,
-         "streetAddress": string,
-         "locality": string,
-         "region": string,
-         "postalCode": string,
-         "country": string,
-         "primary": boolean,
-         "countryCode": string
-         }
-         ],
-         "organizations": [
-         {
-         "name": string,
-         "title": string,
-         "primary": boolean,
-         "type": string,
-         "customType": string,
-         "department": string,
-         "symbol": string,
-         "location": string,
-         "description": string,
-         "domain": string,
-         "costCenter": string
-         }
-         ],
-         "phones": [
-         {
-         "value": string,
-         "primary": boolean,
-         "type": string,
-         "customType": string
-         }
-         ],
-         "aliases": [
-         string
-         ],
-         "nonEditableAliases": [
-         string
-         ],
-         "customerId": string,
-         "orgUnitPath": string,
-         "isMailboxSetup": boolean,
-         "includeInGlobalAddressList": boolean,
-         "thumbnailPhotoUrl": string
-         }
+        {
+          "id": string,
+          "primaryEmail": string,
+          "password": value,
+          "hashFunction": string,
+          "isAdmin": boolean,
+          "isDelegatedAdmin": boolean,
+          "agreedToTerms": boolean,
+          "suspended": boolean,
+          "changePasswordAtNextLogin": boolean,
+          "ipWhitelisted": boolean,
+          "name": {
+            object (UserName)
+          },
+          "kind": string,
+          "etag": string,
+          "emails": value,
+          "externalIds": value,
+          "relations": value,
+          "aliases": [
+            string
+          ],
+          "isMailboxSetup": boolean,
+          "customerId": string,
+          "addresses": value,
+          "organizations": value,
+          "lastLoginTime": string,
+          "phones": value,
+          "suspensionReason": string,
+          "thumbnailPhotoUrl": string,
+          "languages": value,
+          "posixAccounts": value,
+          "creationTime": string,
+          "nonEditableAliases": [
+            string
+          ],
+          "sshPublicKeys": value,
+          "notes": value,
+          "websites": value,
+          "locations": value,
+          "includeInGlobalAddressList": boolean,
+          "keywords": value,
+          "deletionTime": string,
+          "gender": value,
+          "thumbnailPhotoEtag": string,
+          "ims": value,
+          "customSchemas": value,
+          "isEnrolledIn2Sv": boolean,
+          "isEnforcedIn2Sv": boolean,
+          "archived": boolean,
+          "orgUnitPath": string,
+          "recoveryEmail": string,
+          "recoveryPhone": string
+        }
          */
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
@@ -495,11 +456,36 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         builder.addAttributeInfo(AttributeInfoBuilder.define(DELETION_TIME_ATTR).setUpdateable(
                 false).setCreateable(false).build());
 
+        builder.addAttributeInfo(AttributeInfoBuilder.define(LOCATIONS_ATTR)
+                .setMultiValued(true).build());
+
         // Virtual Attribute
         builder.addAttributeInfo(AttributeInfoBuilder.define(PHOTO_ATTR, byte[].class)
                 .setReturnedByDefault(false).build());
 
-        /* 
+        builder.addAttributeInfo(AttributeInfoBuilder.build(ARCHIVED_ATTR, Boolean.class));
+
+        // the attribute has different format - it is not ready yet
+//        builder.addAttributeInfo(AttributeInfoBuilder.define(GENDER_ATTR).build());
+//        builder.addAttributeInfo(AttributeInfoBuilder.define(NOTES_ATTR).build());
+        builder.addAttributeInfo(AttributeInfoBuilder.define(KEYWORDS_ATTR)
+                .setMultiValued(true).build());
+        builder.addAttributeInfo(AttributeInfoBuilder.define(WEBSITES_ATTR)
+                .setMultiValued(true).build());
+        builder.addAttributeInfo(AttributeInfoBuilder.define(LANGUAGES_ATTR)
+                .setMultiValued(true).build());
+        builder.addAttributeInfo(AttributeInfoBuilder.define(SSH_PUBLIC_KEYS_ATTR)
+                .setMultiValued(true).build());
+
+        builder.addAttributeInfo(AttributeInfoBuilder.build(RECOVERY_EMAIL_ATTR));
+        builder.addAttributeInfo(AttributeInfoBuilder.build(RECOVERY_PHONE_ATTR));
+
+        builder.addAttributeInfo(AttributeInfoBuilder.define(IS_ENFORCED_IN_2SV_ATTR, Boolean.TYPE)
+                .setUpdateable(false).setCreateable(false).build());
+        builder.addAttributeInfo(AttributeInfoBuilder.define(IS_ENROLLED_IN_2SV_ATTR, Boolean.TYPE)
+                .setUpdateable(false).setCreateable(false).build());
+
+        /*
         builder.addAttributeInfo(PredefinedAttributeInfos.GROUPS.setReturnedByDefault(true));
         AttributeInfoBuilder subjectId = new AttributeInfoBuilder();
         subjectId.setName("subjectId");
@@ -567,6 +553,17 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         user.setOrgUnitPath(attributes.findString(ORG_UNIT_PATH_ATTR));
         user.setIncludeInGlobalAddressList(attributes
                 .findBoolean(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR));
+
+        user.setLocations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(LOCATIONS_ATTR)));
+        user.setArchived(attributes.findBoolean(ARCHIVED_ATTR));
+
+        user.setKeywords(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(KEYWORDS_ATTR)));
+        user.setWebsites(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(WEBSITES_ATTR)));
+        user.setLanguages(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(LANGUAGES_ATTR)));
+        user.setSshPublicKeys(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(SSH_PUBLIC_KEYS_ATTR)));
+
+        user.setRecoveryEmail(attributes.findString(RECOVERY_EMAIL_ATTR));
+        user.setRecoveryPhone(attributes.findString(RECOVERY_PHONE_ATTR));
 
         try {
             return users.insert(user).setFields(ID_ETAG);
@@ -733,6 +730,79 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                     content = new User();
                 }
                 content.setIncludeInGlobalAddressList(booleanValue);
+            }
+        }
+
+        Attribute locations = attributes.find(LOCATIONS_ATTR);
+        if (null != locations) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setLocations(GoogleAppsUtil.getStructAttr(locations));
+        }
+
+        Attribute archived = attributes.find(ARCHIVED_ATTR);
+        if (null != archived) {
+            Boolean booleanValue = GoogleAppsUtil.getBooleanValueWithDefault(archived, null);
+            if (null != booleanValue) {
+                if (null == content) {
+                    content = new User();
+                }
+                content.setArchived(booleanValue);
+            }
+        }
+
+        Attribute keywords = attributes.find(KEYWORDS_ATTR);
+        if (null != keywords) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setKeywords(GoogleAppsUtil.getStructAttr(keywords));
+        }
+
+        Attribute websites = attributes.find(WEBSITES_ATTR);
+        if (null != websites) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setWebsites(GoogleAppsUtil.getStructAttr(websites));
+        }
+
+        Attribute languages = attributes.find(LANGUAGES_ATTR);
+        if (null != languages) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setLanguages(GoogleAppsUtil.getStructAttr(languages));
+        }
+
+        Attribute sshPublic = attributes.find(SSH_PUBLIC_KEYS_ATTR);
+        if (null != sshPublic) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setSshPublicKeys(GoogleAppsUtil.getStructAttr(sshPublic));
+        }
+
+        Attribute recoveryEmail = attributes.find(RECOVERY_EMAIL_ATTR);
+        if (null != recoveryEmail) {
+            String stringValue = GoogleAppsUtil.getStringValueWithDefault(recoveryEmail, null);
+            if (null != stringValue) {
+                if (null == content) {
+                    content = new User();
+                }
+                content.setRecoveryEmail(stringValue);
+            }
+        }
+
+        Attribute recoveryPhone = attributes.find(RECOVERY_PHONE_ATTR);
+        if (null != recoveryPhone) {
+            String stringValue = GoogleAppsUtil.getStringValueWithDefault(recoveryPhone, null);
+            if (null != stringValue) {
+                if (null == content) {
+                    content = new User();
+                }
+                content.setRecoveryPhone(stringValue);
             }
         }
 
