@@ -1754,7 +1754,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     .getOrganizations())));
         }
         if (null == attributesToGet || attributesToGet.contains(PHONES_ATTR)) {
-//            builder.addAttribute(AttributeBuilder.build(PHONES_ATTR, (Collection) user.getPhones()));
             builder.addAttribute(AttributeBuilder.build(PHONES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones())));
         }
         if (null == attributesToGet || attributesToGet.contains(ALIASES_ATTR)) {
