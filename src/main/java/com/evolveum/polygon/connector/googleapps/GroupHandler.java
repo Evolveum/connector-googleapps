@@ -35,6 +35,7 @@ import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.*;
 
 import java.io.IOException;
+import java.util.List;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
 
@@ -67,9 +68,17 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
 
     public Void visitContainsAllValuesFilter(Directory.Groups.List list,
             ContainsAllValuesFilter containsAllValuesFilter) {
-        //TODO needed for removing deleted users from groups
+        if (containsAllValuesFilter.getAttribute().is(MEMBERS_ATTR)){
+            List<Object> lUserKey = containsAllValuesFilter.getAttribute().getValue();
+            if (lUserKey.size() == 1) {
+                list.setUserKey(lUserKey.get(0).toString());
+                logger.info("[cz] Content of the filter: {0}", containsAllValuesFilter.toString());
+            }
+        } else {
             logger.warn("Throwing get exception in visitContainsAllValuesFilter");
-        throw getException();
+            throw getException();
+        }
+        return null;
     }
 
     protected RuntimeException getException() {

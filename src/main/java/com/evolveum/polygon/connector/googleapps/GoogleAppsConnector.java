@@ -60,7 +60,6 @@ import java.util.regex.Matcher;
 import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
-import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
 
 /**
  * Main implementation of the GoogleApps Connector.
@@ -87,32 +86,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public static final String NON_EDITABLE_ALIASES_ATTR = "nonEditableAliases";
     public static final String DIRECT_MEMBERS_COUNT_ATTR = "directMembersCount";
     public static final String MY_CUSTOMER_ID = "my_customer";
-    public static final String SUSPENDED_ATTR = "suspended";
-    public static final String CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR = "changePasswordAtNextLogin";
-    public static final String IP_WHITELISTED_ATTR = "ipWhitelisted";
     public static final String ORG_UNIT_PATH_ATTR = "orgUnitPath";
-    public static final String INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR = "includeInGlobalAddressList";
-    public static final String IMS_ATTR = "ims";
-    public static final String EMAILS_ATTR = "emails";
-    public static final String EXTERNAL_IDS_ATTR = "externalIds";
-    public static final String RELATIONS_ATTR = "relations";
-    public static final String ADDRESSES_ATTR = "addresses";
-    public static final String ORGANIZATIONS_ATTR = "organizations";
-    public static final String PHONES_ATTR = "phones";
-    public static final String GIVEN_NAME_ATTR = "givenName";
-    public static final String FAMILY_NAME_ATTR = "familyName";
-    public static final String FULL_NAME_ATTR = "fullName";
-    public static final String IS_ADMIN_ATTR = "isAdmin";
-    public static final String IS_DELEGATED_ADMIN_ATTR = "isDelegatedAdmin";
-    public static final String LAST_LOGIN_TIME_ATTR = "lastLoginTime";
-    public static final String CREATION_TIME_ATTR = "creationTime";
-    public static final String AGREED_TO_TERMS_ATTR = "agreedToTerms";
-    public static final String SUSPENSION_REASON_ATTR = "suspensionReason";
     public static final String ALIASES_ATTR = "aliases";
     public static final String CUSTOMER_ID_ATTR = "customerId";
-    public static final String IS_MAILBOX_SETUP_ATTR = "isMailboxSetup";
-    public static final String THUMBNAIL_PHOTO_URL_ATTR = "thumbnailPhotoUrl";
-    public static final String DELETION_TIME_ATTR = "deletionTime";
     public static final String DESCRIPTION_ATTR = "description";
     public static final String PRIMARY_EMAIL_ATTR = "primaryEmail";
     public static final char COMMA = ',';
@@ -135,18 +111,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public static final String TYPE_ATTR = "type";
     public static final String PRODUCT_ID_SKU_ID_USER_ID = "productId,skuId,userId";
     public static final String PHOTO_ATTR = "__PHOTO__";
-    public static final String LOCATIONS_ATTR = "locations" ;
-    public static final String ARCHIVED_ATTR = "archived";
-//    public static final String GENDER_ATTR = "gender";
-//    public static final String NOTES_ATTR = "notes";
-    public static final String KEYWORDS_ATTR = "keywords";
-    public static final String WEBSITES_ATTR = "websites";
-    public static final String LANGUAGES_ATTR = "languages";
-    public static final String SSH_PUBLIC_KEYS_ATTR = "sshPublicKeys";
-    public static final String RECOVERY_EMAIL_ATTR = "recoveryEmail";
-    public static final String RECOVERY_PHONE_ATTR = "recoveryPhone";
-    public static final String IS_ENROLLED_IN_2SV_ATTR = "isEnrolledIn2Sv";
-    public static final String IS_ENFORCED_IN_2SV_ATTR = "isEnforcedIn2Sv";
     /**
      * Place holder for the {@link Configuration} passed into the init() method
      * {@link GoogleAppsConnector#init(org.identityconnectors.framework.spi.Configuration)}
@@ -202,7 +166,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
 
             Uid uid
-                    = execute(createUser(configuration.getDirectory().users(), accessor),
+                    = execute(UserHandler.createUser(configuration.getDirectory().users(), accessor),
                     new RequestResultHandler<Directory.Users.Insert, User, Uid>() {
                         public Uid handleResult(final Directory.Users.Insert request,
                                                 final User value) {
@@ -219,7 +183,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     if (member instanceof String) {
 
                         String id
-                                = execute(createUserAlias(aliasesService, uid.getUidValue(),
+                                = execute(UserHandler.createUserAlias(aliasesService, uid.getUidValue(),
                                 (String) member),
                                 new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
                                     public String handleResult(
@@ -254,7 +218,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 if (photoObject instanceof byte[]) {
 
                     String id
-                            = execute(createUpdateUserPhoto(configuration.getDirectory().users()
+                            = execute(UserHandler.createUpdateUserPhoto(configuration.getDirectory().users()
                                     .photos(), uid.getUidValue(), (byte[]) photoObject),
                             new RequestResultHandler<Directory.Users.Photos.Update, UserPhoto, String>() {
                                 public String handleResult(
@@ -283,7 +247,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 }
             }
 
-            Attribute isAdmin = accessor.find(IS_ADMIN_ATTR);
+            Attribute isAdmin = accessor.find(UserHandler.IS_ADMIN_ATTR);
             if (null != isAdmin) {
                 try {
                     Boolean isAdminValue = AttributeUtil.getBooleanValue(isAdmin);
@@ -520,7 +484,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         if (null == schema) {
             final SchemaBuilder builder = new SchemaBuilder(GoogleAppsConnector.class);
 
-            ObjectClassInfo user = getUserClassInfo();
+            ObjectClassInfo user = UserHandler.getUserClassInfo();
             builder.defineObjectClass(user);
 
             ObjectClassInfo group = getGroupClassInfo();
@@ -1091,10 +1055,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             || sortKey.getField().equalsIgnoreCase(ALIASES_ATTR)
                             || sortKey.getField().equalsIgnoreCase(ALIAS_ATTR)) {
                         orderBy = EMAIL_ATTR;
-                    } else if (sortKey.getField().equalsIgnoreCase(GIVEN_NAME_ATTR)) {
-                        orderBy = GIVEN_NAME_ATTR;
-                    } else if (sortKey.getField().equalsIgnoreCase(FAMILY_NAME_ATTR)) {
-                        orderBy = FAMILY_NAME_ATTR;
+                    } else if (sortKey.getField().equalsIgnoreCase(UserHandler.GIVEN_NAME_ATTR)) {
+                        orderBy = UserHandler.GIVEN_NAME_ATTR;
+                    } else if (sortKey.getField().equalsIgnoreCase(UserHandler.FAMILY_NAME_ATTR)) {
+                        orderBy = UserHandler.FAMILY_NAME_ATTR;
                     } else {
                         logger.ok("Unsupported SortKey:{0}", sortKey);
                         continue;
@@ -1158,6 +1122,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             }
             attributesToGet.add(ETAG_ATTR);
             for (String attribute : options.getAttributesToGet()) {
+                if (attribute.substring(0,3).equals("___")) {
+                    continue;
+                }
+                logger.info("[cz] Attribute to get... : {0}", attribute);
                 int i = attribute.indexOf('/');
                 if (i == 0) {
                     // Strip off the leading '/'
@@ -1200,13 +1168,13 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             return DESCRIPTION_ATTR;
         }
 
-        if (AttributeUtil.namesEqual(FAMILY_NAME_ATTR, attributeName)) {
+        if (AttributeUtil.namesEqual(UserHandler.FAMILY_NAME_ATTR, attributeName)) {
             return "name/familyName";
         }
-        if (AttributeUtil.namesEqual(GIVEN_NAME_ATTR, attributeName)) {
+        if (AttributeUtil.namesEqual(UserHandler.GIVEN_NAME_ATTR, attributeName)) {
             return "name/givenName";
         }
-        if (AttributeUtil.namesEqual(FULL_NAME_ATTR, attributeName)) {
+        if (AttributeUtil.namesEqual(UserHandler.FULL_NAME_ATTR, attributeName)) {
             return "name/fullName";
         }
         return attributeName; //__GROUPS__ //__PASSWORD__
@@ -1256,15 +1224,18 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 attributes.add(attribute);
             }
             for (String attribute : options.getAttributesToGet()) {
+                if (attribute.substring(0,3).equals("___")) {
+                    continue;
+                }
                 if (AttributeUtil.namesEqual(PredefinedAttributes.DESCRIPTION, attribute)) {
                     attributes.add(DESCRIPTION_ATTR);
                 } else if (AttributeUtil.isSpecialName(attribute)) {
                     continue;
-                } else if (AttributeUtil.namesEqual(FAMILY_NAME_ATTR, attribute)) {
+                } else if (AttributeUtil.namesEqual(UserHandler.FAMILY_NAME_ATTR, attribute)) {
                     attributes.add("name/familyName");
-                } else if (AttributeUtil.namesEqual(GIVEN_NAME_ATTR, attribute)) {
+                } else if (AttributeUtil.namesEqual(UserHandler.GIVEN_NAME_ATTR, attribute)) {
                     attributes.add("name/givenName");
-                } else if (AttributeUtil.namesEqual(FULL_NAME_ATTR, attribute)) {
+                } else if (AttributeUtil.namesEqual(UserHandler.FULL_NAME_ATTR, attribute)) {
                     attributes.add("name/fullName");
                 } else {
                     attributes.add(attribute);
@@ -1300,7 +1271,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
 
             final Directory.Users.Patch patch
-                    = updateUser(configuration.getDirectory().users(), uid,
+                    = UserHandler.updateUser(configuration.getDirectory().users(), uid,
                     attributesAccessor);
             if (null != patch) {
                 uidAfterUpdate
@@ -1327,7 +1298,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     if (member instanceof String) {
 
                         String id
-                                = execute(createUserAlias(aliasesService, uid.getUidValue(),
+                                = execute(UserHandler.createUserAlias(aliasesService, uid.getUidValue(),
                                 (String) member),
                                 new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
                                     public String handleResult(
@@ -1359,7 +1330,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                     if (member instanceof String) {
 
                         String id
-                                = execute(deleteUserAlias(aliasesService, uid.getUidValue(),
+                                = execute(UserHandler.deleteUserAlias(aliasesService, uid.getUidValue(),
                                 (String) member),
                                 new RequestResultHandler<Directory.Users.Aliases.Delete, Alias, String>() {
                                     public String handleResult(
@@ -1684,80 +1655,84 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         // Optional
         // If both givenName and familyName are empty then Google didn't return
         // with 'name'
-        if (null == attributesToGet || attributesToGet.contains(GIVEN_NAME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(GIVEN_NAME_ATTR,
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.GIVEN_NAME_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR,
                     null != user.getName() ? user.getName().getGivenName() : null));
         }
-        if (null == attributesToGet || attributesToGet.contains(FAMILY_NAME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(FAMILY_NAME_ATTR,
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.FAMILY_NAME_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR,
                     null != user.getName() ? user.getName().getFamilyName() : null));
         }
-        if (null == attributesToGet || attributesToGet.contains(FULL_NAME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(FULL_NAME_ATTR,
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.FULL_NAME_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.FULL_NAME_ATTR,
                     null != user.getName() ? user.getName().getFullName() : null));
         }
 
-        if (null == attributesToGet || attributesToGet.contains(IS_ADMIN_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_ADMIN_ATTR, user.getIsAdmin()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.IS_ADMIN_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.IS_ADMIN_ATTR, user.getIsAdmin()));
         }
-        if (null == attributesToGet || attributesToGet.contains(IS_DELEGATED_ADMIN_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_DELEGATED_ADMIN_ATTR, user
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.IS_DELEGATED_ADMIN_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.IS_DELEGATED_ADMIN_ATTR, user
                     .getIsDelegatedAdmin()));
         }
-        if (null == attributesToGet || attributesToGet.contains(LAST_LOGIN_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(LAST_LOGIN_TIME_ATTR, 
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.LAST_LOGIN_TIME_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.LAST_LOGIN_TIME_ATTR,
             null != user.getLastLoginTime() ? user.getLastLoginTime().toString() : null));
         }
-        if (null == attributesToGet || attributesToGet.contains(CREATION_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(CREATION_TIME_ATTR,
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.CREATION_TIME_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.CREATION_TIME_ATTR,
             null != user.getCreationTime() ? user.getCreationTime().toString() : null));
         }
-        if (null == attributesToGet || attributesToGet.contains(AGREED_TO_TERMS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(AGREED_TO_TERMS_ATTR, user
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.AGREED_TO_TERMS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.AGREED_TO_TERMS_ATTR, user
                     .getAgreedToTerms()));
         }
-        if (null == attributesToGet || attributesToGet.contains(SUSPENDED_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(SUSPENDED_ATTR, user.getSuspended()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.SUSPENDED_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, user.getSuspended()));
         }
-        if (null == attributesToGet || attributesToGet.contains(SUSPENSION_REASON_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(SUSPENSION_REASON_ATTR, user
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.SUSPENSION_REASON_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.SUSPENSION_REASON_ATTR, user
                     .getSuspensionReason()));
         }
-        if (null == attributesToGet || attributesToGet.contains(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, user
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, user
                     .getChangePasswordAtNextLogin()));
         }
-        if (null == attributesToGet || attributesToGet.contains(IP_WHITELISTED_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IP_WHITELISTED_ATTR, user
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.IP_WHITELISTED_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.IP_WHITELISTED_ATTR, user
                     .getIpWhitelisted()));
         }
-        if (null == attributesToGet || attributesToGet.contains(IMS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IMS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.IMS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.IMS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms())));
         }
-        if (null == attributesToGet || attributesToGet.contains(EMAILS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(EMAILS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.EMAILS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.EMAILS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails())));
         }
-        if (null == attributesToGet || attributesToGet.contains(EXTERNAL_IDS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(EXTERNAL_IDS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getExternalIds())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.EXTERNAL_IDS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.EXTERNAL_IDS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getExternalIds())));
         }
-        if (null == attributesToGet || attributesToGet.contains(RELATIONS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(RELATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getRelations())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.RELATIONS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.RELATIONS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getRelations())));
         }
-        if (null == attributesToGet || attributesToGet.contains(ADDRESSES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ADDRESSES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getAddresses())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.ADDRESSES_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.ADDRESSES_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAddresses())));
         }
-        if (null == attributesToGet || attributesToGet.contains(ORGANIZATIONS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ORGANIZATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getOrganizations())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.ORGANIZATIONS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.ORGANIZATIONS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getOrganizations())));
         }
-        if (null == attributesToGet || attributesToGet.contains(PHONES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(PHONES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.PHONES_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.PHONES_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones())));
         }
         if (null == attributesToGet || attributesToGet.contains(ALIASES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ALIASES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases())));
+            builder.addAttribute(AttributeBuilder.build(ALIASES_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases())));
         }
 
         if (null == attributesToGet || attributesToGet.contains(NON_EDITABLE_ALIASES_ATTR)) {
@@ -1771,18 +1746,17 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         if (null == attributesToGet || attributesToGet.contains(ORG_UNIT_PATH_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(ORG_UNIT_PATH_ATTR, user.getOrgUnitPath()));
         }
-        if (null == attributesToGet || attributesToGet.contains(IS_MAILBOX_SETUP_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_MAILBOX_SETUP_ATTR, user
-                    .getIsMailboxSetup()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.IS_MAILBOX_SETUP_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.IS_MAILBOX_SETUP_ATTR, user.getIsMailboxSetup()));
         }
         if (null == attributesToGet
-                || attributesToGet.contains(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, user
-                    .getIncludeInGlobalAddressList()));
+                || attributesToGet.contains(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR,
+                    user.getIncludeInGlobalAddressList()));
         }
-        if (null == attributesToGet || attributesToGet.contains(THUMBNAIL_PHOTO_URL_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(THUMBNAIL_PHOTO_URL_ATTR, user
-                    .getThumbnailPhotoUrl()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.THUMBNAIL_PHOTO_URL_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.THUMBNAIL_PHOTO_URL_ATTR,
+                    user.getThumbnailPhotoUrl()));
         }
         if (null == attributesToGet || attributesToGet.contains(PHOTO_ATTR))
         {
@@ -1795,17 +1769,18 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             }
             builder.addAttribute(AttributeBuilder.build(PHOTO_ATTR, decodedePhoto));
         }
-        if (null == attributesToGet || attributesToGet.contains(DELETION_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(DELETION_TIME_ATTR, null != user
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.DELETION_TIME_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.DELETION_TIME_ATTR, null != user
                     .getDeletionTime() ? user.getDeletionTime().toString() : null));
         }
 
-        if (null == attributesToGet || attributesToGet.contains(LOCATIONS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(LOCATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.LOCATIONS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.LOCATIONS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations())));
         }
 
-        if (null == attributesToGet || attributesToGet.contains(ARCHIVED_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ARCHIVED_ATTR, user.getArchived()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.ARCHIVED_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.ARCHIVED_ATTR, user.getArchived()));
         }
 
         // The following two attributes has different format - can't be simply handled as other already existing attributes
@@ -1816,31 +1791,35 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 //            builder.addAttribute(AttributeBuilder.build(NOTES_ATTR, user.getNotes().toString()));
 //        }
         // ---------------------------------------------------------------------------------------------------------------
-        if (null == attributesToGet || attributesToGet.contains(KEYWORDS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(KEYWORDS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getKeywords())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.KEYWORDS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.KEYWORDS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getKeywords())));
         }
-        if (null == attributesToGet || attributesToGet.contains(WEBSITES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(WEBSITES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getWebsites())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.WEBSITES_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.WEBSITES_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getWebsites())));
         }
-        if (null == attributesToGet || attributesToGet.contains(LANGUAGES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(LANGUAGES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLanguages())));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.LANGUAGES_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.LANGUAGES_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLanguages())));
         }
-        if (null == attributesToGet || attributesToGet.contains(SSH_PUBLIC_KEYS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(SSH_PUBLIC_KEYS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getSshPublicKeys())));
-        }
-
-        if (null == attributesToGet || attributesToGet.contains(RECOVERY_EMAIL_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(RECOVERY_EMAIL_ATTR, user.getRecoveryEmail()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(RECOVERY_PHONE_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(RECOVERY_PHONE_ATTR, user.getRecoveryPhone()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.SSH_PUBLIC_KEYS_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.SSH_PUBLIC_KEYS_ATTR,
+                    (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getSshPublicKeys())));
         }
 
-        if (null == attributesToGet || attributesToGet.contains(IS_ENROLLED_IN_2SV_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_ENROLLED_IN_2SV_ATTR, user.getIsEnrolledIn2Sv()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.RECOVERY_EMAIL_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.RECOVERY_EMAIL_ATTR, user.getRecoveryEmail()));
         }
-        if (null == attributesToGet || attributesToGet.contains(IS_ENFORCED_IN_2SV_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_ENFORCED_IN_2SV_ATTR, user.getIsEnforcedIn2Sv()));
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.RECOVERY_PHONE_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.RECOVERY_PHONE_ATTR, user.getRecoveryPhone()));
+        }
+
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.IS_ENROLLED_IN_2SV_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.IS_ENROLLED_IN_2SV_ATTR, user.getIsEnrolledIn2Sv()));
+        }
+        if (null == attributesToGet || attributesToGet.contains(UserHandler.IS_ENFORCED_IN_2SV_ATTR)) {
+            builder.addAttribute(AttributeBuilder.build(UserHandler.IS_ENFORCED_IN_2SV_ATTR, user.getIsEnforcedIn2Sv()));
         }
 
         // Expensive to get
