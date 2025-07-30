@@ -348,7 +348,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         String role = (String) ((Map) member).get(ROLE_ATTR);
 
                         String id
-                                = execute(createMember(membersService, uid.getUidValue(), email, role),
+                                = execute(createMemberByEmail(membersService, uid.getUidValue(), email, role),
                                 new RequestResultHandler<Directory.Members.Insert, Member, String>() {
                                     public String handleResult(
                                             final Directory.Members.Insert request,
@@ -1414,7 +1414,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             if (activeGroups.contains(member)) {
                                 keepGroups.add((String) member);
                             } else {
-                                addGroups.add(createMember(service, (String) member, uidAfterUpdate
+                                addGroups.add(createMemberById(service, (String) member, uidAfterUpdate
                                         .getUidValue(), null));
                             }
                         } else if (null != member) {
@@ -1528,7 +1528,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                 }
                             }
                             if (notMember) {
-                                addMembership.add(createMember(service, uidAfterUpdate
+                                addMembership.add(createMemberByEmail(service, uidAfterUpdate
                                         .getUidValue(), email, "MEMBER"));
                             }
                         } else if (null != member) {
