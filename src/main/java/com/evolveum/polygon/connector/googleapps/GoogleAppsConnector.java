@@ -314,6 +314,24 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         });
             }
 
+            // groups member
+            Attribute groups = accessor.find(PredefinedAttributes.GROUPS_NAME);
+            if (null != groups && null != groups.getValue()) {
+                final Directory.Members service = configuration.getDirectory().members();
+                for (Object groupId : groups.getValue()) {
+                    if (groupId instanceof String) {
+                        execute(createMemberById(service, (String) groupId, uid.getUidValue(), null),
+                                new RequestResultHandler<Directory.Members.Insert, Member, String>() {
+                                    public String handleResult(
+                                            final Directory.Members.Insert request,
+                                            final Member value) {
+                                        return null;
+                                    }
+                                });
+                    }
+                }
+            }
+
             return uid;
         } else if (ObjectClass.GROUP.equals(objectClass)) {
             // @formatter:off
@@ -1937,7 +1955,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             Directory.Groups.List request = service.list();
             request.setUserKey(userKey);
-            request.setFields("groups/email");
+            request.setFields("groups/id,groups/email");
             //400 Bad Request if the Customer(my_customer or exact value) is set, only domain-userKey combination allowed.
             //request.setCustomer(MY_CUSTOMER_ID);
             request.setDomain(configuration.getDomain());
