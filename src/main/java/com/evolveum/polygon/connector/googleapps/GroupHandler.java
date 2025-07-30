@@ -186,7 +186,9 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(ObjectClass.GROUP_NAME);
         // email
-        builder.addAttributeInfo(Name.INFO);
+        builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setRequired(true)
+                .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
+                .build());
         builder.addAttributeInfo(AttributeInfoBuilder.build(NAME_ATTR));
         builder.addAttributeInfo(PredefinedAttributeInfos.DESCRIPTION);
 
