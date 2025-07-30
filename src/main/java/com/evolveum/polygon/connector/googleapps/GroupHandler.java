@@ -308,21 +308,41 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
                     "Missing required attribute 'groupKey'. Identifies the group in the API request. Required when creating a Member.");
         }
 
-        String memberKey = attributes.findString(EMAIL_ATTR);
-        if (StringUtil.isBlank(memberKey)) {
+        String memberEmail = attributes.findString(EMAIL_ATTR);
+        if (StringUtil.isBlank(memberEmail)) {
             throw new InvalidAttributeValueException(
-                    "Missing required attribute 'memberKey'. Identifies the group member in the API request. Required when creating a Member.");
+                    "Missing required attribute 'email'. Identifies the group member in the API request. Required when creating a Member.");
         }
         String role = attributes.findString(ROLE_ATTR);
 
-        return createMember(service, groupKey, memberKey, role);
+        return createMemberByEmail(service, groupKey, memberEmail, role);
     }
 
-    public static Directory.Members.Insert createMember(Directory.Members service, String groupKey,
+    public static Directory.Members.Insert createMemberByEmail(Directory.Members service, String groupKey,
+            String memberEmail, String role) {
+
+        Member content = new Member();
+        content.setEmail(memberEmail);
+        if (StringUtil.isBlank(role)) {
+            content.setRole("MEMBER");
+        } else {
+            // OWNER. MANAGER. MEMBER.
+            content.setRole(role);
+        }
+        try {
+            return service.insert(groupKey, content).setFields(EMAIL_ETAG);
+            // } catch (HttpResponseException e){
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Members#Insert");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    public static Directory.Members.Insert createMemberById(Directory.Members service, String groupKey,
             String memberKey, String role) {
 
         Member content = new Member();
-        content.setEmail(memberKey);
+        content.setId(memberKey);
         if (StringUtil.isBlank(role)) {
             content.setRole("MEMBER");
         } else {
