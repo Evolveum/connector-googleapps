@@ -49,6 +49,7 @@ import java.util.EnumSet;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.ID_ATTR;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.PHOTO_ATTR;
+import static org.identityconnectors.framework.common.objects.OperationalAttributes.ENABLE_NAME;
 
 /**
  *
@@ -430,7 +431,9 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 + "and contact information.");
 
         // primaryEmail
-        builder.addAttributeInfo(Name.INFO);
+        builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setRequired(true)
+                .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
+                .build());
 
         builder.addAttributeInfo(AttributeInfoBuilder.define(GIVEN_NAME_ATTR).setRequired(true)
                 .build());
@@ -455,6 +458,9 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         builder.addAttributeInfo(AttributeInfoBuilder.define(OperationalAttributes.PASSWORD_NAME,
                 GuardedString.class).setRequired(true).setReadable(false).setReturnedByDefault(
                         false).build());
+
+        // Support activation
+        builder.addAttributeInfo(OperationalAttributeInfos.ENABLE);
 
         builder.addAttributeInfo(AttributeInfoBuilder.build(SUSPENDED_ATTR, Boolean.class));
         builder.addAttributeInfo(AttributeInfoBuilder.define(SUSPENSION_REASON_ATTR).setUpdateable(
@@ -567,6 +573,10 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         user.setPhones(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(PHONES_ATTR)));
         user.setLocations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(LOCATIONS_ATTR)));
 
+        if (Boolean.FALSE.equals(attributes.findBoolean(ENABLE_NAME))) {
+            user.setSuspended(true);
+        }
+
         user.setSuspended(attributes.findBoolean(SUSPENDED_ATTR));
         user.setChangePasswordAtNextLogin(attributes
                 .findBoolean(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR));
@@ -626,6 +636,14 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 content = new User();
             }
             content.setPassword(SecurityUtil.decrypt(password));
+        }
+
+        Boolean enable = attributes.findBoolean(ENABLE_NAME);
+        if (null != enable) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setSuspended(!enable);
         }
 
         Attribute suspended = attributes.find(SUSPENDED_ATTR);
