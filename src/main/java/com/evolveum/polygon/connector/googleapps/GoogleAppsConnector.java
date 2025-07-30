@@ -1379,9 +1379,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             // groups member
             Attribute groups = attributesAccessor.find(PredefinedAttributes.GROUPS_NAME);
-            if (null != groups && null != groups.getValue()) {
+            if (null != groups) {
                 final Directory.Members service = configuration.getDirectory().members();
-                if (groups.getValue().isEmpty()) {
+                if (groups.getValue() == null || groups.getValue().isEmpty()) {
                     // Remove all membership
                     for (String groupKey : listGroups(configuration.getDirectory().groups(),
                             uidAfterUpdate.getUidValue())) {
@@ -1957,7 +1957,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                         GoogleAppsConfiguration GAconf = (GoogleAppsConfiguration) getConfiguration();
                                         String domain = GAconf.getDomain();
                                         if (group.getEmail().endsWith(domain)) {//TODO fix loading crossdomain groups for users
-                                            result.add(group.getEmail());
+                                            result.add(group.getId());
                                         }
                                     }
                                 }
