@@ -23,21 +23,17 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
+import com.google.api.client.util.ArrayMap;
+import com.google.api.client.util.Joiner;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeUtil;
 import org.identityconnectors.framework.common.objects.Name;
-import com.google.api.client.util.ArrayMap;
-import com.google.api.client.util.Joiner;
-import java.util.Collection;
-import java.util.HashSet;
+
+import java.util.*;
 import java.util.Map.Entry;
 
 /**

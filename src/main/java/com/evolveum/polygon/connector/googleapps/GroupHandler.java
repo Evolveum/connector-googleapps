@@ -24,137 +24,36 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
+import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
+import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
+import com.google.api.client.util.Data;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Group;
-import com.google.api.services.directory.model.Member;
+import com.google.api.services.directory.model.Groups;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.*;
-import org.identityconnectors.framework.common.objects.filter.*;
+import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
 
 /**
  * A GroupHandler is a util class to cover all Group related operations.
  * 
  * @author Laszlo Hordos
  */
-public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> {
+public class GroupHandler {
 
     /**
      * Setup logging for the {@link GroupHandler}.
      */
     private static final Log logger = Log.getLog(GroupHandler.class);
-
-    public Void visitAndFilter(Directory.Groups.List list, AndFilter andFilter) {
-            logger.warn("Throwing get exception in visitAndFilter");
-        throw getException();
-    }
-
-    public Void visitContainsFilter(Directory.Groups.List list, ContainsFilter containsFilter) {
-        if (containsFilter.getAttribute().is(MEMBERS_ATTR)) {
-            list.setUserKey(containsFilter.getValue());
-        } else {
-            logger.warn("Throwing get exception in visitContainsFilter");
-            throw getException();
-        }
-        return null;
-    }
-
-    public Void visitContainsAllValuesFilter(Directory.Groups.List list,
-            ContainsAllValuesFilter containsAllValuesFilter) {
-        //TODO needed for removing deleted users from groups
-            logger.warn("Throwing get exception in visitContainsAllValuesFilter");
-        throw getException();
-    }
-
-    protected RuntimeException getException() {
-        return new UnsupportedOperationException(
-                "Only EqualsFilter(['domain','customer','userKey']) and ContainsFilter('members') are supported");
-    }
-    
-    protected RuntimeException getException(EqualsFilter equalsFilter) {
-        return new UnsupportedOperationException(
-                "filter is:" + equalsFilter + "Only EqualsFilter(['domain','customer','userKey']) and ContainsFilter('members') are supported");
-    }
-
-    public Void visitEqualsFilter(Directory.Groups.List list, EqualsFilter equalsFilter) {
-        if (equalsFilter.getAttribute().is("customer")) {
-            if (null != list.getDomain() || null != list.getUserKey()) {
-                throw new InvalidAttributeValueException(
-                        "The 'customer', 'domain' and 'userKey' can not be in the same query");
-            } else {
-                list.setCustomer(AttributeUtil.getStringValue(equalsFilter.getAttribute()));
-            }
-        } else if (equalsFilter.getAttribute().is("domain")) {
-            if (null != list.getCustomer() || null != list.getUserKey()) {
-                throw new InvalidAttributeValueException(
-                        "The 'customer', 'domain' and 'userKey' can not be in the same query");
-            } else {
-                list.setDomain(AttributeUtil.getStringValue(equalsFilter.getAttribute()));
-            }
-        } else if (equalsFilter.getAttribute().is("userKey")) {
-            if (null != list.getDomain() || null != list.getCustomer()) {
-                throw new InvalidAttributeValueException(
-                        "The 'customer', 'domain' and 'userKey' can not be in the same query");
-            } else {
-                list.setUserKey(AttributeUtil.getStringValue(equalsFilter.getAttribute()));
-            }
-        } else {
-            throw getException(equalsFilter) ; 
-        }
-
-        return null;
-    }
-
-    public Void visitExtendedFilter(Directory.Groups.List list, Filter filter) {
-        throw getException();
-    }
-
-    public Void visitGreaterThanFilter(Directory.Groups.List list,
-            GreaterThanFilter greaterThanFilter) {
-        throw getException();
-    }
-
-    public Void visitGreaterThanOrEqualFilter(Directory.Groups.List list,
-            GreaterThanOrEqualFilter greaterThanOrEqualFilter) {
-        throw getException();
-    }
-
-    public Void visitLessThanFilter(Directory.Groups.List list, LessThanFilter lessThanFilter) {
-        throw getException();
-    }
-
-    public Void visitLessThanOrEqualFilter(Directory.Groups.List list,
-            LessThanOrEqualFilter lessThanOrEqualFilter) {
-        throw getException();
-    }
-
-    public Void visitNotFilter(Directory.Groups.List list, NotFilter notFilter) {
-        throw getException();
-    }
-
-    public Void visitOrFilter(Directory.Groups.List list, OrFilter orFilter) {
-        throw getException();
-    }
-
-    public Void visitStartsWithFilter(Directory.Groups.List list, StartsWithFilter startsWithFilter) {
-        throw getException();
-    }
-
-    public Void visitEndsWithFilter(Directory.Groups.List list, EndsWithFilter endsWithFilter) {
-        throw getException();
-    }
-
-    @Override
-    public Void visitEqualsIgnoreCaseFilter(Directory.Groups.List list, EqualsIgnoreCaseFilter filter)
-    {
-         throw getException();
-    }
 
     // /////////////
     //
@@ -185,7 +84,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(ObjectClass.GROUP_NAME);
-        // email
+        // email (mapped to Name.NAME)
         builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setRequired(true)
                 .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
                 .build());
@@ -204,32 +103,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
 
         // Virtual Attribute
         builder.addAttributeInfo(AttributeInfoBuilder.define(MEMBERS_ATTR).setMultiValued(true)
-                .setReturnedByDefault(true).build());
-
-        return builder.build();
-    }
-
-    public static ObjectClassInfo getMemberClassInfo() {
-        // @formatter:off
-            /*
-            {
-			}
-            */
-        // @formatter:on
-        ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
-        builder.setType(MEMBER.getObjectClassValue());
-        builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setUpdateable(false)
-                .setCreateable(false)/* .setRequired(true) */.build());
-
-        // optional
-        builder.addAttributeInfo(AttributeInfoBuilder.define(GROUP_KEY_ATTR).setUpdateable(false)
-        /* .setCreateable(false) */.setRequired(true).build());
-        builder.addAttributeInfo(AttributeInfoBuilder.define(EMAIL_ATTR).setUpdateable(false)
-        /* .setCreateable(false) */.setRequired(true).build());
-
-        builder.addAttributeInfo(AttributeInfoBuilder.build(ROLE_ATTR));
-        builder.addAttributeInfo(AttributeInfoBuilder.define(TYPE_ATTR).setUpdateable(false)
-                .setCreateable(false).build());
+                .setReturnedByDefault(false).setUpdateable(false).setCreateable(false).build());
 
         return builder.build();
     }
@@ -252,170 +126,402 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         }
     }
 
-    public static Directory.Groups.Patch updateGroup(Directory.Groups groups, String groupKey,
-            AttributesAccessor attributes) {
-        Group group = null;
+    /**
+     * Execute group updateDelta with attribute delta processing.
+     * This handles only core group attribute updates (name, email, description).
+     * Member updates are handled via User side in midPoint.
+     */
+    public static Set<AttributeDelta> executeGroupUpdateDelta(GoogleApiExecutor executor, Uid uid,
+                                                             Set<AttributeDelta> modifications) {
+        final Set<AttributeDelta> sideEffectDeltas = new HashSet<>();
+        
+        // Update core group attributes using Groups.patch API
+        if (!modifications.isEmpty()) {
+            final Directory.Groups.Patch patch = buildGroupUpdateRequest(executor.getDirectory().groups(), uid, modifications);
+            if (patch != null) {
+                executor.execute(patch, new RequestResultHandler.NoOp<Directory.Groups.Patch, Group>());
+            }
+        }
+        
+        return sideEffectDeltas;
+    }
 
-        Name email = attributes.getName();
-        if (email != null) {
-            String stringValue = GoogleAppsUtil.getStringValueWithDefault(email, null);
-            if (null != stringValue) {
-                if (StringUtil.isBlank(stringValue)) {
-                    throw new InvalidAttributeValueException(
-                            "Invalid attribute '__NAME__'. The group's email address. Can not be blank when updating a group.");
-                }
-                group = new Group();
-                group.setEmail(stringValue);
+    /**
+     * Build group update request from attribute deltas.
+     */
+    private static Directory.Groups.Patch buildGroupUpdateRequest(Directory.Groups service, Uid uid, Set<AttributeDelta> deltas) {
+        Group group = new Group();
+        boolean hasChanges = false;
+
+        for (AttributeDelta delta : deltas) {
+            String attributeName = delta.getName();
+
+            // Handle single-valued attributes
+            if (Name.NAME.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                group.setEmail(value);
+                hasChanges = true;
+            } else if (NAME_ATTR.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                group.setName(value);
+                hasChanges = true;
+            } else if (PredefinedAttributes.DESCRIPTION.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                group.setDescription(value != null ? value : Data.NULL_STRING);
+                hasChanges = true;
             }
         }
 
-        Attribute description = attributes.find(PredefinedAttributes.DESCRIPTION);
-        if (null != description) {
-            String stringValue = GoogleAppsUtil.getStringValueWithDefault(description, null);
-            if (null != stringValue) {
-                if (null == group) {
-                    group = new Group();
-                }
-                group.setDescription(stringValue);
-            }
-        }
-        Attribute name = attributes.find(NAME_ATTR);
-        if (null != name) {
-            String stringValue = GoogleAppsUtil.getStringValueWithDefault(name, null);
-            if (null != stringValue) {
-                if (null == group) {
-                    group = new Group();
-                }
-                group.setName(stringValue);
-            }
-        }
-
-        if (null == group) {
+        if (!hasChanges) {
             return null;
         }
+
         try {
-            return groups.patch(groupKey, group).setFields(ID_ETAG);
-            // } catch (HttpResponseException e){
+            return service.patch(uid.getUidValue(), group);
         } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#Patch");
+            logger.warn(e, "Failed to create group patch request");
             throw ConnectorException.wrap(e);
         }
     }
 
-    public static Directory.Members.Insert createMember(Directory.Members service,
-            AttributesAccessor attributes) {
-        String groupKey = attributes.findString(GROUP_KEY_ATTR);
-        if (StringUtil.isBlank(groupKey)) {
-            throw new InvalidAttributeValueException(
-                    "Missing required attribute 'groupKey'. Identifies the group in the API request. Required when creating a Member.");
-        }
+    /**
+     * Execute group read query by UID.
+     */
+    public static void executeGroupReadQuery(GoogleApiExecutor apiExecutor, ConnectorObjectsCache objectsCache,
+                                           Uid uid, final ResultsHandler handler, OperationOptions options, 
+                                           final Set<String> attributesToGet, SchemaDefinition schemaDef) {
+        try {
+            // Try the cache first
+            ConnectorObject cachedGroup = objectsCache.getGroup(uid.getUidValue());
+            if (cachedGroup != null) {
+                handler.handle(cachedGroup);
+                return;
+            }
 
-        String memberEmail = attributes.findString(EMAIL_ATTR);
-        if (StringUtil.isBlank(memberEmail)) {
-            throw new InvalidAttributeValueException(
-                    "Missing required attribute 'email'. Identifies the group member in the API request. Required when creating a Member.");
-        }
-        String role = attributes.findString(ROLE_ATTR);
+            Directory.Groups.Get request = apiExecutor.getDirectory().groups().get(uid.getUidValue());
+            String fields = schemaDef.createGoogleApiFieldsString(attributesToGet, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
+            request.setFields(fields);
 
-        return createMemberByEmail(service, groupKey, memberEmail, role);
+            apiExecutor.execute(request,
+                    new RequestResultHandler.ReadQuery<>(
+                        group -> GroupConverter.fromGroup(group, attributesToGet, apiExecutor.getDirectory().members(), options),
+                        objectsCache::addGroup,
+                        handler));
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#Get");
+            throw ConnectorException.wrap(e);
+        }
     }
 
-    public static Directory.Members.Insert createMemberByEmail(Directory.Members service, String groupKey,
-            String memberEmail, String role) {
+    /**
+     * Execute group read query by Name.
+     */
+    public static void executeGroupReadQuery(GoogleApiExecutor apiExecutor, ConnectorObjectsCache objectsCache,
+                                           Name name, final ResultsHandler handler, OperationOptions options, 
+                                           final Set<String> attributesToGet, SchemaDefinition schemaDef) {
+        try {
+            Directory.Groups.Get request = apiExecutor.getDirectory().groups().get(name.getNameValue());
+            String fields = schemaDef.createGoogleApiFieldsString(attributesToGet, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
+            request.setFields(fields);
 
-        Member content = new Member();
-        content.setEmail(memberEmail);
-        if (StringUtil.isBlank(role)) {
-            content.setRole("MEMBER");
+            apiExecutor.execute(request,
+                    new RequestResultHandler.ReadQuery<>(
+                        group -> GroupConverter.fromGroup(group, attributesToGet, apiExecutor.getDirectory().members(), options),
+                        objectsCache::addGroup,
+                        handler));
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    /**
+     * Execute group search query.
+     */
+    public static void executeGroupSearchQuery(GoogleApiExecutor apiExecutor, GoogleFilter googleFilter, 
+                                             final ResultsHandler handler, OperationOptions options, 
+                                             final Set<String> attributesToGet, SchemaDefinition schemaDef) {
+        try {
+            // Create and configure base request with all common settings
+            Directory.Groups.List baseRequest = apiExecutor.getDirectory().groups().list();
+            if (googleFilter.hasSearchQuery()) {
+                googleFilter.configureGroupRequest(baseRequest);
+            } else {
+                baseRequest.setCustomer(MY_CUSTOMER_ID);
+            }
+
+            // Apply sort configuration to base request
+            if (null != options.getSortKeys()) {
+                for (SortKey sortKey : options.getSortKeys()) {
+                    if (sortKey.getField().equalsIgnoreCase(Name.NAME)
+                            || sortKey.getField().equalsIgnoreCase(EMAIL_ATTR)) {
+                        baseRequest.setOrderBy("email");
+                        if (sortKey.isAscendingOrder()) {
+                            baseRequest.setSortOrder("ASCENDING");
+                        } else {
+                            baseRequest.setSortOrder("DESCENDING");
+                        }
+                        break; // Only first valid sort key is used
+                    }
+                }
+            }
+
+            // Get paging configuration and parameters
+            int configMaxResults = apiExecutor.getConfiguration().getGroupPagingMaxResults();
+            Integer pagedResultsOffset = options.getPagedResultsOffset();
+            Integer pageSize = options.getPageSize();
+            String pagedResultsCookie = options.getPagedResultsCookie();
+
+            // Route to appropriate search method based on paging parameters
+            if (pagedResultsOffset != null && pagedResultsOffset > 0) {
+                // Offset-based paging
+                executeGroupOffsetBasedSearch(apiExecutor, baseRequest, handler, attributesToGet,
+                        configMaxResults, schemaDef, pagedResultsOffset, pageSize, options);
+            } else if (pagedResultsCookie != null || (pageSize != null && pageSize > 0)) {
+                // Cookie-based paging (with or without pageSize)
+                executeGroupCookieBasedSearch(apiExecutor, baseRequest, handler, attributesToGet,
+                        configMaxResults, schemaDef, pageSize, pagedResultsCookie, options);
+            } else {
+                // No paging - fetch all with automatic pagination
+                executeGroupUnpagedSearch(apiExecutor, baseRequest, handler, attributesToGet,
+                        configMaxResults, schemaDef, options);
+            }
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#List");
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    /**
+     * Execute offset-based search with two-phase approach.
+     */
+    private static void executeGroupOffsetBasedSearch(GoogleApiExecutor apiExecutor, Directory.Groups.List baseRequest,
+                                                    ResultsHandler handler, Set<String> attributesToGet,
+                                                    int configMaxResults, SchemaDefinition schemaDef,
+                                                    int pagedResultsOffset, Integer pageSize, OperationOptions options) throws IOException {
+        int skipCount = pagedResultsOffset - 1;  // Convert 1-based to 0-based
+        int targetSize = pageSize != null ? pageSize : Integer.MAX_VALUE;
+        
+        String nextToken = null;
+        
+        // Phase 1: Skip to offset position (if needed)
+        if (skipCount > 0) {
+            Directory.Groups.List skipRequest = apiExecutor.getDirectory().groups().list();
+            copyGroupBaseRequestSettings(skipRequest, baseRequest);
+            
+            // Minimal fields for efficient skipping
+            skipRequest.setFields("nextPageToken,groups(id)");
+            
+            int skipped = 0;
+            while (skipped < skipCount) {
+                skipRequest.setPageToken(nextToken);
+                
+                // Optimize maxResults for skipping
+                int remainingToSkip = skipCount - skipped;
+                skipRequest.setMaxResults(Math.min(remainingToSkip, configMaxResults));
+                
+                Groups result = apiExecutor.execute(skipRequest,
+                        new RequestResultHandler<Directory.Groups.List, Groups, Groups>() {
+                            public Groups handleResult(Directory.Groups.List request, Groups value) {
+                                return value;
+                            }
+                        });
+                
+                if (result.getGroups() != null) {
+                    skipped += result.getGroups().size();
+                }
+                
+                nextToken = result.getNextPageToken();
+                if (nextToken == null) {
+                    // Reached end of data before offset
+                    return;
+                }
+            }
+        }
+        
+        // Phase 2: Fetch actual data with all required fields
+        Directory.Groups.List dataRequest = apiExecutor.getDirectory().groups().list();
+        copyGroupBaseRequestSettings(dataRequest, baseRequest);
+        dataRequest.setPageToken(nextToken);
+        
+        // Full fields for actual data
+        String fields = schemaDef.createGoogleApiFieldsString(attributesToGet, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
+        dataRequest.setFields("nextPageToken,groups(" + fields + ")");
+        
+        int fetched = 0;
+        while (fetched < targetSize) {
+            // Optimize maxResults for data fetching
+            int remaining = targetSize - fetched;
+            dataRequest.setMaxResults(Math.min(remaining, configMaxResults));
+            
+            Groups result = apiExecutor.execute(dataRequest,
+                    new RequestResultHandler<Directory.Groups.List, Groups, Groups>() {
+                        public Groups handleResult(Directory.Groups.List request, Groups value) {
+                            return value;
+                        }
+                    });
+            
+            if (result.getGroups() != null) {
+                for (Group group : result.getGroups()) {
+                    if (fetched >= targetSize) break;
+                    handler.handle(GroupConverter.fromGroup(group,
+                            attributesToGet, apiExecutor.getDirectory().members(), options));
+                    fetched++;
+                }
+            }
+            
+            String nextPageToken = result.getNextPageToken();
+            if (nextPageToken == null || fetched >= targetSize) {
+                break;
+            }
+            dataRequest.setPageToken(nextPageToken);
+        }
+    }
+
+    /**
+     * Execute cookie-based search with single page retrieval.
+     */
+    private static void executeGroupCookieBasedSearch(GoogleApiExecutor apiExecutor, Directory.Groups.List baseRequest,
+                                                    ResultsHandler handler, Set<String> attributesToGet,
+                                                    int configMaxResults, SchemaDefinition schemaDef,
+                                                    Integer pageSize, String pagedResultsCookie, OperationOptions options) throws IOException {
+        Directory.Groups.List request = apiExecutor.getDirectory().groups().list();
+        copyGroupBaseRequestSettings(request, baseRequest);
+        
+        // Set maxResults: use pageSize if provided, otherwise use config max
+        if (pageSize != null && pageSize > 0) {
+            int effectiveMaxResults = Math.min(pageSize, configMaxResults);
+            request.setMaxResults(effectiveMaxResults);
         } else {
-            // OWNER. MANAGER. MEMBER.
-            content.setRole(role);
+            request.setMaxResults(configMaxResults);
         }
+        request.setPageToken(pagedResultsCookie);
+        
+        // Set fields
+        String fields = schemaDef.createGoogleApiFieldsString(attributesToGet, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
+        request.setFields("nextPageToken,groups(" + fields + ")");
+        
+        // Execute and return one page with continuation token
+        String nextPageToken = apiExecutor.execute(request,
+                new RequestResultHandler<Directory.Groups.List, Groups, String>() {
+                    public String handleResult(Directory.Groups.List request, Groups value) {
+                        if (null != value.getGroups()) {
+                            for (Group group : value.getGroups()) {
+                                handler.handle(GroupConverter.fromGroup(group,
+                                        attributesToGet, apiExecutor.getDirectory().members(), options));
+                            }
+                        }
+                        return value.getNextPageToken();
+                    }
+                });
+        
+        if (StringUtil.isNotBlank(nextPageToken)) {
+            logger.info("Paged Search was requested and next token is:{0}", nextPageToken);
+            ((SearchResultsHandler) handler).handleResult(new SearchResult(nextPageToken, 0));
+        }
+    }
+
+    /**
+     * Execute unpaged search with automatic pagination.
+     */
+    private static void executeGroupUnpagedSearch(GoogleApiExecutor apiExecutor, Directory.Groups.List baseRequest,
+                                                 ResultsHandler handler, Set<String> attributesToGet,
+                                                 int configMaxResults, SchemaDefinition schemaDef, OperationOptions options) throws IOException {
+        Directory.Groups.List request = apiExecutor.getDirectory().groups().list();
+        copyGroupBaseRequestSettings(request, baseRequest);
+        request.setMaxResults(configMaxResults);
+        
+        // Set fields
+        String fields = schemaDef.createGoogleApiFieldsString(attributesToGet, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
+        request.setFields("nextPageToken,groups(" + fields + ")");
+        
+        // Fetch all pages
+        String nextPageToken = null;
+        do {
+            request.setPageToken(nextPageToken);
+            nextPageToken = apiExecutor.execute(request,
+                    new RequestResultHandler<Directory.Groups.List, Groups, String>() {
+                        public String handleResult(Directory.Groups.List request, Groups value) {
+                            if (null != value.getGroups()) {
+                                for (Group group : value.getGroups()) {
+                                    handler.handle(GroupConverter.fromGroup(group,
+                                            attributesToGet, apiExecutor.getDirectory().members(), options));
+                                }
+                            }
+                            return value.getNextPageToken();
+                        }
+                    });
+        } while (StringUtil.isNotBlank(nextPageToken));
+    }
+
+    /**
+     * Copy all settings from baseRequest to targetRequest.
+     */
+    private static void copyGroupBaseRequestSettings(Directory.Groups.List targetRequest, Directory.Groups.List baseRequest) {
+        if (baseRequest.getCustomer() != null) {
+            targetRequest.setCustomer(baseRequest.getCustomer());
+        }
+        if (baseRequest.getDomain() != null) {
+            targetRequest.setDomain(baseRequest.getDomain());
+        }
+        if (baseRequest.getQuery() != null) {
+            targetRequest.setQuery(baseRequest.getQuery());
+        }
+        if (baseRequest.getOrderBy() != null) {
+            targetRequest.setOrderBy(baseRequest.getOrderBy());
+            targetRequest.setSortOrder(baseRequest.getSortOrder());
+        }
+    }
+
+    /**
+     * Execute Group create operation.
+     */
+    public static Uid executeGroupCreate(GoogleApiExecutor executor, Set<Attribute> createAttributes) {
+        final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
+        
+        return executor.execute(createGroup(executor.getDirectory().groups(), accessor),
+                new RequestResultHandler.Create<>(ObjectClass.GROUP, 
+                    (Group group) -> new Uid(group.getId(), group.getEtag(), new Name(group.getEmail()))));
+    }
+
+    /**
+     * Execute Group delete operation.
+     */
+    public static void executeGroupDelete(GoogleApiExecutor executor, ConnectorObjectsCache objectsCache, Uid uid) {
         try {
-            return service.insert(groupKey, content).setFields(EMAIL_ETAG);
-            // } catch (HttpResponseException e){
+            AbstractGoogleJsonClientRequest<Void> request = executor.getDirectory().groups().delete(uid.getUidValue());
+
+            executor.execute(request, new RequestResultHandler.Delete(uid, ObjectClass.GROUP));
+            
+            // Remove from cache
+            objectsCache.removeGroup(uid.getUidValue());
+            
         } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Members#Insert");
             throw ConnectorException.wrap(e);
         }
     }
 
-    public static Directory.Members.Insert createMemberById(Directory.Members service, String groupKey,
-            String memberKey, String role) {
-
-        Member content = new Member();
-        content.setId(memberKey);
-        if (StringUtil.isBlank(role)) {
-            content.setRole("MEMBER");
+    /**
+     * Unified query execution method for Groups that handles both read and search operations.
+     */
+    public static void executeQuery(GoogleApiExecutor executor, ConnectorObjectsCache objectsCache, 
+                                   GoogleFilter googleFilter, ResultsHandler handler, OperationOptions options, 
+                                   SchemaDefinition schemaDef) {
+        // Get attributes to retrieve - call only once
+        final Set<String> attributesToGet = schemaDef.createFullAttributesToGet(options);
+        if (googleFilter.isReadByUid()) {
+            // Read request by UID
+            executeGroupReadQuery(executor, objectsCache, googleFilter.getUid(), handler, options, attributesToGet, schemaDef);
+        } else if (googleFilter.isReadByName()) {
+            // Read request by Name
+            executeGroupReadQuery(executor, objectsCache, googleFilter.getName(), handler, options, attributesToGet, schemaDef);
         } else {
-            // OWNER. MANAGER. MEMBER.
-            content.setRole(role);
-        }
-        try {
-            return service.insert(groupKey, content).setFields(EMAIL_ETAG);
-            // } catch (HttpResponseException e){
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Members#Insert");
-            throw ConnectorException.wrap(e);
+            // Search query (including list all when filter has no search query)
+            executeGroupSearchQuery(executor, googleFilter, handler, options, attributesToGet, schemaDef);
         }
     }
 
-    public static Directory.Members.Patch updateMembers(Directory.Members service, String groupKey,
-            String memberKey, String role) {
-        Member content = new Member();
-        content.setEmail(memberKey);
-
-        if (StringUtil.isBlank(role)) {
-            content.setRole("MEMBER");
-        } else {
-            // OWNER. MANAGER. MEMBER.
-            content.setRole(role);
-        }
-        try {
-            return service.patch(groupKey, memberKey, content).setFields(EMAIL_ETAG);
-            // } catch (HttpResponseException e){
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Members#Insert");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    public static Directory.Members.Delete deleteMembers(Directory.Members service,
-            String groupKey, String memberKey) {
-        try {
-            return service.delete(groupKey, memberKey);
-            // } catch (HttpResponseException e){
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Members#Delete");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    public static ConnectorObject fromMember(String groupKey, Member content) {
-        ConnectorObjectBuilder builder = new ConnectorObjectBuilder();
-        builder.setObjectClass(MEMBER);
-
-        Uid uid = generateMemberId(groupKey, content);
-        builder.setUid(uid);
-        builder.setName(uid.getUidValue());
-
-        builder.addAttribute(AttributeBuilder.build(GROUP_KEY_ATTR, content.getId()));
-        builder.addAttribute(AttributeBuilder.build(EMAIL_ATTR, content.getEmail()));
-        builder.addAttribute(AttributeBuilder.build(ROLE_ATTR, content.getRole()));
-        builder.addAttribute(AttributeBuilder.build(TYPE_ATTR, content.getType()));
-
-        return builder.build();
-    }
-
-    public static Uid generateMemberId(String groupKey, Member content) {
-        Uid uid = null;
-        String memberName = groupKey + '/' + content.getEmail();
-
-        if (null != content.getEtag()) {
-            uid = new Uid(memberName, content.getEtag());
-        } else {
-            uid = new Uid(memberName);
-        }
-        return uid;
-    }
 }
