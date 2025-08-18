@@ -24,6 +24,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import com.google.api.client.util.ArrayMap;
+import com.google.api.client.util.Data;
 import com.google.api.client.util.Joiner;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -129,28 +130,38 @@ public class GoogleAppsUtil {
         }
         return null;
     }
-    
+
     public static Object structAttrToString(Collection values) {
         if (values != null && values.size() > 0) {
             ArrayList<Object> attrItems = new ArrayList();
             for (Object item : values.toArray()) {
                 if (item instanceof ArrayMap) {
-                    if (((ArrayMap) item).containsKey("value") && (((ArrayMap) item).get("value").equals("null") || ((ArrayMap) item).get("value").equals(""))) {
-                        continue;
-                    }
-                    ArrayList<String> entryItems = new ArrayList();
+                    // Use TreeMap to ensure consistent key ordering (alphabetical)
+                    TreeMap<String, Object> sortedMap = new TreeMap<>();
                     for (Object entryAM : ((ArrayMap) item).entrySet()) {
                         Entry<Object, Object> entry = (Entry<Object, Object>) entryAM;
-                        entryItems.add("\"" + entry.getKey().toString() + "\"=\"" + entry.getValue().toString() + "\"");
+                        sortedMap.put(entry.getKey().toString(), entry.getValue());
+                    }
+
+                    // Build JSON string representation
+                    List<String> entryItems = new ArrayList<>();
+                    for (Entry<String, Object> entry : sortedMap.entrySet()) {
+                        Object value = entry.getValue();
+                        // Skip null values and Google API's special NULL markers
+                        // Note: Google API typically omits null-valued fields from JSON responses,
+                        // but this defensive check handles cases where null values might be present
+                        // (e.g., future API changes, library updates, or edge cases)
+                        if (value != null && !Data.isNull(value)) {
+                            entryItems.add("\"" + entry.getKey() + "\":\"" + value.toString() + "\"");
+                        }
                     }
                     attrItems.add('{' + Joiner.on(',').join(entryItems) + '}');
                 } else {
                     attrItems.add(item.toString());
-                } 
+                }
             }
             return attrItems;
         }
         return null;
     }
-    
 }
