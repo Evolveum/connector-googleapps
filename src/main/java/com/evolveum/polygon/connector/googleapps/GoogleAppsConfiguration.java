@@ -24,12 +24,10 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.apache.v2.ApacheHttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.directory.Directory;
@@ -66,7 +64,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
 
 
 /**
@@ -594,7 +591,6 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
 
         return httpTransport;
     }
-
 
     /**
      * Create HttpRequestInitializer with credentials only.
