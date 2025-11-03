@@ -36,6 +36,7 @@ import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.common.security.SecurityUtil;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
+import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.*;
 import org.identityconnectors.framework.common.objects.AttributeInfo.Flags;
@@ -90,6 +91,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
     public static final String THUMBNAIL_PHOTO_URL_ATTR = "thumbnailPhotoUrl";
     public static final String DELETION_TIME_ATTR = "deletionTime";
     public static final String LOCATIONS_ATTR = "locations";
+    public static final String PASSWORD_ATTR = "__PASSWORD__";
 
     private static final Map<String, String> NAME_DICTIONARY;
     private static final Set<String> S;
@@ -702,6 +704,191 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
             logger.warn(e, "Failed to initialize Groups#Insert");
             throw ConnectorException.wrap(e);
         }
+    }
+
+    public static void updateDeltaAccount(GoogleAppsConnector connector, Uid uid, Set<AttributeDelta> modifications, OperationOptions options) {
+        Set<AttributeInfo> usersInfo = connector.getUserClass().getAttributeInfo();
+        Set<String> activeGroups = connector.listGroups(connector.configuration.getDirectory().groups(), uid.getUidValue());
+        Set<Attribute> replaceAttributes = getUserAttributesFromDelta(connector.configuration.getDirectory().users(), uid,
+                usersInfo, activeGroups, modifications);
+        connector.update(ObjectClass.ACCOUNT, uid, replaceAttributes, options);
+    }
+
+    public static Set<Attribute> getUserAttributesFromDelta(Directory.Users users, Uid uid,
+            Set<AttributeInfo> userAttrInfo, Set<String> userGroups, Set<AttributeDelta> modifications) {
+        Set<Attribute> replaceAttributes = new HashSet<>();
+        User user = null;
+        try {
+            user = users.get(uid.getUidValue()).execute();
+        } catch (IOException e) {
+            logger.warn(e, "User with uid " + uid.getUidValue() + " not found.");
+            throw UnknownUidException.wrap(e);
+        }
+
+        for (AttributeDelta attributeDelta : modifications) {
+
+            String attrName = attributeDelta.getName();
+            List<Object> addDelta = attributeDelta.getValuesToAdd();
+            List<Object> deleteDelta = attributeDelta.getValuesToRemove();
+            List<Object> replaceDelta = attributeDelta.getValuesToReplace();
+
+            if (replaceDelta != null) {
+                // single value attrs
+                Optional<AttributeInfo> attrInfo = userAttrInfo.stream()
+                        .filter(attrI -> attrI.is(attrName))
+                        .findFirst();
+
+                if (attrInfo.isPresent()) {
+                    if (attrInfo.get().isMultiValued()) {
+                        throw new InvalidAttributeValueException("Multivalue attribute in values to replace.");
+                    }
+                }
+
+                for (Object value : replaceDelta) {
+                    Attribute newAttribute = AttributeBuilder.build(attrName, value);
+                    replaceAttributes.add(newAttribute);
+                }
+            } else {
+                // multi value attrs
+                if (addDelta != null) {
+                    switch (attrName) {
+                        case IMS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case EMAILS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case EXTERNAL_IDS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getExternalIds());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case RELATIONS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getRelations());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case ADDRESSES_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAddresses());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case ORGANIZATIONS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getOrganizations());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case PHONES_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case LOCATIONS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case ALIASES_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases());
+                            currentValues.addAll(addDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case PASSWORD_ATTR: {
+                            if (deleteDelta != null && !deleteDelta.isEmpty() && deleteDelta.get(0) == user.getPassword()) {
+                                for (Object value : addDelta) {
+                                    Attribute newAttribute = AttributeBuilder.build(PASSWORD_ATTR, value);
+                                    replaceAttributes.add(newAttribute);
+                                }
+                            }
+                        }
+                    }
+                    if (attrName.equals(PredefinedAttributes.GROUPS_NAME)) {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(userGroups);
+                        currentValues.addAll(addDelta);
+                        Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                        replaceAttributes.add(newAttribute);
+                    }
+                }
+                if (deleteDelta != null) {
+                    switch (attrName) {
+                        case IMS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case EMAILS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case EXTERNAL_IDS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getExternalIds());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case RELATIONS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getRelations());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case ADDRESSES_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAddresses());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case ORGANIZATIONS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getOrganizations());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case PHONES_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case LOCATIONS_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                        case ALIASES_ATTR: {
+                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases());
+                            currentValues.removeAll(deleteDelta);
+                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                            replaceAttributes.add(newAttribute);
+                        }
+                    }
+                    if (attrName.equals(PredefinedAttributes.GROUPS_NAME)) {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(userGroups);
+                        currentValues.removeAll(deleteDelta);
+                        Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                        replaceAttributes.add(newAttribute);
+                    }
+                }
+            }
+        }
+        return replaceAttributes;
     }
 
     public static Directory.Users.Patch updateUser(Directory.Users users, Uid uid,

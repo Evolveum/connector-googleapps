@@ -27,6 +27,9 @@ package com.evolveum.polygon.connector.googleapps;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,16 +38,7 @@ import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.Attribute;
-import org.identityconnectors.framework.common.objects.AttributeBuilder;
-import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
-import org.identityconnectors.framework.common.objects.AttributeUtil;
-import org.identityconnectors.framework.common.objects.AttributesAccessor;
-import org.identityconnectors.framework.common.objects.ConnectorObject;
-import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
-import org.identityconnectors.framework.common.objects.ObjectClassInfo;
-import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
-import org.identityconnectors.framework.common.objects.Uid;
+import org.identityconnectors.framework.common.objects.*;
 
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.model.LicenseAssignment;
@@ -135,6 +129,31 @@ public class LicenseAssignmentsHandler {
             logger.warn(e, "Failed to initialize LicenseAssignments#Insert");
             throw ConnectorException.wrap(e);
         }
+    }
+
+    public static void updateDeltaLicenseAssignment(GoogleAppsConnector connector, Uid uid, Set<AttributeDelta> modifications, OperationOptions options) {
+        Set<Attribute> replaceAttributes = getLicenseAssignmentAttributesFromDelta(modifications);
+        connector.update(LICENSE_ASSIGNMENT, uid, replaceAttributes, options);
+    }
+
+    public static Set<Attribute> getLicenseAssignmentAttributesFromDelta(Set<AttributeDelta> modifications) {
+        Set<Attribute> replaceAttributes = new HashSet<>();
+
+        for (AttributeDelta attributeDelta : modifications) {
+
+            String attrName = attributeDelta.getName();
+            List<Object> replaceDelta = attributeDelta.getValuesToReplace();
+
+            if (replaceDelta != null) {
+                if (attrName.equals(SKU_ID_ATTR)) {
+                    for (Object value : replaceDelta) {
+                        Attribute newAttribute = AttributeBuilder.build(SKU_ID_ATTR, value);
+                        replaceAttributes.add(newAttribute);
+                    }
+                }
+            }
+        }
+        return replaceAttributes;
     }
 
     public static final Pattern LICENSE_NAME_PATTERN =

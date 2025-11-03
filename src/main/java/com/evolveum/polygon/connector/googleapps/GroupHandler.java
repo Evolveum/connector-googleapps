@@ -35,6 +35,7 @@ import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.*;
 
 import java.io.IOException;
+import java.util.*;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
 
@@ -248,6 +249,89 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
             logger.warn(e, "Failed to initialize Groups#Insert");
             throw ConnectorException.wrap(e);
         }
+    }
+
+    public static void updateDeltaMember(GoogleAppsConnector connector, Uid uid, Set<AttributeDelta> modifications, OperationOptions options) {
+        Set<Attribute> replaceAttributes = getMemberAttributesFromDelta(modifications);
+        connector.update(MEMBER, uid, replaceAttributes, options);
+    }
+
+    public static Set<Attribute> getMemberAttributesFromDelta(Set<AttributeDelta> modifications) {
+        Set<Attribute> replaceAttributes = new HashSet<>();
+
+        for (AttributeDelta attributeDelta : modifications) {
+
+            String attrName = attributeDelta.getName();
+            List<Object> replaceDelta = attributeDelta.getValuesToReplace();
+
+            if (replaceDelta != null) {
+                if (attrName.equals(ROLE_ATTR)) {
+                    for (Object value : replaceDelta) {
+                        Attribute newAttribute = AttributeBuilder.build(ROLE_ATTR, value);
+                        replaceAttributes.add(newAttribute);
+                    }
+                }
+            }
+        }
+        return replaceAttributes;
+    }
+
+    public static void updateDeltaGroup(GoogleAppsConnector connector, Uid uid, Set<AttributeDelta> modifications, OperationOptions options) {
+        Set<AttributeInfo> groupsInfo = getGroupClassInfo().getAttributeInfo();
+        List<String> activeMembership = connector.listMembers(connector.configuration.getDirectory().members(), uid.getUidValue(), null);
+        Set<Attribute> replaceAttributes = getGroupAttributesFromDelta(groupsInfo, activeMembership, modifications);
+        connector.update(ObjectClass.GROUP, uid, replaceAttributes, options);
+    }
+
+    public static Set<Attribute> getGroupAttributesFromDelta(Set<AttributeInfo> groupAttrInfo,
+            List<String> groupMemberships, Set<AttributeDelta> modifications) {
+        Set<Attribute> replaceAttributes = new HashSet<>();
+
+        for (AttributeDelta attributeDelta : modifications) {
+
+            String attrName = attributeDelta.getName();
+            List<Object> addDelta = attributeDelta.getValuesToAdd();
+            List<Object> deleteDelta = attributeDelta.getValuesToRemove();
+            List<Object> replaceDelta = attributeDelta.getValuesToReplace();
+
+            if (replaceDelta != null) {
+                // single value attrs
+                Optional<AttributeInfo> attrInfo = groupAttrInfo.stream()
+                        .filter(attrI -> attrI.is(attrName))
+                        .findFirst();
+
+                if (attrInfo.isPresent()) {
+                    if (attrInfo.get().isMultiValued()) {
+                        throw new InvalidAttributeValueException("Multivalue attribute in values to replace.");
+                    }
+                }
+
+                for (Object value : replaceDelta) {
+                    Attribute newAttribute = AttributeBuilder.build(attrName, value);
+                    replaceAttributes.add(newAttribute);
+                }
+            } else {
+                if (addDelta != null) {
+                    if (attrName.equals(MEMBERS_ATTR)) {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(groupMemberships);
+                        currentValues.addAll(addDelta);
+                        Attribute newAttribute = AttributeBuilder.build(attrName,
+                                (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                        replaceAttributes.add(newAttribute);
+                    }
+                }
+                if (deleteDelta != null) {
+                    if (attrName.equals(MEMBERS_ATTR)) {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(groupMemberships);
+                        currentValues.removeAll(deleteDelta);
+                        Attribute newAttribute = AttributeBuilder.build(attrName,
+                                (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                        replaceAttributes.add(newAttribute);
+                    }
+                }
+            }
+        }
+        return replaceAttributes;
     }
 
     public static Directory.Groups.Patch updateGroup(Directory.Groups groups, String groupKey,

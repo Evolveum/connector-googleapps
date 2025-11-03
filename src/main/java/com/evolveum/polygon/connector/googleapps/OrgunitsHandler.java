@@ -27,6 +27,8 @@ package com.evolveum.polygon.connector.googleapps;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.identityconnectors.common.CollectionUtil;
@@ -34,19 +36,8 @@ import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
-import org.identityconnectors.framework.common.objects.Attribute;
-import org.identityconnectors.framework.common.objects.AttributeBuilder;
-import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
-import org.identityconnectors.framework.common.objects.AttributeUtil;
-import org.identityconnectors.framework.common.objects.AttributesAccessor;
-import org.identityconnectors.framework.common.objects.ConnectorObject;
-import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
-import org.identityconnectors.framework.common.objects.Name;
-import org.identityconnectors.framework.common.objects.ObjectClassInfo;
-import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
-import org.identityconnectors.framework.common.objects.PredefinedAttributeInfos;
-import org.identityconnectors.framework.common.objects.PredefinedAttributes;
-import org.identityconnectors.framework.common.objects.Uid;
+import org.identityconnectors.framework.common.exceptions.UnknownUidException;
+import org.identityconnectors.framework.common.objects.*;
 
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.OrgUnit;
@@ -134,6 +125,29 @@ public class OrgunitsHandler {
             logger.warn(e, "Failed to initialize Groups#Insert");
             throw ConnectorException.wrap(e);
         }
+    }
+
+    public static void updateDeltaOrgunit(GoogleAppsConnector connector, Uid uid, Set<AttributeDelta> modifications, OperationOptions options) {
+        Set<Attribute> replaceAttributes = getOrgunitAttributesFromDelta(modifications);
+        connector.update(ORG_UNIT, uid, replaceAttributes, options);
+    }
+
+    public static Set<Attribute> getOrgunitAttributesFromDelta(Set<AttributeDelta> modifications) {
+        Set<Attribute> replaceAttributes = new HashSet<>();
+
+        for (AttributeDelta attributeDelta : modifications) {
+
+            String attrName = attributeDelta.getName();
+            List<Object> replaceDelta = attributeDelta.getValuesToReplace();
+
+            if (replaceDelta != null) {
+                for (Object value : replaceDelta) {
+                    Attribute newAttribute = AttributeBuilder.build(attrName, value);
+                    replaceAttributes.add(newAttribute);
+                }
+            }
+        }
+        return replaceAttributes;
     }
 
     public static Directory.Orgunits.Patch updateOrgunit(Directory.Orgunits service,

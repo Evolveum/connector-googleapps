@@ -69,7 +69,7 @@ import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
 @ConnectorClass(displayNameKey = "GoogleApps.connector.display",
         configurationClass = GoogleAppsConfiguration.class)
 public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, SchemaOp,
-        SearchOp<Filter>, TestOp, UpdateOp {
+        SearchOp<Filter>, TestOp, UpdateOp, UpdateDeltaOp {
 
     /**
      * Setup logging for the {@link GoogleAppsConnector}.
@@ -143,7 +143,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * {@link GoogleAppsConnector#init(org.identityconnectors.framework.spi.Configuration)}
      * .
      */
-    private GoogleAppsConfiguration configuration;
+    GoogleAppsConfiguration configuration;
     private ConnectorObjectsCache objectsCache;
     private Schema schema = null;
 
@@ -547,7 +547,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         return schema;
     }
 
-    private ObjectClassInfo getUserClass(){
+    ObjectClassInfo getUserClass(){
         Schemas schemas = null;
         if (!this.configuration.getProjection().equals("BASIC")){
             schemas= executeUserSchema(this.configuration.getCustomerId());
@@ -1328,6 +1328,28 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             throw ConnectorException.wrap(e);
         }
         logger.info("OK.");
+    }
+
+    @Override
+    public Set<AttributeDelta> updateDelta(ObjectClass objectClass, Uid uid, Set<AttributeDelta> modifications,
+                                           OperationOptions operationOptions) {
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            updateDeltaAccount(this, uid, modifications, operationOptions);
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            updateDeltaGroup(this, uid, modifications, operationOptions);
+        } else if (MEMBER.equals(objectClass)) {
+            updateDeltaMember(this, uid, modifications, operationOptions);
+        } else if (ORG_UNIT.equals(objectClass)) {
+            updateDeltaOrgunit(this, uid, modifications, operationOptions);
+        } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
+            updateDeltaLicenseAssignment(this, uid, modifications, operationOptions);
+        } else {
+            logger.warn("Update of type {0} is not supported", configuration.getConnectorMessages()
+                    .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
+            throw new UnsupportedOperationException("Update of type"
+                    + objectClass.getObjectClassValue() + " is not supported");
+        }
+        return null;
     }
 
     /**
