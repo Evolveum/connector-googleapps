@@ -311,23 +311,14 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
                     replaceAttributes.add(newAttribute);
                 }
             } else {
-                if (addDelta != null) {
-                    if (attrName.equals(MEMBERS_ATTR)) {
-                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(groupMemberships);
+                if (attrName.equals(MEMBERS_ATTR)) {
+                    Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(groupMemberships);
+                    if (addDelta != null)
                         currentValues.addAll(addDelta);
-                        Attribute newAttribute = AttributeBuilder.build(attrName,
-                                (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                        replaceAttributes.add(newAttribute);
-                    }
-                }
-                if (deleteDelta != null) {
-                    if (attrName.equals(MEMBERS_ATTR)) {
-                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(groupMemberships);
+                    if (deleteDelta != null)
                         currentValues.removeAll(deleteDelta);
-                        Attribute newAttribute = AttributeBuilder.build(attrName,
-                                (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                        replaceAttributes.add(newAttribute);
-                    }
+                    Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+                    replaceAttributes.add(newAttribute);
                 }
             }
         }
