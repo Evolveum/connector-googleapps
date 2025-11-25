@@ -29,6 +29,7 @@ import com.google.api.services.directory.model.Schema;
 import com.google.common.base.CharMatcher;
 import com.google.common.escape.Escaper;
 import com.google.common.escape.Escapers;
+import org.apache.commons.logging.LogFactory;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
@@ -44,7 +45,6 @@ import org.identityconnectors.framework.common.objects.AttributeInfo.Flags;
 import java.io.IOException;
 import java.util.*;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.ID_ATTR;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.PHOTO_ATTR;
 
 /**
@@ -96,6 +96,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
     private static final Map<String, String> NAME_DICTIONARY;
     private static final Set<String> S;
     private static final Set<String> SW;
+    private static final org.apache.commons.logging.Log log = LogFactory.getLog(UserHandler.class);
 
     static {
         Map<String, String> dictionary = CollectionUtil.newCaseInsensitiveMap();
@@ -750,145 +751,78 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 }
             } else {
                 // multi value attrs
-                if (addDelta != null) {
-                    switch (attrName) {
-                        case IMS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case EMAILS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case EXTERNAL_IDS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getExternalIds());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case RELATIONS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getRelations());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case ADDRESSES_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAddresses());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case ORGANIZATIONS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getOrganizations());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case PHONES_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case LOCATIONS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case ALIASES_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases());
-                            currentValues.addAll(addDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case PASSWORD_ATTR: {
-                            if (deleteDelta != null && !deleteDelta.isEmpty() && deleteDelta.get(0) == user.getPassword()) {
-                                for (Object value : addDelta) {
-                                    Attribute newAttribute = AttributeBuilder.build(PASSWORD_ATTR, value);
-                                    replaceAttributes.add(newAttribute);
-                                }
+                switch (attrName) {
+                    case IMS_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case EMAILS_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case EXTERNAL_IDS_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getExternalIds());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case RELATIONS_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getRelations());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case ADDRESSES_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAddresses());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case ORGANIZATIONS_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getOrganizations());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case PHONES_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case LOCATIONS_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case ALIASES_ATTR: {
+                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases());
+                        replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                        break;
+                    }
+                    case PASSWORD_ATTR: {
+                        if (deleteDelta != null && !deleteDelta.isEmpty() && deleteDelta.get(0) == user.getPassword()) {
+                            for (Object value : addDelta) {
+                                Attribute newAttribute = AttributeBuilder.build(PASSWORD_ATTR, value);
+                                replaceAttributes.add(newAttribute);
                             }
                         }
                     }
-                    if (attrName.equals(PredefinedAttributes.GROUPS_NAME)) {
-                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(userGroups);
-                        currentValues.addAll(addDelta);
-                        Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                        replaceAttributes.add(newAttribute);
-                    }
                 }
-                if (deleteDelta != null) {
-                    switch (attrName) {
-                        case IMS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case EMAILS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case EXTERNAL_IDS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getExternalIds());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case RELATIONS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getRelations());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case ADDRESSES_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAddresses());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case ORGANIZATIONS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getOrganizations());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case PHONES_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case LOCATIONS_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getLocations());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                        case ALIASES_ATTR: {
-                            Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases());
-                            currentValues.removeAll(deleteDelta);
-                            Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                            replaceAttributes.add(newAttribute);
-                        }
-                    }
-                    if (attrName.equals(PredefinedAttributes.GROUPS_NAME)) {
-                        Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(userGroups);
-                        currentValues.removeAll(deleteDelta);
-                        Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
-                        replaceAttributes.add(newAttribute);
-                    }
+                if (attrName.equals(PredefinedAttributes.GROUPS_NAME)) {
+                    Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(userGroups);
+                    replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
+                    break;
                 }
             }
         }
         return replaceAttributes;
+    }
+
+    private static Attribute getModifiedAttribute(String attrName, Collection currentValues, List<Object> addDelta, List<Object> deleteDelta) {
+        if (addDelta != null)
+            currentValues.addAll(addDelta);
+        if (deleteDelta != null)
+            currentValues.removeAll(deleteDelta);
+        Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+        return newAttribute;
     }
 
     public static Directory.Users.Patch updateUser(Directory.Users users, Uid uid,
