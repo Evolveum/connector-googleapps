@@ -750,7 +750,6 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                     Attribute newAttribute = AttributeBuilder.build(attrName, value);
                     replaceAttributes.add(newAttribute);
                 }
-                logger.ok("DELTA REPLACE------------------------");
             } else {
                 // multi value attrs
                 switch (attrName) {
@@ -820,18 +819,13 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
 
     private static Attribute getModifiedAttribute(String attrName, Collection currentValues, List<Object> addDelta, List<Object> deleteDelta) {
         if ((addDelta != null || deleteDelta != null) && currentValues == null) {
-            logger.ok("DELTA " + attrName + " was null");
             currentValues = new ArrayList();
         }
         if (addDelta != null) {
             currentValues.addAll(addDelta);
-            logger.ok("DELTA ADD------------------------");
         }
         if (deleteDelta != null) {
-            logger.ok("SIZE BEFORE REMOVE: " + currentValues.size());
             currentValues.removeAll(deleteDelta);
-            logger.ok("DELTA REMOVE------------------------");
-            logger.ok("SIZE AFTER REMOVE: " + currentValues.size());
         }
 
         Attribute newAttribute = AttributeBuilder.build(attrName, currentValues);
