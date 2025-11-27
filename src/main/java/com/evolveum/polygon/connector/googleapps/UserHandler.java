@@ -30,6 +30,7 @@ import com.google.common.base.CharMatcher;
 import com.google.common.escape.Escaper;
 import com.google.common.escape.Escapers;
 import org.apache.commons.logging.LogFactory;
+import org.checkerframework.checker.units.qual.A;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
@@ -749,6 +750,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                     Attribute newAttribute = AttributeBuilder.build(attrName, value);
                     replaceAttributes.add(newAttribute);
                 }
+                logger.ok("DELTA REPLACE------------------------");
             } else {
                 // multi value attrs
                 switch (attrName) {
@@ -804,12 +806,12 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                                 replaceAttributes.add(newAttribute);
                             }
                         }
+                        break;
                     }
                 }
                 if (attrName.equals(PredefinedAttributes.GROUPS_NAME)) {
                     Collection currentValues = (Collection) GoogleAppsUtil.structAttrToString(userGroups);
                     replaceAttributes.add(getModifiedAttribute(attrName, currentValues, addDelta, deleteDelta));
-                    break;
                 }
             }
         }
@@ -817,11 +819,22 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
     }
 
     private static Attribute getModifiedAttribute(String attrName, Collection currentValues, List<Object> addDelta, List<Object> deleteDelta) {
-        if (addDelta != null)
+        if ((addDelta != null || deleteDelta != null) && currentValues == null) {
+            logger.ok("DELTA " + attrName + " was null");
+            currentValues = new ArrayList();
+        }
+        if (addDelta != null) {
             currentValues.addAll(addDelta);
-        if (deleteDelta != null)
+            logger.ok("DELTA ADD------------------------");
+        }
+        if (deleteDelta != null) {
+            logger.ok("SIZE BEFORE REMOVE: " + currentValues.size());
             currentValues.removeAll(deleteDelta);
-        Attribute newAttribute = AttributeBuilder.build(attrName, (Collection) GoogleAppsUtil.structAttrToString(currentValues));
+            logger.ok("DELTA REMOVE------------------------");
+            logger.ok("SIZE AFTER REMOVE: " + currentValues.size());
+        }
+
+        Attribute newAttribute = AttributeBuilder.build(attrName, currentValues);
         return newAttribute;
     }
 
