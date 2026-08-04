@@ -425,6 +425,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
          */
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
+        builder.setDescription("Google Workspace user account");
 
         // primaryEmail
         builder.addAttributeInfo(Name.INFO);

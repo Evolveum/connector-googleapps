@@ -87,6 +87,7 @@ public class OrgunitsHandler {
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(ORG_UNIT.getObjectClassValue());
+        builder.setDescription("Google Workspace organizational unit");
         builder.setContainer(true);
         // primaryEmail
         builder.addAttributeInfo(Name.INFO);

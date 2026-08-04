@@ -84,6 +84,7 @@ public class LicenseAssignmentsHandler {
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(LICENSE_ASSIGNMENT.getObjectClassValue());
+        builder.setDescription("Google Workspace product license assignment");
         // productId
         builder.addAttributeInfo(AttributeInfoBuilder.define(PRODUCT_ID_ATTR).setRequired(true)
                 .build());

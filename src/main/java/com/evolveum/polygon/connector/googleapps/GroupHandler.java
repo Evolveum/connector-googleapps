@@ -185,6 +185,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(ObjectClass.GROUP_NAME);
+        builder.setDescription("Google Workspace group");
         // email
         builder.addAttributeInfo(Name.INFO);
         builder.addAttributeInfo(AttributeInfoBuilder.build(NAME_ATTR));
@@ -216,6 +217,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(MEMBER.getObjectClassValue());
+        builder.setDescription("Google Workspace group membership");
         builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setUpdateable(false)
                 .setCreateable(false)/* .setRequired(true) */.build());
 
