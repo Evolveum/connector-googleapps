@@ -425,6 +425,9 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
          */
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
+        builder.setDescription("A user identity in the configured Google Workspace domain. "
+                + "Represents the user's sign-in account, profile, status, organizational unit, aliases, "
+                + "and contact information.");
 
         // primaryEmail
         builder.addAttributeInfo(Name.INFO);

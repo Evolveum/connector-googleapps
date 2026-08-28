@@ -84,6 +84,8 @@ public class LicenseAssignmentsHandler {
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(LICENSE_ASSIGNMENT.getObjectClassValue());
+        builder.setDescription("A relationship assigning a Google Workspace product SKU to a user. It connects "
+                + "the user, product, and SKU and can be used to assign, revoke, or change a license.");
         // productId
         builder.addAttributeInfo(AttributeInfoBuilder.define(PRODUCT_ID_ATTR).setRequired(true)
                 .build());

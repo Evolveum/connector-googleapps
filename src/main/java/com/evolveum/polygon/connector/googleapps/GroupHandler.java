@@ -185,6 +185,8 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(ObjectClass.GROUP_NAME);
+        builder.setDescription("A Google Group used as an email distribution list and membership container. "
+                + "Group memberships are represented separately by the Member object class.");
         // email
         builder.addAttributeInfo(Name.INFO);
         builder.addAttributeInfo(AttributeInfoBuilder.build(NAME_ATTR));
@@ -216,6 +218,8 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(MEMBER.getObjectClassValue());
+        builder.setDescription("A membership relationship linking a user, another group, or a customer domain "
+                + "to a Google Group. It includes the member type and role, such as MEMBER, MANAGER, or OWNER.");
         builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setUpdateable(false)
                 .setCreateable(false)/* .setRequired(true) */.build());
 
