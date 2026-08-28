@@ -87,7 +87,8 @@ public class OrgunitsHandler {
         // @formatter:on
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(ORG_UNIT.getObjectClassValue());
-        builder.setDescription("Google Workspace organizational unit");
+        builder.setDescription("A node in the Google Workspace organizational hierarchy. Users assigned to it "
+                + "receive the services and settings configured for that organizational unit.");
         builder.setContainer(true);
         // primaryEmail
         builder.addAttributeInfo(Name.INFO);
