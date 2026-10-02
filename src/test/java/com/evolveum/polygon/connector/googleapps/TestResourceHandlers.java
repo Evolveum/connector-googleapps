@@ -138,6 +138,7 @@ public class TestResourceHandlers {
                 licensing().licenseAssignments(), licenseUid(),
                 attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, replacementSku)));
 
+        assertNotNull(request);
         LicenseAssignment content = (LicenseAssignment) request.getJsonContent();
         assertEquals(request.getProductId(), PRODUCT);
         assertEquals(request.getSkuId(), SKU);
