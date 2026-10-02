@@ -74,12 +74,12 @@ public class TestGoogleAppsUtil {
 
         Collection<?> converted = (Collection<?>) GoogleAppsUtil.getStructAttr(values);
 
-        assertEquals(converted.size(), 2);
+        assertEquals(converted.size(), 3);
         assertTrue(converted.stream().anyMatch(value -> value instanceof ArrayMap
                 && "+421123".equals(((ArrayMap<?, ?>) value).get("value"))));
         assertTrue(converted.stream().anyMatch(value -> value instanceof ArrayMap
                 && "work".equals(((ArrayMap<?, ?>) value).get("type"))));
-        assertFalse(converted.stream().anyMatch(value -> value instanceof ArrayMap
+        assertTrue(converted.stream().anyMatch(value -> value instanceof ArrayMap
                 && "null".equals(((ArrayMap<?, ?>) value).get("value"))));
     }
 
