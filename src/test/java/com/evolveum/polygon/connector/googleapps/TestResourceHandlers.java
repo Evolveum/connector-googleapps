@@ -23,7 +23,10 @@ import com.google.api.services.directory.model.Member;
 import com.google.api.services.directory.model.OrgUnit;
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.model.LicenseAssignment;
+import com.google.api.services.licensing.model.LicenseAssignmentInsert;
+import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
+import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
 import org.identityconnectors.framework.common.objects.AttributesAccessor;
@@ -35,6 +38,7 @@ import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -88,6 +92,7 @@ public class TestResourceHandlers {
 
         Directory.Orgunits.Patch patch = OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
                 attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "Company/Platform")));
+        assertNotNull(patch);
         OrgUnit patchContent = (OrgUnit) patch.getJsonContent();
         assertEquals(patch.getOrgUnitPath(), "Engineering");
         assertEquals(patchContent.getParentOrgUnitPath(), "/Company/Platform");
@@ -113,12 +118,40 @@ public class TestResourceHandlers {
                 .setBlockInheritance(true);
 
         ConnectorObject object = OrgunitsHandler.fromOrgunit(orgUnit,
-                new HashSet<String>(Arrays.asList(GoogleAppsConnector.ORG_UNIT_PATH_ATTR)));
+                new HashSet<>(List.of(GoogleAppsConnector.ORG_UNIT_PATH_ATTR)));
 
         assertEquals(object.getUid().getUidValue(), "Engineering");
         assertNotNull(object.getAttributeByName(GoogleAppsConnector.ORG_UNIT_PATH_ATTR));
         assertNull(object.getAttributeByName(PredefinedAttributes.DESCRIPTION));
         assertNull(object.getAttributeByName(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void createOrgUnitRequiresName() {
+        OrgunitsHandler.createOrgunit(directory().orgunits(),
+                attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "/")));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void createOrgUnitRequiresParentPath() {
+        OrgunitsHandler.createOrgunit(directory().orgunits(), attributes(new Name("Engineering")));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void updateOrgUnitRejectsBlankParentPath() {
+        OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
+                attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, " ")));
+    }
+
+    @Test
+    public void updateOrgUnitCanReturnNullOrClearDescription() {
+        assertNull(OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering", attributes()));
+
+        Directory.Orgunits.Patch patch = OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
+                attributes(AttributeBuilder.build(PredefinedAttributes.DESCRIPTION)));
+
+        assertNotNull(patch);
+        assertEquals(((OrgUnit) patch.getJsonContent()).getDescription(), "");
     }
 
     @Test
@@ -129,6 +162,17 @@ public class TestResourceHandlers {
         assertEquals(request.getProductId(), PRODUCT);
         assertEquals(request.getSkuId(), SKU);
         assertEquals(request.getUserId(), USER);
+    }
+
+    @Test(expectedExceptions = UnknownUidException.class)
+    public void licenseDeleteRejectsMalformedUid() {
+        LicenseAssignmentsHandler.deleteLicenseAssignment(licensing().licenseAssignments(), "not-a-license-id");
+    }
+
+    @Test(expectedExceptions = UnknownUidException.class)
+    public void licenseUpdateRejectsMalformedUid() {
+        LicenseAssignmentsHandler.updateLicenseAssignment(licensing().licenseAssignments(), "not-a-license-id",
+                attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, "replacement")));
     }
 
     @Test
@@ -147,9 +191,61 @@ public class TestResourceHandlers {
     }
 
     @Test
+    public void createLicenseAssignmentMapsRequiredFieldsToRequest() {
+        Licensing.LicenseAssignments.Insert request = LicenseAssignmentsHandler.createLicenseAssignment(
+                licensing().licenseAssignments(), attributes(
+                        AttributeBuilder.build(GoogleAppsConnector.PRODUCT_ID_ATTR, PRODUCT),
+                        AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU),
+                        AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, USER)));
+
+        LicenseAssignmentInsert content = (LicenseAssignmentInsert) request.getJsonContent();
+        assertEquals(request.getProductId(), PRODUCT);
+        assertEquals(request.getSkuId(), SKU);
+        assertEquals(request.getFields(), GoogleAppsConnector.PRODUCT_ID_SKU_ID_USER_ID);
+        assertEquals(content.getUserId(), USER);
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void createLicenseAssignmentRequiresProduct() {
+        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes(
+                AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU),
+                AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, USER)));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void createLicenseAssignmentRequiresSku() {
+        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes(
+                AttributeBuilder.build(GoogleAppsConnector.PRODUCT_ID_ATTR, PRODUCT),
+                AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, USER)));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void createLicenseAssignmentRequiresUser() {
+        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes(
+                AttributeBuilder.build(GoogleAppsConnector.PRODUCT_ID_ATTR, PRODUCT),
+                AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU)));
+    }
+
+    @Test
+    public void updateLicenseAssignmentPassesRequestedSkuToGoogle() {
+        Licensing.LicenseAssignments.Patch patch = LicenseAssignmentsHandler.updateLicenseAssignment(
+                licensing().licenseAssignments(), licenseUid(),
+                attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, "new-sku")));
+
+        assertNotNull(patch);
+        assertEquals(((LicenseAssignment) patch.getJsonContent()).getSkuId(), "new-sku");
+    }
+
+    @Test
     public void unchangedLicenseSkuDoesNotCreatePatch() {
         assertNull(LicenseAssignmentsHandler.updateLicenseAssignment(licensing().licenseAssignments(), licenseUid(),
                 attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU))));
+    }
+
+    @Test
+    public void licenseUpdateWithoutSkuDoesNotCreatePatch() {
+        assertNull(LicenseAssignmentsHandler.updateLicenseAssignment(licensing().licenseAssignments(), licenseUid(),
+                attributes()));
     }
 
     @Test
@@ -165,6 +261,145 @@ public class TestResourceHandlers {
         assertFalse(LicenseAssignmentsHandler.LICENSE_NAME_PATTERN.matcher("invalid-license-id").matches());
     }
 
+    @Test
+    public void licenseWithoutEtagUsesUidWithoutRevision() {
+        LicenseAssignment assignment = new LicenseAssignment()
+                .setProductId(PRODUCT).setSkuId(SKU).setUserId(USER);
+
+        Uid uid = LicenseAssignmentsHandler.generateLicenseAssignmentId(assignment);
+
+        assertEquals(uid.getUidValue(), licenseUid());
+        assertNull(uid.getRevision());
+    }
+
+    @Test
+    public void licenseAssignmentMapsToConnectorObject() {
+        LicenseAssignment assignment = new LicenseAssignment()
+                .setProductId(PRODUCT)
+                .setSkuId(SKU)
+                .setUserId(USER)
+                .setSelfLink("https://example.test/license")
+                .setEtags("version-2");
+
+        ConnectorObject object = LicenseAssignmentsHandler.fromLicenseAssignment(assignment);
+
+        assertEquals(object.getObjectClass(), GoogleAppsConnector.LICENSE_ASSIGNMENT);
+        assertEquals(object.getUid().getUidValue(), licenseUid());
+        assertEquals(object.getUid().getRevision(), "version-2");
+        assertEquals(object.getName().getNameValue(), licenseUid());
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.PRODUCT_ID_ATTR).getValue(), List.of(PRODUCT));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.SKU_ID_ATTR).getValue(), List.of(SKU));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.USER_ID_ATTR).getValue(), List.of(USER));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.SELF_LINK_ATTR).getValue(),
+                List.of("https://example.test/license"));
+    }
+
+    @Test
+    public void groupRequestMappingsBuildAndSkipEmptyPatch() {
+        Directory.Groups.Insert insert = GroupHandler.createGroup(directory().groups(),
+                attributes(new Name("engineering@example.com"),
+                        AttributeBuilder.build(GoogleAppsConnector.NAME_ATTR, "Engineering"),
+                        AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, "Team")));
+        com.google.api.services.directory.model.Group insertBody =
+                (com.google.api.services.directory.model.Group) insert.getJsonContent();
+        assertEquals(insertBody.getEmail(), "engineering@example.com");
+        assertEquals(insertBody.getName(), "Engineering");
+        assertEquals(insertBody.getDescription(), "Team");
+        assertEquals(insert.getFields(), GoogleAppsConnector.ID_ETAG);
+
+        assertNull(GroupHandler.updateGroup(directory().groups(), "engineering@example.com", attributes()));
+        Directory.Groups.Patch patch = GroupHandler.updateGroup(directory().groups(), "engineering@example.com",
+                attributes(AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, "New description")));
+        assertNotNull(patch);
+        assertEquals(((com.google.api.services.directory.model.Group) patch.getJsonContent()).getDescription(),
+                "New description");
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void groupUpdateRejectsBlankPrimaryEmail() {
+        GroupHandler.updateGroup(directory().groups(), "engineering@example.com", attributes(new Name(" ")));
+    }
+
+    @Test
+    public void memberMappingsPreserveEtagAndMapAttributes() {
+        Member member = new Member().setId("123").setEmail(USER).setRole("OWNER").setType("USER")
+                .setEtag("member-version");
+
+        Uid uid = GroupHandler.generateMemberId("engineering@example.com", member);
+        ConnectorObject object = GroupHandler.fromMember("engineering@example.com", member);
+
+        assertEquals(uid.getUidValue(), "engineering@example.com/" + USER);
+        assertEquals(uid.getRevision(), "member-version");
+        assertEquals(object.getUid(), uid);
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.GROUP_KEY_ATTR).getValue(), List.of("123"));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.ROLE_ATTR).getValue(), List.of("OWNER"));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.TYPE_ATTR).getValue(), List.of("USER"));
+        assertNull(GroupHandler.generateMemberId("engineering@example.com", new Member().setEmail(USER)).getRevision());
+    }
+
+    @Test
+    public void memberUpdateDefaultsRoleAndDeleteBuildRequests() {
+        Directory.Members.Patch patch = GroupHandler.updateMembers(directory().members(), "g", USER, " ");
+        assertEquals(((Member) patch.getJsonContent()).getRole(), "MEMBER");
+        assertEquals(patch.getFields(), GoogleAppsConnector.EMAIL_ETAG);
+        assertEquals(GroupHandler.deleteMembers(directory().members(), "g", USER).getMemberKey(), USER);
+    }
+
+    @Test
+    public void userCreateUpdatePhotoAndAliasesBuildRequests() {
+        Directory.Users.Insert insert = UserHandler.createUser(directory().users(), attributes(
+                new Name(USER), AttributeBuilder.buildPassword(new GuardedString("P@ssw0rd".toCharArray())),
+                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada"),
+                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace"),
+                AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true),
+                AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering")));
+        com.google.api.services.directory.model.User user =
+                (com.google.api.services.directory.model.User) insert.getJsonContent();
+        assertEquals(user.getPrimaryEmail(), USER);
+        assertEquals(user.getName().getGivenName(), "Ada");
+        assertEquals(user.getName().getFamilyName(), "Lovelace");
+        assertEquals(user.getSuspended(), Boolean.TRUE);
+        assertEquals(user.getOrgUnitPath(), "/Engineering");
+        assertEquals(insert.getFields(), UserHandler.ID_ETAG);
+
+        assertNull(UserHandler.updateUser(directory().users(), new Uid("u"), attributes()));
+        Directory.Users.Patch patch = UserHandler.updateUser(directory().users(), new Uid("u"), attributes(
+                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Byron"),
+                AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, "false")));
+        assertNotNull(patch);
+        com.google.api.services.directory.model.User patchBody =
+                (com.google.api.services.directory.model.User) patch.getJsonContent();
+        assertEquals(patchBody.getName().getFamilyName(), "Byron");
+        assertEquals(patchBody.getIncludeInGlobalAddressList(), Boolean.FALSE);
+        assertEquals(UserHandler.createUpdateUserPhoto(directory().users().photos(), USER,
+                new byte[]{1, 2, 3}).getFields(), GoogleAppsConnector.ID_ATTR);
+        assertEquals(UserHandler.createUserAlias(directory().users().aliases(), USER,
+                "ada.alias@example.com").getFields(), UserHandler.ID_ETAG);
+        assertEquals(UserHandler.deleteUserAlias(directory().users().aliases(), USER,
+                "ada.alias@example.com").getUserKey(), USER);
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void userCreateRequiresPassword() {
+        UserHandler.createUser(directory().users(), attributes(new Name(USER),
+                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada"),
+                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace")));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void userCreateRequiresGivenName() {
+        UserHandler.createUser(directory().users(), attributes(new Name(USER),
+                AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
+                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace")));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void userCreateRequiresFamilyName() {
+        UserHandler.createUser(directory().users(), attributes(new Name(USER),
+                AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
+                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")));
+    }
+
     private static Directory directory() {
         return new Directory.Builder(new NetHttpTransport(), new GsonFactory(), request -> { })
                 .setApplicationName("connector-googleapps-test")
@@ -178,7 +413,7 @@ public class TestResourceHandlers {
     }
 
     private static AttributesAccessor attributes(Attribute... attributes) {
-        return new AttributesAccessor(new HashSet<Attribute>(Arrays.asList(attributes)));
+        return new AttributesAccessor(new HashSet<>(Arrays.asList(attributes)));
     }
 
     private static String licenseUid() {
