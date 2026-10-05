@@ -29,7 +29,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.expectThrows;
 
-public class TestFilters {
+public class FiltersTest {
 
     @Test
     public void userFiltersTranslateValuesAndEscapeWhitespaceAndQuotes() throws Exception {

@@ -27,7 +27,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
-public class TestRequestResultHandler {
+public class RequestResultHandlerTest {
 
     private final RequestResultHandler<AbstractGoogleJsonClientRequest<?>, Object, String> handler =
             new RequestResultHandler<>() {

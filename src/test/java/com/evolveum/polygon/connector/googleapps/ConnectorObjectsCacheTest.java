@@ -34,7 +34,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
-public class TestConnectorObjectsCache {
+public class ConnectorObjectsCacheTest {
 
     @Test
     public void enabledCacheReturnsStoredObjectAndRemovesIt() {
@@ -81,9 +81,9 @@ public class TestConnectorObjectsCache {
     }
 
     private static ConnectorObjectsCache cache(boolean enabled) {
-        GoogleAppsConfiguration configuration = TestGoogleAppsConfiguration.validConfiguration();
+        GoogleAppsConfiguration configuration = GoogleAppsConfigurationTest.validConfiguration();
         configuration.setAllowCache(enabled);
-        return ConnectorObjectsCache.getInstance(configuration, Log.getLog(TestConnectorObjectsCache.class));
+        return ConnectorObjectsCache.getInstance(configuration, Log.getLog(ConnectorObjectsCacheTest.class));
     }
 
     private static ConnectorObject user() {

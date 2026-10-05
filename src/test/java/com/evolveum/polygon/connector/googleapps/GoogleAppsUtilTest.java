@@ -30,7 +30,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
-public class TestGoogleAppsUtil {
+public class GoogleAppsUtilTest {
 
     @Test
     public void getNameReturnsEmail() {

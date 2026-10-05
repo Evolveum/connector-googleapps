@@ -46,7 +46,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
-public class TestResourceHandlers {
+public class ResourceHandlersTest {
 
     private static final String PRODUCT = "Google-Drive-storage";
     private static final String SKU = "Google-Drive-storage-1TB";
