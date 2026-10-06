@@ -17,6 +17,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import com.google.api.client.util.ArrayMap;
+import com.google.gson.JsonSyntaxException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
@@ -67,7 +68,7 @@ public class GoogleAppsUtilTest {
     }
 
     @Test
-    public void structAttributesConvertPlainAndJsonValuesAndOmitNullValue() {
+    public void structAttributesConvertPlainAndJsonValuesAndDoNotOmitNullValue() {
         Attribute values = AttributeBuilder.build("phones",
                 Arrays.asList("+421123", "{\"type\":\"work\",\"value\":\"+421456\"}", "{\"value\":\"null\"}"));
 
@@ -87,4 +88,21 @@ public class GoogleAppsUtilTest {
         assertNull(GoogleAppsUtil.getStructAttr(AttributeBuilder.build("phones")));
         assertNull(GoogleAppsUtil.structAttrToString(null));
     }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void booleanValueHelperRejectsUnrecognizedString() {
+        GoogleAppsUtil.getBooleanValueWithDefault(AttributeBuilder.build("flag", "sometimes"), null);
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void stringValueHelperRejectsMultipleValues() {
+        GoogleAppsUtil.getStringValueWithDefault(
+                AttributeBuilder.build("label", Arrays.asList("one", "two")), null);
+    }
+
+    @Test(expectedExceptions = JsonSyntaxException.class)
+    public void malformedJsonStructAttributeThrowsInsteadOfReturningCorruptedData() {
+        GoogleAppsUtil.getStructAttr(AttributeBuilder.build("phones", "{not-json}"));
+    }
+
 }
