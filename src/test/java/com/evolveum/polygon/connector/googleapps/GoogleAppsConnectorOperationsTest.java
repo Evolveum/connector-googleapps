@@ -74,7 +74,7 @@ public class GoogleAppsConnectorOperationsTest {
                 AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace"),
                 AttributeBuilder.build(GoogleAppsConnector.ALIASES_ATTR, List.of("ada.alias@example.com")),
                 AttributeBuilder.build(GoogleAppsConnector.PHOTO_ATTR, (Object) new byte[]{1, 2, 3}),
-                AttributeBuilder.build(GoogleAppsConnector.IS_ADMIN_ATTR, true));
+                AttributeBuilder.build( "isAdmin", true));
 
         Uid uid = connector.create(ObjectClass.ACCOUNT, attributes, new OperationOptionsBuilder().build());
 

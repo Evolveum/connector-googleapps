@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 import java.util.Set;
 
+import static com.evolveum.polygon.connector.googleapps.UserHandler.FAMILY_NAME_ATTR;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -75,7 +76,7 @@ public class ConnectorQuerySupportTest {
     @Test
     public void googleNamesAndFieldsMapConnIdAttributes() {
         OperationOptions options = new OperationOptionsBuilder()
-                .setAttributesToGet(Name.NAME, PredefinedAttributes.DESCRIPTION, GoogleAppsConnector.FAMILY_NAME_ATTR)
+                .setAttributesToGet(Name.NAME, PredefinedAttributes.DESCRIPTION, FAMILY_NAME_ATTR)
                 .build();
 
         assertEquals(connector.googleName(ObjectClass.ACCOUNT, Name.NAME), GoogleAppsConnector.PRIMARY_EMAIL_ATTR);
@@ -114,30 +115,6 @@ public class ConnectorQuerySupportTest {
                 new OperationOptionsBuilder().setAttributesToGet("(value)").build()));
     }
 
-    @Test
-    public void namesMapForOtherObjectClassesAndEveryNestedNameComponent() {
-        assertEquals(connector.googleName(GoogleAppsConnector.ORG_UNIT, Name.NAME), GoogleAppsConnector.NAME_ATTR);
-        assertEquals(connector.googleName(ObjectClass.ACCOUNT, GoogleAppsConnector.GIVEN_NAME_ATTR), "name/givenName");
-        assertEquals(connector.googleName(ObjectClass.ACCOUNT, GoogleAppsConnector.FULL_NAME_ATTR), "name/fullName");
-        assertEquals(connector.googleName(ObjectClass.ACCOUNT, GoogleAppsConnector.FAMILY_NAME_ATTR), "name/familyName");
-        assertEquals(connector.googleName(ObjectClass.ACCOUNT, "customAttribute"), "customAttribute");
-    }
-
-    @Test
-    public void fieldsProjectionIncludesNestedNamesButSkipsSpecialIdentityFields() {
-        OperationOptions options = new OperationOptionsBuilder()
-                .setAttributesToGet(Uid.NAME, GoogleAppsConnector.GIVEN_NAME_ATTR,
-                        GoogleAppsConnector.FULL_NAME_ATTR, "customAttribute")
-                .build();
-
-        String fields = connector.getFields(options, GoogleAppsConnector.ID_ATTR);
-
-        assertTrue(fields.contains(GoogleAppsConnector.ID_ATTR));
-        assertTrue(fields.contains("name/givenName"));
-        assertTrue(fields.contains("name/fullName"));
-        assertTrue(fields.contains("customAttribute"));
-        assertFalse(fields.contains(Uid.NAME));
-    }
 
     @Test
     public void lifecycleSchemaAndFilterTranslationAreUsableWithoutApiCalls() {

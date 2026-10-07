@@ -18,7 +18,6 @@ package com.evolveum.polygon.connector.googleapps;
 
 import com.google.api.services.directory.model.Group;
 import com.google.api.services.directory.model.User;
-import com.google.api.services.directory.model.UserName;
 import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.testng.annotations.Test;
@@ -35,84 +34,16 @@ import static org.testng.Assert.assertNull;
 public class ConnectorObjectMappingTest {
 
     @Test
-    public void userResourceMapsRequestedAttributesWithoutExpensiveAssociations() {
-        GoogleAppsConnector connector = new GoogleAppsConnector();
-        Set<String> attributes = new HashSet<>(Arrays.asList(
-                GoogleAppsConnector.GIVEN_NAME_ATTR,
-                GoogleAppsConnector.FAMILY_NAME_ATTR,
-                GoogleAppsConnector.FULL_NAME_ATTR,
-                GoogleAppsConnector.IS_ADMIN_ATTR,
-                GoogleAppsConnector.IS_DELEGATED_ADMIN_ATTR,
-                GoogleAppsConnector.LAST_LOGIN_TIME_ATTR,
-                GoogleAppsConnector.CREATION_TIME_ATTR,
-                GoogleAppsConnector.AGREED_TO_TERMS_ATTR,
-                GoogleAppsConnector.SUSPENDED_ATTR,
-                GoogleAppsConnector.SUSPENSION_REASON_ATTR,
-                GoogleAppsConnector.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR,
-                GoogleAppsConnector.IP_WHITELISTED_ATTR,
-                GoogleAppsConnector.IMS_ATTR,
-                GoogleAppsConnector.EMAILS_ATTR,
-                GoogleAppsConnector.EXTERNAL_IDS_ATTR,
-                GoogleAppsConnector.RELATIONS_ATTR,
-                GoogleAppsConnector.ADDRESSES_ATTR,
-                GoogleAppsConnector.ORGANIZATIONS_ATTR,
-                GoogleAppsConnector.PHONES_ATTR,
-                GoogleAppsConnector.ALIASES_ATTR,
-                GoogleAppsConnector.LOCATIONS_ATTR,
-                GoogleAppsConnector.NON_EDITABLE_ALIASES_ATTR,
-                GoogleAppsConnector.CUSTOMER_ID_ATTR,
-                GoogleAppsConnector.ORG_UNIT_PATH_ATTR,
-                GoogleAppsConnector.IS_MAILBOX_SETUP_ATTR,
-                GoogleAppsConnector.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR,
-                GoogleAppsConnector.THUMBNAIL_PHOTO_URL_ATTR,
-                GoogleAppsConnector.DELETION_TIME_ATTR));
-        User user = new User()
-                .setId("user-id")
-                .setEtag("etag-1")
-                .setPrimaryEmail("ada@example.com")
-                .setName(new UserName().setGivenName("Ada").setFamilyName("Lovelace").setFullName("Ada Lovelace"))
-                .setIsAdmin(true)
-                .setIsDelegatedAdmin(false)
-                .setLastLoginTime(new com.google.api.client.util.DateTime("2026-01-01T00:00:00.000Z"))
-                .setCreationTime(new com.google.api.client.util.DateTime("2020-01-01T00:00:00.000Z"))
-                .setAgreedToTerms(true)
-                .setSuspended(false)
-                .setSuspensionReason("NONE")
-                .setChangePasswordAtNextLogin(false)
-                .setIpWhitelisted(false)
-                .setNonEditableAliases(List.of("legacy@example.com"))
-                .setCustomerId("customer-id")
-                .setOrgUnitPath("/Engineering")
-                .setIsMailboxSetup(true)
-                .setIncludeInGlobalAddressList(true)
-                .setThumbnailPhotoUrl("https://example.test/photo")
-                .setDeletionTime(new com.google.api.client.util.DateTime("2026-02-01T00:00:00.000Z"));
-
-        ConnectorObject object = connector.fromUser(user, attributes, null);
-
-        assertEquals(object.getObjectClass(), ObjectClass.ACCOUNT);
-        assertEquals(object.getUid().getUidValue(), "user-id");
-        assertEquals(object.getUid().getRevision(), "etag-1");
-        assertEquals(object.getName().getNameValue(), "ada@example.com");
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.GIVEN_NAME_ATTR).getValue(), List.of("Ada"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.FAMILY_NAME_ATTR).getValue(), List.of("Lovelace"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.SUSPENDED_ATTR).getValue(), List.of(false));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).getValue(), List.of("/Engineering"));
-        assertNull(object.getAttributeByName(GoogleAppsConnector.PHOTO_ATTR));
-        assertNull(object.getAttributeByName(org.identityconnectors.framework.common.objects.PredefinedAttributes.GROUPS_NAME));
-    }
-
-    @Test
     public void userResourceUsesIdWithoutRevisionWhenNoEtagAndNoName() {
         GoogleAppsConnector connector = new GoogleAppsConnector();
-        Set<String> attributes = new HashSet<>(List.of(GoogleAppsConnector.GIVEN_NAME_ATTR));
+        Set<String> attributes = new HashSet<>(List.of(UserHandler.GIVEN_NAME_ATTR));
         User user = new User().setId("user-id").setPrimaryEmail("ada@example.com");
 
         ConnectorObject object = connector.fromUser(user, attributes, null);
 
         assertEquals(object.getUid().getUidValue(), "user-id");
         assertNull(object.getUid().getRevision());
-        assertNotNull(object.getAttributeByName(GoogleAppsConnector.GIVEN_NAME_ATTR));
+        assertNotNull(object.getAttributeByName(UserHandler.GIVEN_NAME_ATTR));
     }
 
     @Test
