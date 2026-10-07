@@ -16,9 +16,11 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
+import org.identityconnectors.common.security.GuardedString;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 
 public class GoogleAppsConfigurationTest {
 
@@ -63,6 +65,40 @@ public class GoogleAppsConfigurationTest {
         GoogleAppsConfiguration configuration = validConfiguration();
         configuration.setClientId(" ");
         configuration.validate();
+    }
+
+    @Test
+    public void allConfigurationPropertiesCanBeReadBackAfterSetting() {
+        GoogleAppsConfiguration configuration = new GoogleAppsConfiguration();
+        GuardedString clientSecret = new GuardedString("client-secret".toCharArray());
+        GuardedString refreshToken = new GuardedString("refresh-token".toCharArray());
+        GuardedString serviceAccountKey = new GuardedString("service-account-key".toCharArray());
+
+        configuration.setDomain("example.org");
+        configuration.setProductId("product");
+        configuration.setSkuId("sku");
+        configuration.setAutoAddLicense(true);
+        configuration.setClientId("client-id");
+        configuration.setClientSecret(clientSecret);
+        configuration.setRefreshToken(refreshToken);
+        configuration.setServiceAccountKeyJson(serviceAccountKey);
+        configuration.setServiceAccountUser("admin@example.org");
+        configuration.setAllowCache(true);
+        configuration.setMaxCacheTTL(1234L);
+        configuration.setIgnoreCacheAfterUpdateTTL(567L);
+
+        assertEquals(configuration.getDomain(), "example.org");
+        assertEquals(configuration.getProductId(), "product");
+        assertEquals(configuration.getSkuId(), "sku");
+        assertEquals(configuration.getAutoAddLicense(), Boolean.TRUE);
+        assertEquals(configuration.getClientId(), "client-id");
+        assertSame(configuration.getClientSecret(), clientSecret);
+        assertSame(configuration.getRefreshToken(), refreshToken);
+        assertSame(configuration.getServiceAccountKeyJson(), serviceAccountKey);
+        assertEquals(configuration.getServiceAccountUser(), "admin@example.org");
+        assertEquals(configuration.getAllowCache(), Boolean.TRUE);
+        assertEquals(configuration.getMaxCacheTTL(), Long.valueOf(1234L));
+        assertEquals(configuration.getIgnoreCacheAfterUpdateTTL(), Long.valueOf(567L));
     }
 
     static GoogleAppsConfiguration validConfiguration() {

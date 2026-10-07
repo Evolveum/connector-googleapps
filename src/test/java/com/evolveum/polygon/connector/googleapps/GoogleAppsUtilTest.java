@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -67,8 +68,19 @@ public class GoogleAppsUtilTest {
         GoogleAppsUtil.getBooleanValueWithDefault(AttributeBuilder.build("flag", 42), null);
     }
 
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void booleanValueHelperRejectsUnrecognizedString() {
+        GoogleAppsUtil.getBooleanValueWithDefault(AttributeBuilder.build("flag", "sometimes"), null);
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void stringValueHelperRejectsMultipleValues() {
+        GoogleAppsUtil.getStringValueWithDefault(
+                AttributeBuilder.build("label", Arrays.asList("one", "two")), null);
+    }
+
     @Test
-    public void structAttributesConvertPlainAndJsonValuesAndDoNotOmitNullValue() {
+    public void structAttributesConvertPlainAndJsonValuesAndOmitNullValue() {
         Attribute values = AttributeBuilder.build("phones",
                 Arrays.asList("+421123", "{\"type\":\"work\",\"value\":\"+421456\"}", "{\"value\":\"null\"}"));
 
@@ -89,20 +101,53 @@ public class GoogleAppsUtilTest {
         assertNull(GoogleAppsUtil.structAttrToString(null));
     }
 
-    @Test(expectedExceptions = InvalidAttributeValueException.class)
-    public void booleanValueHelperRejectsUnrecognizedString() {
-        GoogleAppsUtil.getBooleanValueWithDefault(AttributeBuilder.build("flag", "sometimes"), null);
+    @Test
+    public void structAttributesHandleNullAndNonStringValues() {
+        assertNull(GoogleAppsUtil.getStructAttr(null));
+
+        ArrayMap<String, Object> map = new ArrayMap<>();
+        map.put("type", "work");
+        Collection<?> converted = (Collection<?>) GoogleAppsUtil.getStructAttr(
+                AttributeBuilder.build("phones", map));
+
+        assertEquals(converted.size(), 1);
+        assertTrue(converted.contains(map));
     }
 
-    @Test(expectedExceptions = IllegalArgumentException.class)
-    public void stringValueHelperRejectsMultipleValues() {
-        GoogleAppsUtil.getStringValueWithDefault(
-                AttributeBuilder.build("label", Arrays.asList("one", "two")), null);
+    @Test
+    public void structAttributesSerializeMapsAndScalarValuesAndSkipEmptyValues() {
+        ArrayMap<String, Object> value = new ArrayMap<>();
+        value.put("type", "work");
+        value.put("value", "+421123");
+        ArrayMap<String, Object> nullValue = new ArrayMap<>();
+        nullValue.put("value", "null");
+        ArrayMap<String, Object> emptyValue = new ArrayMap<>();
+        emptyValue.put("value", "");
+
+        Collection<?> serialized = (Collection<?>) GoogleAppsUtil.structAttrToString(
+                Arrays.asList(value, nullValue, emptyValue, "plain"));
+
+        assertEquals(serialized.size(), 2);
+        assertTrue(serialized.contains("{\"type\"=\"work\",\"value\"=\"+421123\"}"));
+        assertTrue(serialized.contains("plain"));
+        assertTrue(((Collection<?>) GoogleAppsUtil.structAttrToString(Arrays.asList(nullValue, emptyValue))).isEmpty());
+        assertNull(GoogleAppsUtil.structAttrToString(List.of()));
+    }
+
+    @Test
+    public void nestedJsonStructAttributeIsParsedRecursively() {
+        Collection<?> converted = (Collection<?>) GoogleAppsUtil.getStructAttr(
+                AttributeBuilder.build("addresses", "{\"type\":\"work\",\"metadata\":{\"primary\":\"true\"}}"));
+
+        assertEquals(converted.size(), 1);
+        ArrayMap<?, ?> address = (ArrayMap<?, ?>) converted.iterator().next();
+        assertEquals(address.get("type"), "work");
+        assertTrue(address.get("metadata") instanceof ArrayMap);
+        assertEquals(((ArrayMap<?, ?>) address.get("metadata")).get("primary"), "true");
     }
 
     @Test(expectedExceptions = JsonSyntaxException.class)
     public void malformedJsonStructAttributeThrowsInsteadOfReturningCorruptedData() {
         GoogleAppsUtil.getStructAttr(AttributeBuilder.build("phones", "{not-json}"));
     }
-
 }

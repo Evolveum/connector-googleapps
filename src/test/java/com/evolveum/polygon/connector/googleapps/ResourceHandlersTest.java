@@ -21,6 +21,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Member;
 import com.google.api.services.directory.model.OrgUnit;
+import com.google.api.services.directory.model.User;
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentInsert;
@@ -39,6 +40,7 @@ import org.testng.annotations.Test;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -126,6 +128,19 @@ public class ResourceHandlersTest {
         assertNull(object.getAttributeByName(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR));
     }
 
+    @Test
+    public void orgUnitProjectionMapsAllOptionalFieldsWhenNoProjectionIsProvided() {
+        OrgUnit orgUnit = new OrgUnit().setName("Engineering").setOrgUnitPath("/Engineering")
+                .setParentOrgUnitPath("/").setDescription("Team").setBlockInheritance(true);
+
+        ConnectorObject object = OrgunitsHandler.fromOrgunit(orgUnit, null);
+
+        assertEquals(object.getAttributeByName(PredefinedAttributes.DESCRIPTION).getValue(), List.of("Team"));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).getValue(), List.of("/Engineering"));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR).getValue(), List.of("/"));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR).getValue(), List.of(true));
+    }
+
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createOrgUnitRequiresName() {
         OrgunitsHandler.createOrgunit(directory().orgunits(),
@@ -138,9 +153,21 @@ public class ResourceHandlersTest {
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void createOrgUnitRejectsBlankParentPath() {
+        OrgunitsHandler.createOrgunit(directory().orgunits(), attributes(new Name("Engineering"),
+                AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, " ")));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void updateOrgUnitRejectsBlankParentPath() {
         OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
                 attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, " ")));
+    }
+
+    @Test(expectedExceptions = ClassCastException.class)
+    public void updateOrgUnitRejectsNonBooleanInheritanceValue() {
+        OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
+                attributes(AttributeBuilder.build(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR, "sometimes")));
     }
 
     @Test
@@ -320,6 +347,18 @@ public class ResourceHandlersTest {
         GroupHandler.updateGroup(directory().groups(), "engineering@example.com", attributes(new Name(" ")));
     }
 
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void createGroupRequiresPrimaryEmail() {
+        GroupHandler.createGroup(directory().groups(), attributes(
+                AttributeBuilder.build(GoogleAppsConnector.NAME_ATTR, "Engineering")));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void groupUpdateRejectsNonStringDescription() {
+        GroupHandler.updateGroup(directory().groups(), "engineering@example.com",
+                attributes(AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, 42)));
+    }
+
     @Test
     public void memberMappingsPreserveEtagAndMapAttributes() {
         Member member = new Member().setId("123").setEmail(USER).setRole("OWNER").setType("USER")
@@ -379,6 +418,114 @@ public class ResourceHandlersTest {
                 "ada.alias@example.com").getUserKey(), USER);
     }
 
+    @Test
+    public void userCreateMapsStructuredAndOptionalScalarAttributes() {
+        Directory.Users.Insert insert = UserHandler.createUser(directory().users(), attributes(
+                new Name(USER), AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
+                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada"),
+                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace"),
+                AttributeBuilder.build(UserHandler.IMS_ATTR, "{\"type\":\"work\",\"value\":\"ada-chat\"}"),
+                AttributeBuilder.build(UserHandler.EMAILS_ATTR, "{\"type\":\"work\",\"value\":\"ada@example.com\"}"),
+                AttributeBuilder.build(UserHandler.EXTERNAL_IDS_ATTR, "{\"type\":\"account\",\"value\":\"42\"}"),
+                AttributeBuilder.build(UserHandler.RELATIONS_ATTR, "{\"type\":\"manager\",\"value\":\"grace@example.com\"}"),
+                AttributeBuilder.build(UserHandler.ADDRESSES_ATTR, "{\"type\":\"work\",\"streetAddress\":\"London\"}"),
+                AttributeBuilder.build(UserHandler.ORGANIZATIONS_ATTR, "{\"name\":\"Analytical Engine\"}"),
+                AttributeBuilder.build(UserHandler.PHONES_ATTR, "{\"type\":\"work\",\"value\":\"+44123\"}"),
+                AttributeBuilder.build(UserHandler.LOCATIONS_ATTR, "{\"type\":\"desk\",\"area\":\"A1\"}"),
+                AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true),
+                AttributeBuilder.build(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, true),
+                AttributeBuilder.build(UserHandler.IP_WHITELISTED_ATTR, false),
+                AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering"),
+                AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true)));
+
+        User content = (User) insert.getJsonContent();
+
+        assertEquals(((java.util.List<?>) content.getIms()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getEmails()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getExternalIds()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getRelations()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getAddresses()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getOrganizations()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getPhones()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getLocations()).size(), 1);
+        assertEquals(content.getSuspended(), Boolean.TRUE);
+        assertEquals(content.getChangePasswordAtNextLogin(), Boolean.TRUE);
+        assertEquals(content.getIpWhitelisted(), Boolean.FALSE);
+        assertEquals(content.getOrgUnitPath(), "/Engineering");
+        assertEquals(content.getIncludeInGlobalAddressList(), Boolean.TRUE);
+    }
+
+    @Test
+    public void userUpdateMapsEveryOptionalFieldAndAcceptsNullValues() {
+        Directory.Users.Patch patch = UserHandler.updateUser(directory().users(), new Uid("u"), attributes(
+                new Name("new@example.com"),
+                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Augusta"),
+                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "King"),
+                AttributeBuilder.buildPassword(new GuardedString("new-secret".toCharArray())),
+                AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true),
+                AttributeBuilder.build(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, false),
+                AttributeBuilder.build(UserHandler.IP_WHITELISTED_ATTR, true),
+                AttributeBuilder.build(UserHandler.IMS_ATTR, "{\"type\":\"work\",\"value\":\"ada-chat\"}"),
+                AttributeBuilder.build(UserHandler.EMAILS_ATTR, "{\"type\":\"work\",\"value\":\"new@example.com\"}"),
+                AttributeBuilder.build(UserHandler.EXTERNAL_IDS_ATTR, "{\"type\":\"account\",\"value\":\"42\"}"),
+                AttributeBuilder.build(UserHandler.RELATIONS_ATTR, "{\"type\":\"manager\",\"value\":\"grace@example.com\"}"),
+                AttributeBuilder.build(UserHandler.ADDRESSES_ATTR, "{\"type\":\"work\",\"streetAddress\":\"London\"}"),
+                AttributeBuilder.build(UserHandler.ORGANIZATIONS_ATTR, "{\"name\":\"Analytical Engine\"}"),
+                AttributeBuilder.build(UserHandler.PHONES_ATTR, "{\"type\":\"work\",\"value\":\"+44123\"}"),
+                AttributeBuilder.build(UserHandler.LOCATIONS_ATTR, "{\"type\":\"desk\",\"area\":\"A1\"}"),
+                AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering"),
+                AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true)));
+
+        assertNotNull(patch);
+        User content = (User) patch.getJsonContent();
+        assertEquals(content.getPrimaryEmail(), "new@example.com");
+        assertEquals(content.getName().getGivenName(), "Augusta");
+        assertEquals(content.getName().getFamilyName(), "King");
+        assertEquals(content.getPassword(), "new-secret");
+        assertEquals(content.getSuspended(), Boolean.TRUE);
+        assertEquals(content.getChangePasswordAtNextLogin(), Boolean.FALSE);
+        assertEquals(content.getIpWhitelisted(), Boolean.TRUE);
+        assertEquals(((java.util.List<?>) content.getIms()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getEmails()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getExternalIds()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getRelations()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getAddresses()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getOrganizations()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getPhones()).size(), 1);
+        assertEquals(((java.util.List<?>) content.getLocations()).size(), 1);
+        assertEquals(content.getOrgUnitPath(), "/Engineering");
+        assertEquals(content.getIncludeInGlobalAddressList(), Boolean.TRUE);
+    }
+
+    @Test
+    public void userUpdateCanInitializeThePatchFromEachOptionalFieldAlone() {
+        AttributesAccessor[] individualAttributes = new AttributesAccessor[] {
+            attributes(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")),
+            attributes(AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace")),
+            attributes(AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray()))),
+            attributes(AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true)),
+            attributes(AttributeBuilder.build(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, true)),
+            attributes(AttributeBuilder.build(UserHandler.IP_WHITELISTED_ATTR, true)),
+            attributes(AttributeBuilder.build(UserHandler.IMS_ATTR, "{\"type\":\"work\"}")),
+            attributes(AttributeBuilder.build(UserHandler.EMAILS_ATTR, "{\"type\":\"work\"}")),
+            attributes(AttributeBuilder.build(UserHandler.EXTERNAL_IDS_ATTR, "{\"type\":\"account\"}")),
+            attributes(AttributeBuilder.build(UserHandler.RELATIONS_ATTR, "{\"type\":\"manager\"}")),
+            attributes(AttributeBuilder.build(UserHandler.ADDRESSES_ATTR, "{\"type\":\"work\"}")),
+            attributes(AttributeBuilder.build(UserHandler.ORGANIZATIONS_ATTR, "{\"name\":\"Org\"}")),
+            attributes(AttributeBuilder.build(UserHandler.PHONES_ATTR, "{\"type\":\"work\"}")),
+            attributes(AttributeBuilder.build(UserHandler.LOCATIONS_ATTR, "{\"type\":\"desk\"}")),
+            attributes(AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering")),
+            attributes(AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true))
+        };
+
+        for (AttributesAccessor singleAttribute : individualAttributes) {
+            assertNotNull(UserHandler.updateUser(directory().users(), new Uid("u"),
+                    singleAttribute));
+        }
+        assertNull(UserHandler.updateUser(directory().users(), new Uid("u"),
+                new AttributesAccessor(Set.of())));
+    }
+
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void userCreateRequiresPassword() {
         UserHandler.createUser(directory().users(), attributes(new Name(USER),
@@ -398,6 +545,18 @@ public class ResourceHandlersTest {
         UserHandler.createUser(directory().users(), attributes(new Name(USER),
                 AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
                 AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void userUpdateRejectsNonStringGivenName() {
+        UserHandler.updateUser(directory().users(), new Uid("u"),
+                attributes(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, 42)));
+    }
+
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    public void userUpdateRejectsUnrecognizedBooleanValue() {
+        UserHandler.updateUser(directory().users(), new Uid("u"),
+                attributes(AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, "sometimes")));
     }
 
     private static Directory directory() {

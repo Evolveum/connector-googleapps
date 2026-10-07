@@ -126,7 +126,7 @@ public class ConnectorObjectsCacheTest {
         assertNull(cache.getUser(user.getUid().getUidValue()));
 
         configuration.setAllowCache(false);
-        ConnectorObjectsCache.getInstance(configuration, Log.getLog(GoogleAppsConfigurationTest.class));
+        ConnectorObjectsCache.getInstance(configuration, Log.getLog(ConnectorObjectsCacheTest.class));
         cache.addUser(user);
         assertNull(cache.getUser(user.getUid().getUidValue()));
     }

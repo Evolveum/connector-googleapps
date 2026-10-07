@@ -75,6 +75,90 @@ public class FiltersTest {
         expectThrows(InvalidAttributeValueException.class, () -> userKey.accept(new GroupHandler(), request));
     }
 
+    @Test
+    public void userFilterVisitorsRejectUnsupportedAttributes() throws Exception {
+        Directory.Users.List request = directory().users().list();
+        UserHandler handler = new UserHandler();
+
+        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.contains(
+                AttributeBuilder.build("unsupported", "x")).accept(handler, request));
+        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.startsWith(
+                AttributeBuilder.build("unsupported", "x")).accept(handler, request));
+        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.equalTo(
+                AttributeBuilder.build("unsupported", "x")).accept(handler, request));
+        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.contains(
+                AttributeBuilder.build("description", "x")).accept(handler, request));
+    }
+
+    @Test
+    public void groupFilterVisitorsRejectUnsupportedOperatorsAndAttributes() throws Exception {
+        Directory.Groups.List request = directory().groups().list();
+        GroupHandler handler = new GroupHandler();
+
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.startsWith(
+                AttributeBuilder.build("domain", "example.com")).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.contains(
+                AttributeBuilder.build("email", "ada@example.com")).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.equalTo(
+                AttributeBuilder.build("email", "ada@example.com")).accept(handler, request));
+    }
+
+    @Test
+    public void userFilterVisitorsCombineSupportedFiltersAndIgnoreUnsupportedOperators() throws Exception {
+        Directory.Users.List request = directory().users().list();
+        UserHandler handler = new UserHandler();
+        Filter conjunction = FilterBuilder.and(
+                FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com")),
+                FilterBuilder.startsWith(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")));
+
+        assertEquals(conjunction.accept(handler, request).toString(),
+                "email=ada@example.com givenName:Ada*");
+        assertEquals(FilterBuilder.containsAllValues(AttributeBuilder.build("email",
+                java.util.Arrays.asList("a", "b"))).accept(handler, request), null);
+        assertEquals(FilterBuilder.greaterThan(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
+        assertEquals(FilterBuilder.greaterThanOrEqualTo(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
+        assertEquals(FilterBuilder.lessThan(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
+        assertEquals(FilterBuilder.lessThanOrEqualTo(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
+        assertEquals(FilterBuilder.not(FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com")))
+                .accept(handler, request), null);
+        assertEquals(FilterBuilder.or(
+                FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com")),
+                FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "grace@example.com")))
+                .accept(handler, request), null);
+        assertEquals(FilterBuilder.endsWith(AttributeBuilder.build(Name.NAME, "example.com"))
+                .accept(handler, request), null);
+        assertEquals(FilterBuilder.equalsIgnoreCase(AttributeBuilder.build(Name.NAME, "ADA@example.com"))
+                .accept(handler, request), null);
+    }
+
+    @Test
+    public void groupFilterVisitorsRejectEveryUnsupportedFilterShape() throws Exception {
+        Directory.Groups.List request = directory().groups().list();
+        GroupHandler handler = new GroupHandler();
+        Filter base = FilterBuilder.equalTo(AttributeBuilder.build("customer", "my_customer"));
+
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.and(base,
+                FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.containsAllValues(
+                AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, java.util.Arrays.asList("a", "b")))
+                .accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.greaterThan(
+                AttributeBuilder.build("customer", "x")).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.greaterThanOrEqualTo(
+                AttributeBuilder.build("customer", "x")).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.lessThan(
+                AttributeBuilder.build("customer", "x")).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.lessThanOrEqualTo(
+                AttributeBuilder.build("customer", "x")).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.not(base).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.or(base,
+                FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.endsWith(
+                AttributeBuilder.build("domain", "example.com")).accept(handler, request));
+        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.equalsIgnoreCase(
+                AttributeBuilder.build("domain", "example.com")).accept(handler, request));
+    }
+
     private static Directory directory() {
         return new Directory.Builder(new NetHttpTransport(), new GsonFactory(), request -> { })
                 .setApplicationName("connector-googleapps-test")
