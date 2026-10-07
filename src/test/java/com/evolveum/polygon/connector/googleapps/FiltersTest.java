@@ -27,6 +27,7 @@ import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.expectThrows;
 
 public class FiltersTest {
@@ -139,8 +140,7 @@ public class FiltersTest {
 
         expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.and(base,
                 FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.containsAllValues(
-                AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, java.util.Arrays.asList("a", "b")))
+        assertNull(FilterBuilder.containsAllValues(AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, java.util.Arrays.asList("a", "b")))
                 .accept(handler, request));
         expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.greaterThan(
                 AttributeBuilder.build("customer", "x")).accept(handler, request));
