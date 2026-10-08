@@ -47,6 +47,11 @@
         <connectorClass>GoogleAppsConnector</connectorClass>
         <framework.compatibilityVersion>1.4</framework.compatibilityVersion>
         <framework.releaseVersion>1.0</framework.releaseVersion>
+        <!-- Ordinary builds run unit tests only. Select one of the test profiles below. -->
+        <skipTests>false</skipTests>
+        <skipUnitTests>${skipTests}</skipUnitTests>
+        <skipITs>true</skipITs>
+        <gws.it.enabled>false</gws.it.enabled>
     </properties>
 
     <repositories>
@@ -98,9 +103,98 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skipTests>${skipUnitTests}</skipTests>
+                    <includes combine.self="override">
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>integration-test-sources</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                            <goal>add-test-resource</goal>
+                        </goals>
+                        <configuration>
+                            <skipAddTestSource>${skipITs}</skipAddTestSource>
+                            <skipAddTestResource>${skipITs}</skipAddTestResource>
+                            <sources>
+                                <source>src/integration-test/java</source>
+                            </sources>
+                            <resources>
+                                <resource>
+                                    <directory>src/integration-test/resources</directory>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <skipITs>${skipITs}</skipITs>
+                    <includes combine.self="override">
+                        <include>**/*IT.java</include>
+                    </includes>
+                    <failIfNoTests>true</failIfNoTests>
+                    <systemPropertyVariables>
+                        <gws.it.enabled>${gws.it.enabled}</gws.it.enabled>
+                    </systemPropertyVariables>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>integration-tests</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>unit-tests</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <skipUnitTests>${skipTests}</skipUnitTests>
+                <skipITs>true</skipITs>
+                <gws.it.enabled>false</gws.it.enabled>
+            </properties>
+        </profile>
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <skipUnitTests>true</skipUnitTests>
+                <skipITs>false</skipITs>
+                <gws.it.enabled>true</gws.it.enabled>
+            </properties>
+        </profile>
+        <profile>
+            <id>all-tests</id>
+            <properties>
+                <skipUnitTests>${skipTests}</skipUnitTests>
+                <skipITs>false</skipITs>
+                <gws.it.enabled>true</gws.it.enabled>
+            </properties>
+        </profile>
+    </profiles>
 
     <dependencies>
         <dependency>

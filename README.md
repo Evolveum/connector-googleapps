@@ -10,9 +10,31 @@ Status: [![Build Status](https://travis-ci.org/Evolveum/connector-googleapps.svg
 the user, and verifies absence. It uses the real `GoogleAppsConnector` and Google
 Directory API. This is connector-level coverage, not a midPoint deployment test.
 
-The existing TestNG/Surefire dependencies are sufficient; no POM changes are needed.
-The `*IT` name is outside the current ordinary test includes. An additional
-`gws.it.enabled=true` flag is required before configuration loading or network access.
+TestNG remains the test framework. Surefire runs unit tests and Failsafe runs
+integration tests; build-helper registers the integration source/resource directories.
+No application or test-library dependencies are added.
+
+```text
+src/
+  main/java/                 production code
+  main/resources/            production resources
+  test/java/                 *Test.java unit tests and shared test helpers
+  test/resources/            unit/shared test resources
+  integration-test/java/     *IT.java integration tests and their base classes
+  integration-test/resources/  optional integration-only resources
+```
+
+`IntegrationConfigurationTest` and its helper `IntegrationConfiguration` stay under
+`src/test/java`; the loader is shared with integration tests, like Gradle's
+`integrationTest.compileClasspath += main.output + test.output`. `UserCrudIT` and
+`GoogleAppsIntegrationSupport` live under `src/integration-test/java`.
+The integration source/resource directories are registered only when `skipITs=false`.
+Integration mode compiles shared/unit test sources too, but runs only `*IT.java`.
+Helper classes do not need a test suffix; executable tests must use `*Test` or `*IT`.
+
+Ordinary builds use the `unit-tests` profile. Explicitly selecting `integration-tests`
+or `all-tests` also sets `gws.it.enabled=true`: these profiles run real Google CRUD
+operations using the local configuration. No extra enable flag is needed.
 Run sequentially because the production connector uses a shared cache; the POC
 explicitly disables that cache. It polls reads for up to 120 seconds per state,
 with a fresh result collector every two seconds. API/authentication errors fail
@@ -58,16 +80,28 @@ Workspace automatic licensing or guarantee that creating users is free.
 
 ### Run
 
-Regular offline/local checks (no live integration calls):
+Select exactly one profile:
+
+| Mode | Command | Runs |
+| --- | --- | --- |
+| Unit only (default) | `mvn test` or `mvn -Punit-tests test` | Surefire: `*Test.java` |
+| Integration only | `mvn -Pintegration-tests verify` | Failsafe: `*IT.java`; unit execution skipped |
+| Both | `mvn -Pall-tests verify` | Unit tests first, then integration tests |
+
+Use `verify` for integration profiles so Maven also checks the Failsafe result.
+Running just `test` stops before the integration-test phase. `mvn verify` without
+an integration profile still runs only unit tests.
+
+Run a selected unit test:
 
 ```powershell
-mvn test
+mvn '-Dtest=FiltersTest' test
 ```
 
-Explicit live POC, after filling the local file or injecting environment values:
+Run only the live POC, after filling the local file or injecting environment values:
 
 ```powershell
-mvn '-Dtest=UserCrudIT' '-Dgws.it.enabled=true' test
+mvn -Pintegration-tests '-Dit.test=UserCrudIT' verify
 ```
 
 To keep the file outside the checkout, additionally pass
@@ -77,12 +111,24 @@ itself still calls Google. If your environment needs a forked compiler, add
 `'-Dmaven.compiler.fork=true'`.
 
 The enabled test fails setup when required settings are missing; it does not report
-a successful live run with missing credentials. Without the enable flag, an explicitly
-selected `UserCrudIT` is skipped before accessing credentials or the network.
+a successful live run with missing credentials. For a build-wiring check without
+Google access, explicitly override the live guard:
+
+```powershell
+mvn -Pintegration-tests '-Dgws.it.enabled=false' verify
+mvn -Pall-tests '-Dgws.it.enabled=false' verify
+```
+
+These checks compile/discover the integration test but mark it skipped before reading
+credentials or calling Google. A skipped run is not a successful live CRUD validation.
+`-DskipITs=true` skips integration tests; `-DskipTests=true` skips both runners with
+the inherited Surefire/Failsafe 3.5.2 versions.
 
 The output identifies CREATE, READ, UPDATE and DELETE and the generated email.
-Surefire writes reports to `target/surefire-reports`. Do not enable HTTP wire logging
-or publish credential files with test reports.
+Unit reports are in `target/surefire-reports`; integration reports are in
+`target/failsafe-reports`. Use `clean` before a run if you need reports containing
+only the current mode. Do not enable HTTP wire logging or publish credential files
+with test reports.
 
 Cleanup runs even after an assertion fails. If create fails after the remote user
 was inserted (for example during automatic licensing), cleanup uses its exact email
