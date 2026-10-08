@@ -78,15 +78,34 @@ Use a dedicated test Workspace/domain and an existing test OU appropriate for it
 licensing policy. Disabling connector-side license assignment does not disable
 Workspace automatic licensing or guarantee that creating users is free.
 
-### Run
+## Running tests
 
-Select exactly one profile:
+### Unit tests only
 
-| Mode | Command | Runs |
-| --- | --- | --- |
-| Unit only (default) | `mvn test` or `mvn -Punit-tests test` | Surefire: `*Test.java` |
-| Integration only | `mvn -Pintegration-tests verify` | Failsafe: `*IT.java`; unit execution skipped |
-| Both | `mvn -Pall-tests verify` | Unit tests first, then integration tests |
+```shell
+mvn test
+```
+
+The default profile runs `*Test.java` through Surefire. The explicit equivalent is
+`mvn -Punit-tests test`.
+
+### Integration tests only
+
+```shell
+mvn -Pintegration-tests verify
+```
+
+Runs `*IT.java` through Failsafe and skips unit test execution. This profile enables
+real Google CRUD operations and requires the local configuration described above.
+
+### All tests (unit + integration)
+
+```shell
+mvn -Pall-tests verify
+```
+
+Runs unit tests first, then integration tests, including real Google CRUD operations.
+Select exactly one test profile per run.
 
 Use `verify` for integration profiles so Maven also checks the Failsafe result.
 Running just `test` stops before the integration-test phase. `mvn verify` without
@@ -110,21 +129,15 @@ If dependencies are already cached, `mvn -o` can run Maven offline while the tes
 itself still calls Google. If your environment needs a forked compiler, add
 `'-Dmaven.compiler.fork=true'`.
 
+### Check test selection without calling Google
+
 The enabled test fails setup when required settings are missing; it does not report
 a successful live run with missing credentials. For a build-wiring check without
 Google access, explicitly override the live guard:
 
-## Unit tests only
 ```shell
-mvn test
-```
-## Integration tests only
-```shell
-mvn -Pintegration-tests verify
-```
-## All tests (unit + integration)
-```shell
-mvn -Pall-tests verify
+mvn -Pintegration-tests '-Dgws.it.enabled=false' verify
+mvn -Pall-tests '-Dgws.it.enabled=false' verify
 ```
 
 These checks compile/discover the integration test but mark it skipped before reading
