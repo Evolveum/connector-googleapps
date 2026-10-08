@@ -114,9 +114,17 @@ The enabled test fails setup when required settings are missing; it does not rep
 a successful live run with missing credentials. For a build-wiring check without
 Google access, explicitly override the live guard:
 
-```powershell
-mvn -Pintegration-tests '-Dgws.it.enabled=false' verify
-mvn -Pall-tests '-Dgws.it.enabled=false' verify
+## Unit tests only
+```shell
+mvn test
+```
+## Integration tests only
+```shell
+mvn -Pintegration-tests verify
+```
+## All tests (unit + integration)
+```shell
+mvn -Pall-tests verify
 ```
 
 These checks compile/discover the integration test but mark it skipped before reading
