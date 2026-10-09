@@ -1,6 +1,7 @@
 package com.evolveum.polygon.connector.googleapps.integration;
 
 import com.evolveum.polygon.connector.googleapps.GoogleAppsConnector;
+import com.evolveum.polygon.connector.googleapps.GoogleAppsConfiguration;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
@@ -27,6 +28,9 @@ import static org.testng.Assert.assertTrue;
 public abstract class GoogleAppsIntegrationSupport {
     protected GoogleAppsConnector connector;
     protected IntegrationConfiguration settings;
+    protected GoogleAppsConfiguration configuration;
+    protected String orgUnitPath;
+    protected GoogleDirectoryMockServer mockServer;
     protected Uid createdUid;
     protected String testEmail;
     protected String familyMarker;
@@ -38,7 +42,11 @@ public abstract class GoogleAppsIntegrationSupport {
 
     @BeforeMethod(alwaysRun = true)
     public void setUp() throws Exception {
-        if (!"true".equalsIgnoreCase(System.getProperty("gws.it.enabled", "false"))) {
+        String target = System.getProperty("gws.it.target", "live");
+        if (!"live".equals(target) && !"mock".equals(target)) {
+            throw new IllegalArgumentException("gws.it.target must be live or mock");
+        }
+        if ("live".equals(target) && !"true".equalsIgnoreCase(System.getProperty("gws.it.enabled", "false"))) {
             throw new SkipException("Live Google CRUD test is disabled; use -Dgws.it.enabled=true explicitly");
         }
         createdUid = null;
@@ -46,9 +54,19 @@ public abstract class GoogleAppsIntegrationSupport {
         familyMarker = null;
         createAttempted = false;
         deletionConfirmed = false;
-        settings = IntegrationConfiguration.load();
+        if ("mock".equals(target)) {
+            mockServer = new GoogleDirectoryMockServer();
+            configuration = new MockGoogleAppsConfiguration(mockServer);
+            orgUnitPath = "";
+            Reporter.log("CRUD target: local mock server " + mockServer.rootUrl(), true);
+        } else {
+            settings = IntegrationConfiguration.load();
+            configuration = settings.connectorConfiguration();
+            orgUnitPath = settings.orgUnitPath();
+            Reporter.log("CRUD target: live Google Workspace", true);
+        }
         connector = new GoogleAppsConnector();
-        connector.init(settings.connectorConfiguration());
+        connector.init(configuration);
     }
 
     protected ConnectorObject readUser(Uid uid) {
@@ -100,13 +118,20 @@ public abstract class GoogleAppsIntegrationSupport {
                 }
             }
         } finally {
-            if (connector != null) {
-                connector.dispose();
-                connector = null;
-            }
-            if (settings != null) {
-                settings.close();
-                settings = null;
+            try {
+                if (connector != null) {
+                    connector.dispose();
+                    connector = null;
+                }
+                if (settings != null) {
+                    settings.close();
+                    settings = null;
+                }
+            } finally {
+                if (mockServer != null) {
+                    mockServer.close();
+                    mockServer = null;
+                }
             }
         }
     }

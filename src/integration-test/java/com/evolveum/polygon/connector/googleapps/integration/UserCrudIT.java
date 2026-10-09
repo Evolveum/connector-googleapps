@@ -12,6 +12,7 @@ import org.testng.Reporter;
 import org.testng.annotations.Test;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -20,16 +21,16 @@ import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.GIVE
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.ORG_UNIT_PATH_ATTR;
 import static org.testng.Assert.*;
 
-/** Opt-in live POC. This class deliberately does not match Surefire's ordinary *Test patterns. */
+/** Same CRUD contract against live Google or a local HTTP mock, selected by gws.it.target. */
 public class UserCrudIT extends GoogleAppsIntegrationSupport {
     @Test(groups = "integration")
     public void createsReadsUpdatesAndDeletesUser() throws Exception {
         String runId = UUID.randomUUID().toString().replace("-", "");
-        testEmail = "gws-it-" + runId + "@" + settings.connectorConfiguration().getDomain();
+        testEmail = "gws-it-" + runId + "@" + configuration.getDomain();
         familyMarker = "Poc-" + runId;
         Reporter.log("Temporary POC user (also the manual cleanup key): " + testEmail, true);
 
-        // Unlike connector.test(), this executes a real authenticated Directory request.
+        // Unlike connector.test(), this executes an HTTP request to the selected target.
         assertNull(readUser(new Uid(testEmail)), "Generated test email must not already exist");
 
         GuardedString password = new GuardedString(("Gws!9aA-" + UUID.randomUUID()).toCharArray());
@@ -39,8 +40,8 @@ public class UserCrudIT extends GoogleAppsIntegrationSupport {
             attributes.add(AttributeBuilder.build(GIVEN_NAME_ATTR, "Integration"));
             attributes.add(AttributeBuilder.build(FAMILY_NAME_ATTR, familyMarker));
             attributes.add(AttributeBuilder.build(OperationalAttributes.PASSWORD_NAME, password));
-            if (!settings.orgUnitPath().isEmpty()) {
-                attributes.add(AttributeBuilder.build(ORG_UNIT_PATH_ATTR, settings.orgUnitPath()));
+            if (!orgUnitPath.isEmpty()) {
+                attributes.add(AttributeBuilder.build(ORG_UNIT_PATH_ATTR, orgUnitPath));
             }
             Reporter.log("CREATE user", true);
             createAttempted = true;
@@ -66,6 +67,15 @@ public class UserCrudIT extends GoogleAppsIntegrationSupport {
         connector.delete(ObjectClass.ACCOUNT, createdUid, options);
         awaitUser(createdUid, "deletion", actual -> assertNull(actual, "Deleted user must be absent"));
         deletionConfirmed = true;
+        if (mockServer != null) {
+            String usersPath = "/admin/directory/v1/users";
+            String userPath = usersPath + "/" + createdUid.getUidValue();
+            assertEquals(mockServer.requests(), List.of("GET " + usersPath + "/" + testEmail,
+                    "POST " + usersPath, "GET " + userPath, "PATCH " + userPath,
+                    "GET " + userPath, "DELETE " + userPath, "GET " + userPath),
+                    "The real HTTP client must execute the full CRUD sequence against the mock");
+            assertEquals(mockServer.userCount(), 0, "The mock must contain no user after deletion");
+        }
     }
 
     private void assertUserState(String givenName) throws InterruptedException {

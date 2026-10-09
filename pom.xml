@@ -52,6 +52,7 @@
         <skipUnitTests>${skipTests}</skipUnitTests>
         <skipITs>true</skipITs>
         <gws.it.enabled>false</gws.it.enabled>
+        <gws.it.target>live</gws.it.target>
     </properties>
 
     <repositories>
@@ -151,6 +152,7 @@
                     <failIfNoTests>true</failIfNoTests>
                     <systemPropertyVariables>
                         <gws.it.enabled>${gws.it.enabled}</gws.it.enabled>
+                        <gws.it.target>${gws.it.target}</gws.it.target>
                     </systemPropertyVariables>
                 </configuration>
                 <executions>
@@ -167,6 +169,15 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>mock-integration-tests</id>
+            <properties>
+                <skipUnitTests>true</skipUnitTests>
+                <skipITs>false</skipITs>
+                <gws.it.enabled>false</gws.it.enabled>
+                <gws.it.target>mock</gws.it.target>
+            </properties>
+        </profile>
         <profile>
             <id>unit-tests</id>
             <activation>
