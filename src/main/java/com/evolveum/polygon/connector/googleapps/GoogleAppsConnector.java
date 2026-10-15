@@ -314,6 +314,31 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         });
             }
 
+            try {
+                // groups member
+                Attribute groups = accessor.find(PredefinedAttributes.GROUPS_NAME);
+                if (null != groups && null != groups.getValue()) {
+                    final Directory.Members service = configuration.getDirectory().members();
+                    for (Object groupId : groups.getValue()) {
+                        if (groupId instanceof String) {
+                            execute(createMemberById(service, (String) groupId, uid.getUidValue(), null),
+                                    new RequestResultHandler<Directory.Members.Insert, Member, String>() {
+                                        public String handleResult(
+                                                final Directory.Members.Insert request,
+                                                final Member value) {
+                                            return null;
+                                        }
+                                    });
+                        }
+                    }
+                }
+            } catch (Exception failure) {
+                RetryableException partial = RetryableException.wrap(
+                        "User created but requested groups could not be assigned: " + uid.getUidValue(), uid);
+                partial.addSuppressed(failure);
+                throw partial;
+            }
+
             return uid;
         } else if (ObjectClass.GROUP.equals(objectClass)) {
             // @formatter:off
@@ -348,7 +373,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                         String role = (String) ((Map) member).get(ROLE_ATTR);
 
                         String id
-                                = execute(createMember(membersService, uid.getUidValue(), email, role),
+                                = execute(createMemberByEmail(membersService, uid.getUidValue(), email, role),
                                 new RequestResultHandler<Directory.Members.Insert, Member, String>() {
                                     public String handleResult(
                                             final Directory.Members.Insert request,
@@ -1379,9 +1404,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             // groups member
             Attribute groups = attributesAccessor.find(PredefinedAttributes.GROUPS_NAME);
-            if (null != groups && null != groups.getValue()) {
+            if (null != groups) {
                 final Directory.Members service = configuration.getDirectory().members();
-                if (groups.getValue().isEmpty()) {
+                if (groups.getValue() == null || groups.getValue().isEmpty()) {
                     // Remove all membership
                     for (String groupKey : listGroups(configuration.getDirectory().groups(),
                             uidAfterUpdate.getUidValue())) {
@@ -1414,7 +1439,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                             if (activeGroups.contains(member)) {
                                 keepGroups.add((String) member);
                             } else {
-                                addGroups.add(createMember(service, (String) member, uidAfterUpdate
+                                addGroups.add(createMemberById(service, (String) member, uidAfterUpdate
                                         .getUidValue(), null));
                             }
                         } else if (null != member) {
@@ -1528,7 +1553,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                 }
                             }
                             if (notMember) {
-                                addMembership.add(createMember(service, uidAfterUpdate
+                                addMembership.add(createMemberByEmail(service, uidAfterUpdate
                                         .getUidValue(), email, "MEMBER"));
                             }
                         } else if (null != member) {
@@ -1937,7 +1962,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             Directory.Groups.List request = service.list();
             request.setUserKey(userKey);
-            request.setFields("groups/email");
+            request.setFields("groups/id,groups/email");
             //400 Bad Request if the Customer(my_customer or exact value) is set, only domain-userKey combination allowed.
             //request.setCustomer(MY_CUSTOMER_ID);
             request.setDomain(configuration.getDomain());
@@ -1957,7 +1982,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                                         GoogleAppsConfiguration GAconf = (GoogleAppsConfiguration) getConfiguration();
                                         String domain = GAconf.getDomain();
                                         if (group.getEmail().endsWith(domain)) {//TODO fix loading crossdomain groups for users
-                                            result.add(group.getEmail());
+                                            result.add(group.getId());
                                         }
                                     }
                                 }
