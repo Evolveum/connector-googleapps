@@ -37,7 +37,7 @@
 
     <groupId>com.evolveum.polygon</groupId>
     <artifactId>connector-googleapps</artifactId>
-    <version>1.4.2.20-SNAPSHOT</version>
+    <version>1.4.3.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>GoogleApps Connector</name>
@@ -105,34 +105,16 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.3</version>
                 <configuration>
+                    <failIfNoTests>true</failIfNoTests>
                     <includes>
                         <include>**/*Test.java</include>
                         <include>**/Test*.java</include>
                     </includes>
                 </configuration>
-                <dependencies>
-                    <!-- The parent provides TestNG; also execute the improvement branch's JUnit 5 suite. -->
-                    <dependency>
-                        <groupId>org.apache.maven.surefire</groupId>
-                        <artifactId>surefire-junit-platform</artifactId>
-                        <version>3.5.3</version>
-                    </dependency>
-                </dependencies>
             </plugin>
         </plugins>
     </build>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.junit</groupId>
-                <artifactId>junit-bom</artifactId>
-                <version>5.13.4</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -169,24 +151,6 @@
         </dependency>
 
         <!-- Test dependencies -->
-        <dependency>
-            <groupId>org.junit.platform</groupId>
-            <artifactId>junit-platform-launcher</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.13.4</version>
-            <scope>test</scope>
-        </dependency>
-        
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-params</artifactId>
-            <version>5.13.4</version>
-            <scope>test</scope>
-        </dependency>
         
         <dependency>
             <groupId>org.wiremock</groupId>
