@@ -431,7 +431,8 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 + "and contact information.");
 
         // primaryEmail
-        builder.addAttributeInfo(Name.INFO);
+        builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setRequired(true)
+                .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE).build());
 
         builder.addAttributeInfo(AttributeInfoBuilder.define(GIVEN_NAME_ATTR).setRequired(true)
                 .build());

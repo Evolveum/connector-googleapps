@@ -591,24 +591,35 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             // Read request
             uid = (Uid) ((EqualsFilter) query).getAttribute();
         }
+        Name name = null;
+        if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Name) {
+            // Read request
+            name = (Name) ((EqualsFilter) query).getAttribute();
+        }
         logger.info("executeQuery() - objectClass: " + objectClass +
-                ", uid: " + (uid == null ? "null" : uid.getUidValue()));
+                ", uid: " + (uid == null ? "null" : uid.getUidValue()) +
+                ", name: " + (name == null ? "null" : name.getNameValue()));
 
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
-            if (null == uid) {
+            if (null == uid && null == name) {
                 // Search request
                 executeAccountSearchQuery(query, handler, options, attributesToGet);
-            } else {
+            } else if (uid != null) {
                 // Read request
                 executeAccountReadQuery(uid, handler, options, attributesToGet);
-            }
-        } else if (ObjectClass.GROUP.equals(objectClass)) {
-            if (null == uid) {
-                // Search request
-                executeGroupSearchQuery(query, handler, options, attributesToGet);
             } else {
                 // Read request
+                executeAccountReadQuery(name, handler, options, attributesToGet);
+            }
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            if (null == uid && null == name) {
+                // Search request
+                executeGroupSearchQuery(query, handler, options, attributesToGet);
+            } else if (uid != null) {
+                // Read request
                 executeGroupReadQuery(uid, handler, options, attributesToGet);
+            } else {
+                executeGroupReadQuery(name, handler, options, attributesToGet);
             }
         } else if (MEMBER.equals(objectClass)) {
             if (null == uid) {
@@ -2150,5 +2161,59 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             val = bits % n;
         } while (bits - val + (n - 1) < 0L);
         return val;
+    }
+    private void executeAccountReadQuery(Name name, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            Directory.Users.Get request
+                    = configuration.getDirectory().users().get(name.getNameValue());
+            request.setFields(getFields(ObjectClass.ACCOUNT, options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR));
+
+            execute(request,
+                    new RequestResultHandler<Directory.Users.Get, User, Boolean>() {
+                        public Boolean handleResult(final Directory.Users.Get request,
+                                                    final User value) {
+                            ConnectorObject user = fromUser(value, attributesToGet,
+                                    configuration.getDirectory().groups());
+                            objectsCache.addUser(user);
+                            return handler.handle(user);
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Users#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
+    private void executeGroupReadQuery(Name name, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
+        try {
+            Directory.Groups.Get request
+                    = configuration.getDirectory().groups().get(name.getNameValue());
+            request.setFields(getFields(ObjectClass.GROUP, options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
+
+            execute(request,
+                    new RequestResultHandler<Directory.Groups.Get, Group, Boolean>() {
+                        public Boolean handleResult(final Directory.Groups.Get request,
+                                                    final Group value) {
+                            ConnectorObject group = fromGroup(value, attributesToGet,
+                                    configuration.getDirectory().members());
+                            objectsCache.addGroup(group);
+                            return handler.handle(group);
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Groups#Get");
+            throw ConnectorException.wrap(e);
+        }
     }
 }
