@@ -23,21 +23,18 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
+import com.google.api.client.util.ArrayMap;
+import com.google.api.client.util.Data;
+import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeUtil;
 import org.identityconnectors.framework.common.objects.Name;
-import com.google.api.client.util.ArrayMap;
-import com.google.api.client.util.Joiner;
-import java.util.Collection;
-import java.util.HashSet;
+
+import java.util.*;
 import java.util.Map.Entry;
 
 /**
@@ -84,7 +81,7 @@ public class GoogleAppsUtil {
         return defaultTo;
     }
 
-    private static ArrayMap<String, Object> parseJson(String json) {
+    static ArrayMap<String, Object> parseJson(String json) {
         JsonObject object = (JsonObject) new com.google.gson.JsonParser().parse(json);
         Set<Map.Entry<String, JsonElement>> set = object.entrySet();
         Iterator<Map.Entry<String, JsonElement>> iterator = set.iterator();
@@ -93,8 +90,20 @@ public class GoogleAppsUtil {
             Map.Entry<String, JsonElement> entry = iterator.next();
             String key = entry.getKey();
             JsonElement value = entry.getValue();
-            if (!value.isJsonPrimitive()) {
+            if (value.isJsonNull()) {
+                map.put(key, null);
+            } else if (value.isJsonObject()) {
                 map.put(key, parseJson(value.toString()));
+            } else if (value.isJsonArray()) {
+                map.put(key, new Gson().fromJson(value, List.class));
+            } else if (value.getAsJsonPrimitive().isBoolean()) {
+                map.put(key, value.getAsBoolean());
+            } else if (value.getAsJsonPrimitive().isNumber()) {
+                map.put(key, value.getAsBigDecimal());
+            } else if (("primary".equals(key) || "sourceIsStructured".equals(key))
+                    && ("true".equalsIgnoreCase(value.getAsString()) || "false".equalsIgnoreCase(value.getAsString()))) {
+                // Accept the string booleans emitted by older connector versions.
+                map.put(key, Boolean.valueOf(value.getAsString()));
             } else {
                 map.put(key, value.getAsString());
             }
@@ -110,8 +119,8 @@ public class GoogleAppsUtil {
                     ArrayMap sit = new ArrayMap();
                     if (((String) item).startsWith("{") && ((String) item).endsWith("}")) {
                         sit = parseJson(item.toString());
-                        if (!(sit.containsKey("value") && sit.get("value").equals("null"))) {
-                            attrItems.add(sit);
+                        if ("null".equals(sit.get("value"))) {
+                            continue;
                         }
                     } else {
                         sit.add("value", item.toString());
@@ -133,28 +142,28 @@ public class GoogleAppsUtil {
         }
         return null;
     }
-    
+
     public static Object structAttrToString(Collection values) {
         if (values != null && values.size() > 0) {
             ArrayList<Object> attrItems = new ArrayList();
             for (Object item : values.toArray()) {
-                if (item instanceof ArrayMap) {
-                    if (((ArrayMap) item).containsKey("value") && (((ArrayMap) item).get("value").equals("null") || ((ArrayMap) item).get("value").equals(""))) {
-                        continue;
-                    }
-                    ArrayList<String> entryItems = new ArrayList();
-                    for (Object entryAM : ((ArrayMap) item).entrySet()) {
+                if (item instanceof Map) {
+                    // Use TreeMap to ensure consistent key ordering (alphabetical)
+                    TreeMap<String, Object> sortedMap = new TreeMap<>();
+                    for (Object entryAM : ((Map) item).entrySet()) {
                         Entry<Object, Object> entry = (Entry<Object, Object>) entryAM;
-                        entryItems.add("\"" + entry.getKey().toString() + "\"=\"" + entry.getValue().toString() + "\"");
+                        if (entry.getValue() != null && !Data.isNull(entry.getValue())) {
+                            sortedMap.put(entry.getKey().toString(), entry.getValue());
+                        }
                     }
-                    attrItems.add('{' + Joiner.on(',').join(entryItems) + '}');
+
+                    attrItems.add(new Gson().toJson(sortedMap));
                 } else {
                     attrItems.add(item.toString());
-                } 
+                }
             }
             return attrItems;
         }
         return null;
     }
-    
 }
