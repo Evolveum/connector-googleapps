@@ -61,6 +61,7 @@ import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
 import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
+import static org.identityconnectors.framework.common.objects.OperationalAttributes.ENABLE_NAME;
 
 /**
  * Main implementation of the GoogleApps Connector.
@@ -758,7 +759,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         try {
             Directory.Orgunits.Get request
                     = configuration.getDirectory().orgunits().get(MY_CUSTOMER_ID, uid.getUidValue());
-            request.setFields(getFields(options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR));
+            request.setFields(getFields(ORG_UNIT, options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR));
 
             execute(request,
                     new RequestResultHandler<Directory.Orgunits.Get, OrgUnit, Boolean>() {
@@ -805,7 +806,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             }
 
             // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-            String fields = getFields(options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR);
+            String fields = getFields(ORG_UNIT, options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR);
             if (null != fields) {
                 request.setFields("organizationUnits(" + fields + ")");
             }
@@ -935,7 +936,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             Directory.Groups.Get request
                     = configuration.getDirectory().groups().get(uid.getUidValue());
-            request.setFields(getFields(options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
+            request.setFields(getFields(ObjectClass.GROUP, options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
 
             execute(request,
                     new RequestResultHandler<Directory.Groups.Get, Group, Boolean>() {
@@ -979,7 +980,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             request.setPageToken(options.getPagedResultsCookie());
 
             // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-            String fields = getFields(options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
+            String fields = getFields(ObjectClass.GROUP, options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
             if (null != fields) {
                 request.setFields("nextPageToken,groups(" + fields + ")");
             }
@@ -1032,7 +1033,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             // No success in cache, do the remote call
             Directory.Users.Get request
                     = configuration.getDirectory().users().get(uid.getUidValue());
-            request.setFields(getFields(options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR));
+            request.setFields(getFields(ObjectClass.ACCOUNT, options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR));
 
             execute(request,
                     new RequestResultHandler<Directory.Users.Get, User, Boolean>() {
@@ -1087,7 +1088,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             request.setPageToken(options.getPagedResultsCookie());
 
             // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-            String fields = getFields(options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR);
+            String fields = getFields(ObjectClass.ACCOUNT, options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR);
             if (null != fields) {
                 request.setFields("nextPageToken,users(" + fields + ")");
             }
@@ -1264,7 +1265,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         return attributesToGet;
     }
 
-    protected String getFields(OperationOptions options, String... nameAttribute) {
+    protected String getFields(ObjectClass objectClass, OperationOptions options, String... nameAttribute) {
         if (null != options.getAttributesToGet()) {
             Set<String> attributes = CollectionUtil.newCaseInsensitiveSet();
             for (String attribute : nameAttribute) {
@@ -1273,6 +1274,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             for (String attribute : options.getAttributesToGet()) {
                 if (AttributeUtil.namesEqual(PredefinedAttributes.DESCRIPTION, attribute)) {
                     attributes.add(DESCRIPTION_ATTR);
+                } else if (AttributeUtil.namesEqual(ENABLE_NAME, attribute)) {
+                    if (ObjectClass.ACCOUNT.equals(objectClass)) attributes.add(SUSPENDED_ATTR);
                 } else if (AttributeUtil.isSpecialName(attribute)) {
                     continue;
                 } else if (AttributeUtil.namesEqual(FAMILY_NAME_ATTR, attribute)) {
@@ -1730,6 +1733,13 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         if (null == attributesToGet || attributesToGet.contains(AGREED_TO_TERMS_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(AGREED_TO_TERMS_ATTR, user
                     .getAgreedToTerms()));
+        }
+        if (null == attributesToGet || attributesToGet.contains(ENABLE_NAME)) {
+            if (Boolean.TRUE.equals(user.getSuspended())) {
+                builder.addAttribute(AttributeBuilder.build(ENABLE_NAME, false));
+            } else {
+                builder.addAttribute(AttributeBuilder.build(ENABLE_NAME, true));
+            }
         }
         if (null == attributesToGet || attributesToGet.contains(SUSPENDED_ATTR)) {
             builder.addAttribute(AttributeBuilder.build(SUSPENDED_ATTR, user.getSuspended()));
