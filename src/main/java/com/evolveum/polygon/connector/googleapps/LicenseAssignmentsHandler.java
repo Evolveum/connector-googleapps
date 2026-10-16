@@ -151,9 +151,9 @@ public class LicenseAssignmentsHandler {
             throw new UnknownUidException("Unrecognised id");
         }
 
-        String productId = name.group(0);
-        String oldSkuId = name.group(1);
-        String userId = name.group(2);
+        String productId = name.group(1);
+        String oldSkuId = name.group(2);
+        String userId = name.group(3);
 
         Attribute skuId = attributes.find(SKU_ID_ATTR);
         if (null != skuId) {
@@ -186,9 +186,9 @@ public class LicenseAssignmentsHandler {
             throw new UnknownUidException("Unrecognised id");
         }
 
-        String productId = name.group(0);
-        String skuId = name.group(1);
-        String userId = name.group(2);
+        String productId = name.group(1);
+        String skuId = name.group(2);
+        String userId = name.group(3);
 
         try {
             return service.delete(productId, skuId, userId);

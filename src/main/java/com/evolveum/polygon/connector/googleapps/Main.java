@@ -46,6 +46,8 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.MemoryDataStoreFactory;
 import com.google.gson.JsonObject;
 import java.io.FileWriter;
+import java.io.Writer;
+import java.io.PrintStream;
 
 import java.util.Scanner;
 
@@ -66,6 +68,7 @@ public class Main {
     // }
     // }
     private static final String CLIENTSECRETS_LOCATION = "client_secrets.json";
+    static File clientSecretsFile = new File(CLIENTSECRETS_LOCATION);
     public static final java.lang.String ADMIN_DIRECTORY_GROUP =
             "https://www.googleapis.com/auth/admin.directory.group";
     public static final java.lang.String ADMIN_DIRECTORY_ORGUNIT =
@@ -103,23 +106,47 @@ public class Main {
      */
     private static final JsonFactory JSON_FACTORY = new GsonFactory();
 
+    @FunctionalInterface
+    interface ConfigurationMapProvider {
+        Map<String, Object> get(File file) throws Exception;
+    }
+
+    @FunctionalInterface
+    interface WriterFactory {
+        Writer open(File file) throws IOException;
+    }
+
+    @FunctionalInterface
+    interface CredentialAuthorizer {
+        Credential authorize(GoogleAuthorizationCodeFlow flow) throws IOException;
+    }
+
+    static ConfigurationMapProvider configurationMapProvider = Main::getConfigurationMap;
+    static WriterFactory writerFactory = FileWriter::new;
+    static CredentialAuthorizer credentialAuthorizer = flow ->
+            new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver()).authorize("user");
+
     public static void main(String[] args) throws Exception {
-        System.out.println("-------------------------------------------------------------------------------------------");
-        System.out.println("Generate credentials for GoogleApps Connector");
-        System.out.println("-------------------------------------------------------------------------------------------");
-        System.out.println("You have to created and registered App in Google API and Google API enabled.");
-        System.out.println("Add these credentials into configuration fields in Google Apps Connector. See readme.txt.");
-        System.out.println("-------------------------------------------------------------------------------------------");
-        System.out.println("");
+        run(args, new Scanner(System.in), System.out, System.err, clientSecretsFile,
+                configurationMapProvider, writerFactory);
+    }
+
+    static void run(String[] args, Scanner userInput, PrintStream out, PrintStream err, File file,
+            ConfigurationMapProvider configurationMapProvider, WriterFactory writerFactory) throws Exception {
+        out.println("-------------------------------------------------------------------------------------------");
+        out.println("Generate credentials for GoogleApps Connector");
+        out.println("-------------------------------------------------------------------------------------------");
+        out.println("You have to created and registered App in Google API and Google API enabled.");
+        out.println("Add these credentials into configuration fields in Google Apps Connector. See readme.txt.");
+        out.println("-------------------------------------------------------------------------------------------");
+        out.println("");
         String clientId;
         String clientSecret;
-        File file = new File(CLIENTSECRETS_LOCATION);
-        FileWriter fileWriter = new FileWriter(file);
-        Scanner user_input = new Scanner(System.in);
-        System.out.print("Enter Client ID: ");
-        clientId = user_input.next();
-        System.out.print("Enter Client Secret: ");
-        clientSecret = user_input.next();
+        Writer fileWriter = writerFactory.open(file);
+        out.print("Enter Client ID: ");
+        clientId = userInput.next();
+        out.print("Enter Client Secret: ");
+        clientSecret = userInput.next();
 
         JsonObject jsonObj = new JsonObject();
         JsonObject jsonClient = new JsonObject();
@@ -131,7 +158,7 @@ public class Main {
             fileWriter.write(jsonObj.toString());
 
         } catch (IOException e) {
-            e.printStackTrace();
+            e.printStackTrace(err);
         } finally {
             fileWriter.flush();
             fileWriter.close();
@@ -139,24 +166,24 @@ public class Main {
 
 
         if (file.exists() && file.isFile()) {
-            System.out.println("");
-            Map<String, Object> configMap = getConfigurationMap(file);
-            System.out.println("");
-            System.out.println("Generated credentials:");
-            System.out.println(JSON_FACTORY.toPrettyString(configMap));
-            System.out.println("");
-            System.out.println("--------------------------------------------------------------------");
-            System.out.println("Finished.");
-            System.out.println("--------------------------------------------------------------------");
+            out.println("");
+            Map<String, Object> configMap = configurationMapProvider.get(file);
+            out.println("");
+            out.println("Generated credentials:");
+            out.println(JSON_FACTORY.toPrettyString(configMap));
+            out.println("");
+            out.println("--------------------------------------------------------------------");
+            out.println("Finished.");
+            out.println("--------------------------------------------------------------------");
             return;
         } else {
-            System.err.println("Invalid client secret path. File not exits " + file.getPath());
+            err.println("Invalid client secret path. File not exits " + file.getPath());
         }
 
         String fileName =
                 new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI())
                 .getName();
-        System.out.print("Usage: java -jar " + fileName + " <path to client_secrets.json>");
+        out.print("Usage: java -jar " + fileName + " <path to client_secrets.json>");
     }
 
     static Map<String, Object> getConfigurationMap(File clientJson) throws IOException,
@@ -166,18 +193,21 @@ public class Main {
         GoogleClientSecrets clientSecrets =
                 GoogleClientSecrets.load(JSON_FACTORY, new FileReader(clientJson));
 
-        Credential credential =
-                new AuthorizationCodeInstalledApp(new GoogleAuthorizationCodeFlow.Builder(
+        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
                 HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES).setAccessType(
                 "offline").setApprovalPrompt("force").setDataStoreFactory(
-                MemoryDataStoreFactory.getDefaultInstance()).build(),
-                new LocalServerReceiver()
-                ).authorize("user");
+                MemoryDataStoreFactory.getDefaultInstance()).build();
+        Credential credential = credentialAuthorizer.authorize(flow);
 
+        return configurationMap(clientSecrets.getDetails().getClientId(),
+                clientSecrets.getDetails().getClientSecret(), credential.getRefreshToken());
+    }
+
+    static Map<String, Object> configurationMap(String clientId, String clientSecret, String refreshToken) {
         Map<String, Object> configMap = new LinkedHashMap<String, Object>(3);
-        configMap.put("clientId", clientSecrets.getDetails().getClientId());
-        configMap.put("clientSecret", clientSecrets.getDetails().getClientSecret());
-        configMap.put("refreshToken", credential.getRefreshToken());
+        configMap.put("clientId", clientId);
+        configMap.put("clientSecret", clientSecret);
+        configMap.put("refreshToken", refreshToken);
         return configMap;
     }
 }
