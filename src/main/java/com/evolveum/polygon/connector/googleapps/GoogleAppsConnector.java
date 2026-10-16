@@ -146,6 +146,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     private GoogleAppsConfiguration configuration;
     private ConnectorObjectsCache objectsCache;
     private Schema schema = null;
+    private GoogleApiExecutor apiExecutor;
 
     /**
      * Gets the Configuration context for this connector.
@@ -164,6 +165,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      */
     public void init(final Configuration configuration) {
         this.configuration = (GoogleAppsConfiguration) configuration;
+        this.apiExecutor = new GoogleApiExecutor(this.configuration);
         objectsCache = ConnectorObjectsCache.getInstance(this.configuration, logger);
     }
 
@@ -174,6 +176,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      */
     public void dispose() {
         configuration = null;
+        apiExecutor = null;
     }
 
     /**
@@ -2059,93 +2062,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
     protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
                                                                           RequestResultHandler<G, T, R> handler) {
-        return execute(Assertions.nullChecked(request, "Google Json ClientRequest"), Assertions
-                .nullChecked(handler, "handler"), -1);
+        return apiExecutor.execute(request, handler);
     }
 
     protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
                                                                           RequestResultHandler<G, T, R> handler, int retry) {
-        try {
-            if (retry >= 0) {
-                long sleep = (long) ((1000 * Math.pow(2, retry)) + nextLong(1000));
-                try {
-                    Thread.sleep(sleep);
-                } catch (InterruptedException e) {
-                    throw ConnectorException.wrap(e);
-                }
-            }
-            return handler.handleResult(request, (T) request.execute());
-        } catch (GoogleJsonResponseException e) {
-
-            GoogleJsonError details = e.getDetails();
-            if (null != details && null != details.getErrors()) {
-                GoogleJsonError.ErrorInfo errorInfo = details.getErrors().get(0);
-                // error: 403
-                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) {
-                    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
-                            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
-                        logger.info("System should retry");
-                        throw RetryableException.wrap(e.getMessage(), e);
-                    }else{
-                        //if we are forbidden to do something we should not try again
-                        return handler.handleError(e);
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
-                    if ("notFound".equalsIgnoreCase(errorInfo.getReason())) {
-                        return handler.handleNotFound(e);
-                    }
-                } else if (e.getStatusCode() == 409) {
-                    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
-                        // Already Exists
-                        handler.handleDuplicate(e);
-                    }
-                } else if (e.getStatusCode() == 400) {
-                    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
-                        // Already Exists "Invalid Ou Id"
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE) {
-                    if ("backendError".equalsIgnoreCase(errorInfo.getReason()) && retry < 3) {
-                        logger.warn("retrying 503 backendError retry number " + retry);
-                        return execute(request, handler, ++retry);
-                    } else {
-                        throw RetryableException.wrap(e.getMessage(), e);
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVER_ERROR) {
-                    if ("backendError".equalsIgnoreCase(errorInfo.getReason())
-                            || "internalError".equalsIgnoreCase(errorInfo.getReason()) && retry < 3) {
-                        logger.warn("retrying 500" + errorInfo.getReason() + "retry number " + retry);
-                        return execute(request, handler, ++retry);
-                    } else {
-                        throw RetryableException.wrap(e.getMessage(), e);
-                    }
-                } else {
-                    if (retry < 3) { //last resort retry. We must right all wrongs!
-                        logger.warn("retrying " + e.getStatusCode() + " " + errorInfo.getReason() + " retry number " + retry);
-                        return execute(request, handler, ++retry);
-                    } else {
-                        if (e.getStatusCode() == 409) {
-                            if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
-                                // Already Exists
-                                logger.warn("handling duplicate");
-                                handler.handleDuplicate(e);
-                            }
-                        } else {
-                            throw RetryableException.wrap(e.getMessage(), e);
-                        }
-                    }
-                }
-
-            }
-            throw ConnectorException.wrap(e);
-        } catch (IOException e) {
-            // https://developers.google.com/admin-sdk/directory/v1/limits
-            // rateLimitExceeded or userRateLimitExceeded
-            if (retry < 3) {
-                return execute(request, handler, ++retry);
-            } else {
-                return handler.handleError(e);
-            }
-        }
+        return apiExecutor.execute(request, handler, retry);
     }
 
     protected RuntimeException get(GoogleJsonError.ErrorInfo errorInfo) {
@@ -2215,5 +2137,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             logger.warn(e, "Failed to initialize Groups#Get");
             throw ConnectorException.wrap(e);
         }
+    }
+    public GoogleApiExecutor getApiExecutor() {
+        return apiExecutor;
     }
 }
