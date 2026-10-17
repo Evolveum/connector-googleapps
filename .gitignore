@@ -16,3 +16,5 @@ client_secrets.json
 # idea
 .idea
 *.iml
+
+Test*.java
