@@ -69,7 +69,7 @@ import static org.identityconnectors.framework.common.objects.OperationalAttribu
 @ConnectorClass(displayNameKey = "GoogleApps.connector.display",
         configurationClass = GoogleAppsConfiguration.class)
 public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, SchemaOp,
-        SearchOp<Filter>, TestOp, UpdateOp {
+        SearchOp<Filter>, TestOp, UpdateDeltaOp {
 
     /**
      * Setup logging for the {@link GoogleAppsConnector}.
@@ -2141,4 +2141,39 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public GoogleApiExecutor getApiExecutor() {
         return apiExecutor;
     }
+    @Override
+    public Set<AttributeDelta> updateDelta(ObjectClass objectClass, Uid uid,
+            Set<AttributeDelta> modifications, OperationOptions options) {
+        if (ObjectClass.GROUP.equals(objectClass)) {
+            Set<AttributeDelta> result = GroupHandler.executeGroupUpdateDelta(apiExecutor, uid, modifications);
+            objectsCache.markGroupAsUpdatedNow(uid.getUidValue());
+            return result;
+        }
+
+        Set<Attribute> replacements = new HashSet<>();
+        for (AttributeDelta delta : modifications) {
+            if (delta.getValuesToReplace() != null) {
+                replacements.add(AttributeBuilder.build(delta.getName(), delta.getValuesToReplace()));
+            } else {
+                List<ConnectorObject> found = new ArrayList<>();
+                executeQuery(objectClass, FilterBuilder.equalTo(uid), object -> { found.add(object); return false; },
+                        new OperationOptionsBuilder().setAttributesToGet(delta.getName()).build());
+                if (found.isEmpty()) throw new UnknownUidException(uid.getUidValue());
+                Attribute current = found.get(0).getAttributeByName(delta.getName());
+                List<Object> values = new ArrayList<>();
+                if (current != null && current.getValue() != null) values.addAll(current.getValue());
+                if (delta.getValuesToRemove() != null) values.removeAll(delta.getValuesToRemove());
+                if (delta.getValuesToAdd() != null) for (Object value : delta.getValuesToAdd()) {
+                    if (!values.contains(value)) values.add(value);
+                }
+                replacements.add(AttributeBuilder.build(delta.getName(), values));
+            }
+        }
+        Uid updated = update(objectClass, uid, replacements, options == null ? new OperationOptionsBuilder().build() : options);
+        if (updated != null && !updated.getUidValue().equals(uid.getUidValue())) {
+            return Collections.singleton(AttributeDeltaBuilder.build(Uid.NAME, updated.getUidValue()));
+        }
+        return Collections.emptySet();
+    }
+
 }

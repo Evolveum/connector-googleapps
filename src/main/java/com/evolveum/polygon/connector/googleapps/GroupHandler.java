@@ -24,6 +24,18 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
+
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.EMAIL_ETAG;
+
+import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
+import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
+import com.google.api.client.util.Data;
+import com.google.api.services.directory.model.Groups;
+import org.identityconnectors.framework.spi.SearchResultsHandler;
+import java.util.HashSet;
+import java.util.Set;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Group;
 import com.google.api.services.directory.model.Member;
@@ -36,7 +48,7 @@ import org.identityconnectors.framework.common.objects.filter.*;
 
 import java.io.IOException;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
+
 
 /**
  * A GroupHandler is a util class to cover all Group related operations.
@@ -420,5 +432,56 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
             uid = new Uid(memberName);
         }
         return uid;
+    }
+    public static Set<AttributeDelta> executeGroupUpdateDelta(GoogleApiExecutor executor, Uid uid,
+                                                             Set<AttributeDelta> modifications) {
+        final Set<AttributeDelta> sideEffectDeltas = new HashSet<>();
+        
+        // Update core group attributes using Groups.patch API
+        if (!modifications.isEmpty()) {
+            final Directory.Groups.Patch patch = buildGroupUpdateRequest(executor.getDirectory().groups(), uid, modifications);
+            if (patch != null) {
+                executor.execute(patch, new RequestResultHandler.NoOp<Directory.Groups.Patch, Group>());
+            }
+        }
+        
+        return sideEffectDeltas;
+    }
+    private static Directory.Groups.Patch buildGroupUpdateRequest(Directory.Groups service, Uid uid, Set<AttributeDelta> deltas) {
+        Group group = new Group();
+        boolean hasChanges = false;
+
+        for (AttributeDelta delta : deltas) {
+            String attributeName = delta.getName();
+
+            // Handle single-valued attributes
+            if (Name.NAME.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                if (StringUtil.isBlank(value)) {
+                    throw new InvalidAttributeValueException("Group primary email cannot be null or blank.");
+                }
+                group.setEmail(value);
+                hasChanges = true;
+            } else if (NAME_ATTR.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                group.setName(value);
+                hasChanges = true;
+            } else if (PredefinedAttributes.DESCRIPTION.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                group.setDescription(value != null ? value : Data.NULL_STRING);
+                hasChanges = true;
+            }
+        }
+
+        if (!hasChanges) {
+            return null;
+        }
+
+        try {
+            return service.patch(uid.getUidValue(), group);
+        } catch (IOException e) {
+            logger.warn(e, "Failed to create group patch request");
+            throw ConnectorException.wrap(e);
+        }
     }
 }
