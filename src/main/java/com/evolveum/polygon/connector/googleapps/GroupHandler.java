@@ -407,31 +407,11 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
     }
 
     public static ConnectorObject fromMember(String groupKey, Member content) {
-        ConnectorObjectBuilder builder = new ConnectorObjectBuilder();
-        builder.setObjectClass(MEMBER);
-
-        Uid uid = generateMemberId(groupKey, content);
-        builder.setUid(uid);
-        builder.setName(uid.getUidValue());
-
-        builder.addAttribute(AttributeBuilder.build(GROUP_KEY_ATTR, content.getId()));
-        builder.addAttribute(AttributeBuilder.build(EMAIL_ATTR, content.getEmail()));
-        builder.addAttribute(AttributeBuilder.build(ROLE_ATTR, content.getRole()));
-        builder.addAttribute(AttributeBuilder.build(TYPE_ATTR, content.getType()));
-
-        return builder.build();
+        return MemberHandler.fromMember(groupKey, content);
     }
 
     public static Uid generateMemberId(String groupKey, Member content) {
-        Uid uid = null;
-        String memberName = groupKey + '/' + content.getEmail();
-
-        if (null != content.getEtag()) {
-            uid = new Uid(memberName, content.getEtag());
-        } else {
-            uid = new Uid(memberName);
-        }
-        return uid;
+        return MemberHandler.generateMemberId(groupKey, content);
     }
     public static Set<AttributeDelta> executeGroupUpdateDelta(GoogleApiExecutor executor, Uid uid,
                                                              Set<AttributeDelta> modifications) {
