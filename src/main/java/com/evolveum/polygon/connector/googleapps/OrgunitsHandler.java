@@ -24,7 +24,15 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
+import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
+import com.google.api.services.directory.model.OrgUnits;
+import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.filter.Filter;
+import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
+import java.util.HashSet;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+
+
 
 import java.io.IOException;
 import java.util.Set;
@@ -242,11 +250,75 @@ public class OrgunitsHandler {
         }
 
         if (null != content.getEtag()) {
-            uid = new Uid(orgUnitPath, content.getEtag());
+            uid = new Uid(orgUnitPath, content.getEtag(), new Name(content.getName()));
         } else {
-            uid = new Uid(orgUnitPath);
+            uid = new Uid(orgUnitPath, new Name(content.getName()));
         }
         return uid;
     }
 
+    public static Set<AttributeDelta> executeOrgunitUpdateDelta(GoogleApiExecutor executor, Uid uid,
+                                                                Set<AttributeDelta> modifications) {
+        final Set<AttributeDelta> sideEffectDeltas = new HashSet<>();
+
+        // Update OrgUnit attributes using Orgunits.patch API
+        if (!modifications.isEmpty()) {
+            final Directory.Orgunits.Patch patch = buildOrgunitUpdateRequest(executor.getDirectory().orgunits(), uid, modifications);
+            if (patch != null) {
+                executor.execute(patch, new RequestResultHandler<Directory.Orgunits.Patch, OrgUnit, Object>() {
+                    @Override
+                    public Object handleResult(Directory.Orgunits.Patch request, OrgUnit value) {
+                        String newUid = generateOrgUnitId(value).getUidValue();
+                        if (!uid.getUidValue().equals(newUid)) {
+                            sideEffectDeltas.add(AttributeDeltaBuilder.build(Uid.NAME, newUid));
+                        }
+                        return null;
+                    }
+                });
+            }
+        }
+
+        return sideEffectDeltas;
+    }
+    private static Directory.Orgunits.Patch buildOrgunitUpdateRequest(Directory.Orgunits service, Uid uid, Set<AttributeDelta> deltas) {
+        OrgUnit resource = new OrgUnit();
+        boolean hasChanges = false;
+
+        for (AttributeDelta delta : deltas) {
+            String attributeName = delta.getName();
+
+            // Handle single-valued attributes
+            if (Name.NAME.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                resource.setName(value);
+                hasChanges = true;
+            } else if (PredefinedAttributes.DESCRIPTION.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                resource.setDescription(value != null ? value : EMPTY_STRING);
+                hasChanges = true;
+            } else if (PARENT_ORG_UNIT_PATH_ATTR.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                if (StringUtil.isBlank(value)) {
+                    throw new InvalidAttributeValueException("Parent org unit path cannot be null or blank.");
+                }
+                resource.setParentOrgUnitPath(value.charAt(0) == '/' ? value : "/" + value);
+                hasChanges = true;
+            } else if (BLOCK_INHERITANCE_ATTR.equals(attributeName)) {
+                Boolean value = RequestResultHandler.getSingleValue(delta, Boolean.class);
+                resource.setBlockInheritance(value != null ? value : Boolean.FALSE);
+                hasChanges = true;
+            }
+        }
+
+        if (!hasChanges) {
+            return null;
+        }
+
+        try {
+            return service.patch(MY_CUSTOMER_ID, uid.getUidValue(), resource).setFields(ORG_UNIT_PATH_ETAG);
+        } catch (IOException e) {
+            logger.warn(e, "Failed to create orgunit patch request");
+            throw ConnectorException.wrap(e);
+        }
+    }
 }
