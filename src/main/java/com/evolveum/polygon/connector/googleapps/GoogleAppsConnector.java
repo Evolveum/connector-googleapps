@@ -665,9 +665,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
                 return;
             }
 
-            String productId = name.group(0);
-            String skuId = name.group(1);
-            String userId = name.group(2);
+            String productId = name.group(1);
+            String skuId = name.group(2);
+            String userId = name.group(3);
 
             Licensing.LicenseAssignments.Get request
                     = configuration.getLicensing().licenseAssignments().get(productId, skuId,
@@ -2144,6 +2144,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     @Override
     public Set<AttributeDelta> updateDelta(ObjectClass objectClass, Uid uid,
             Set<AttributeDelta> modifications, OperationOptions options) {
+        if (LICENSE_ASSIGNMENT.equals(objectClass)) {
+            Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(apiExecutor, uid, modifications);
+            
+            return result;
+        }
+
         if (ORG_UNIT.equals(objectClass)) {
             Set<AttributeDelta> result = OrgunitsHandler.executeOrgunitUpdateDelta(apiExecutor, uid, modifications);
             
