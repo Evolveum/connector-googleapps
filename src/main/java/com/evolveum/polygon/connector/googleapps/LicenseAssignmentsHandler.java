@@ -24,7 +24,17 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.*;
+
+
+import com.google.api.services.licensing.LicensingRequest;
+import com.google.api.services.licensing.model.LicenseAssignmentList;
+import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.spi.SearchResultsHandler;
+import java.util.HashSet;
+import java.util.Set;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+
+
 
 import java.io.IOException;
 import java.util.regex.Matcher;
@@ -225,4 +235,56 @@ public class LicenseAssignmentsHandler {
         }
     }
 
+    public static Set<AttributeDelta> executeLicenseAssignmentUpdateDelta(GoogleApiExecutor executor, Uid uid,
+                                                                         Set<AttributeDelta> modifications) {
+        final Set<AttributeDelta> sideEffectDeltas = new HashSet<>();
+        
+        // Update LicenseAssignment attributes using LicenseAssignments.patch API  
+        if (!modifications.isEmpty()) {
+            final Licensing.LicenseAssignments.Patch patch = buildLicenseAssignmentUpdateRequest(executor.getLicensing().licenseAssignments(), uid, modifications);
+            if (patch != null) {
+                executor.execute(patch, new RequestResultHandler.NoOp<Licensing.LicenseAssignments.Patch, LicenseAssignment>());
+            }
+        }
+        
+        return sideEffectDeltas;
+    }
+    private static Licensing.LicenseAssignments.Patch buildLicenseAssignmentUpdateRequest(Licensing.LicenseAssignments service, Uid uid, Set<AttributeDelta> deltas) {
+        LicenseAssignment content = null;
+        
+        // Parse the uid to get productId, oldSkuId, and userId
+        Matcher name = LICENSE_NAME_PATTERN.matcher(uid.getUidValue());
+        if (!name.matches()) {
+            throw new UnknownUidException("Unrecognised id: " + uid.getUidValue());
+        }
+        
+        String productId = name.group(1);
+        String oldSkuId = name.group(2);  
+        String userId = name.group(3);
+        
+        // Check for skuId updates
+        for (AttributeDelta delta : deltas) {
+            String attributeName = delta.getName();
+            
+            if (SKU_ID_ATTR.equals(attributeName)) {
+                String newSkuId = RequestResultHandler.getSingleValue(delta, String.class);
+                if (newSkuId != null && !oldSkuId.equalsIgnoreCase(newSkuId)) {
+                    content = new LicenseAssignment();
+                    content.setSkuId(newSkuId);
+                }
+            }
+            // productId and userId are read-only and cannot be updated
+        }
+        
+        if (content == null) {
+            return null; // No changes or same skuId
+        }
+        
+        try {
+            return service.patch(productId, oldSkuId, userId, content);
+        } catch (IOException e) {
+            logger.warn(e, "Failed to create license assignment patch request");
+            throw ConnectorException.wrap(e);
+        }
+    }
 }
