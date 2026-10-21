@@ -2144,6 +2144,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     @Override
     public Set<AttributeDelta> updateDelta(ObjectClass objectClass, Uid uid,
             Set<AttributeDelta> modifications, OperationOptions options) {
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            Set<AttributeDelta> result = UserHandler.executeUserUpdateDelta(apiExecutor, uid, modifications);
+            objectsCache.markUserAsUpdatedNow(uid.getUidValue());
+            return result;
+        }
+
         if (LICENSE_ASSIGNMENT.equals(objectClass)) {
             Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(apiExecutor, uid, modifications);
             

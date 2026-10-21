@@ -23,6 +23,18 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
+import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
+import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
+import com.google.api.client.util.Data;
+import com.google.api.services.directory.model.*;
+import com.google.api.services.licensing.Licensing;
+import com.google.api.services.licensing.model.LicenseAssignment;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.identityconnectors.framework.spi.SearchResultsHandler;
+import java.util.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Alias;
 import com.google.api.services.directory.model.User;
@@ -825,4 +837,683 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         }
     }
 
+    private static Directory.Members.Insert createMemberById(Directory.Members service, String groupKey,
+            String memberId, String role) {
+        try {
+            Member content = new Member();
+            content.setId(memberId);
+
+            if (StringUtil.isNotBlank(role)) {
+                content.setRole(role);
+            }
+
+            return service.insert(groupKey, content);
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Members#Insert");
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static Directory.Users.Photos.Delete createDeleteUserPhoto(
+            Directory.Users.Photos service, String userKey) {
+        try {
+            return service.delete(userKey);
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize delete user photo request for user: {0}", userKey);
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static Directory.Users.Update buildUserUpdateRequest(Directory.Users users, Uid uid,
+            Set<AttributeDelta> modifications, Optional<User> currentUser) {
+        User content = new User();
+        boolean hasChanges = false;
+
+        // Check if suspended attribute is present - it takes precedence over __ENABLED__
+        boolean hasSuspendedAttribute = modifications.stream()
+            .anyMatch(delta -> SUSPENDED_ATTR.equals(delta.getName()));
+
+        for (AttributeDelta delta : modifications) {
+            String attributeName = delta.getName();
+            
+            // Handle Name (primaryEmail)
+            if (AttributeUtil.namesEqual(Name.NAME, attributeName)) {
+                List<Object> valuesToReplace = delta.getValuesToReplace();
+                if (valuesToReplace != null && !valuesToReplace.isEmpty()) {
+                    content.setPrimaryEmail((String) valuesToReplace.get(0));
+                    hasChanges = true;
+                }
+            }
+            // Handle givenName
+            else if (GIVEN_NAME_ATTR.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                if (content.getName() == null) {
+                    content.setName(new UserName());
+                }
+                // Google API requires Data.NULL_STRING to clear field
+                content.getName().setGivenName(value != null ? value : Data.NULL_STRING);
+                hasChanges = true;
+            }
+            // Handle familyName
+            else if (FAMILY_NAME_ATTR.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                if (content.getName() == null) {
+                    content.setName(new UserName());
+                }
+                // Google API requires Data.NULL_STRING to clear field
+                content.getName().setFamilyName(value != null ? value : Data.NULL_STRING);
+                hasChanges = true;
+            }
+            // Handle password - special processing for replace vs add/remove operations
+            else if (AttributeUtil.namesEqual(OperationalAttributes.PASSWORD_NAME, attributeName)) {
+                List<Object> valuesToReplace = delta.getValuesToReplace();
+                List<Object> valuesToAdd = delta.getValuesToAdd();
+                List<Object> valuesToRemove = delta.getValuesToRemove();
+                
+                if (valuesToReplace != null && !valuesToReplace.isEmpty()) {
+                    // Password Reset operation (admin-initiated, no old password needed)
+                    GuardedString newPassword = (GuardedString) valuesToReplace.get(0);
+                    content.setPassword(SecurityUtil.decrypt(newPassword));
+                    hasChanges = true;
+                } else if (valuesToAdd != null && !valuesToAdd.isEmpty()) {
+                    // Password Change operation (user-initiated in ConnID terms)
+                    // Google Directory API doesn't require old password validation - it operates with admin privileges
+                    // The API directly sets the new password regardless of the old one
+                    GuardedString newPassword = (GuardedString) valuesToAdd.get(0);
+                    content.setPassword(SecurityUtil.decrypt(newPassword));
+                    hasChanges = true;
+                    // Note: valuesToRemove contains old password but Google API ignores it completely
+                }
+            }
+            // Handle enable/suspended
+            else if (ENABLE_NAME.equals(attributeName)) {
+                // If suspended attribute is present, ignore __ENABLED__ (suspended takes precedence)
+                if (hasSuspendedAttribute) {
+                    // Skip __ENABLED__ processing when suspended attribute is also present
+                    continue;
+                }
+                Boolean enable = RequestResultHandler.getSingleValue(delta, Boolean.class);
+                if (enable == null) {
+                    // Clear request - ignore it as __ENABLE__ cannot be cleared
+                    // Note: __ENABLE__ cannot be cleared (set to null) as users must be either enabled or disabled
+                } else {
+                    content.setSuspended(!enable);
+                    hasChanges = true;
+                }
+            }
+            else if (SUSPENDED_ATTR.equals(attributeName)) {
+                Boolean value = RequestResultHandler.getSingleValue(delta, Boolean.class);
+                content.setSuspended(value != null ? value : Data.NULL_BOOLEAN);
+                hasChanges = true;
+            }
+            // Handle changePasswordAtNextLogin
+            else if (CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR.equals(attributeName)) {
+                Boolean value = RequestResultHandler.getSingleValue(delta, Boolean.class);
+                content.setChangePasswordAtNextLogin(value != null ? value : Data.NULL_BOOLEAN);
+                hasChanges = true;
+            }
+            // Handle ipWhitelisted
+            else if (IP_WHITELISTED_ATTR.equals(attributeName)) {
+                Boolean value = RequestResultHandler.getSingleValue(delta, Boolean.class);
+                content.setIpWhitelisted(value != null ? value : Data.NULL_BOOLEAN);
+                hasChanges = true;
+            }
+            // Handle multi-valued attributes
+            else if (IMS_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), IMS_ATTR));
+                content.setIms(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            else if (EMAILS_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), EMAILS_ATTR));
+                content.setEmails(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            else if (EXTERNAL_IDS_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), EXTERNAL_IDS_ATTR));
+                content.setExternalIds(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            else if (RELATIONS_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), RELATIONS_ATTR));
+                content.setRelations(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            else if (ADDRESSES_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), ADDRESSES_ATTR));
+                content.setAddresses(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            else if (ORGANIZATIONS_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), ORGANIZATIONS_ATTR));
+                content.setOrganizations(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            else if (PHONES_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), PHONES_ATTR));
+                content.setPhones(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            else if (LOCATIONS_ATTR.equals(attributeName)) {
+                Object newValue = processMultiValuedAttribute(delta, getCurrentAttributeValue(currentUser.orElse(null), LOCATIONS_ATTR));
+                content.setLocations(newValue); // null means clear all values
+                hasChanges = true;
+            }
+            // Handle simple string attributes
+            else if (ORG_UNIT_PATH_ATTR.equals(attributeName)) {
+                String value = RequestResultHandler.getSingleValue(delta, String.class);
+                // Google API requires Data.NULL_STRING to clear field
+                content.setOrgUnitPath(value != null ? value : Data.NULL_STRING);
+                hasChanges = true;
+            }
+            else if (INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR.equals(attributeName)) {
+                Boolean value = RequestResultHandler.getSingleValue(delta, Boolean.class);
+                content.setIncludeInGlobalAddressList(value != null ? value : Data.NULL_BOOLEAN);
+                hasChanges = true;
+            }
+        }
+
+        if (!hasChanges) {
+            return null;
+        }
+
+        try {
+            return users.update(uid.getUidValue(), content).setFields(ID_ETAG);
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Users#Update");
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static boolean isMultiValuedAttribute(String attributeName) {
+        return IMS_ATTR.equals(attributeName) ||
+               EMAILS_ATTR.equals(attributeName) ||
+               EXTERNAL_IDS_ATTR.equals(attributeName) ||
+               RELATIONS_ATTR.equals(attributeName) ||
+               ADDRESSES_ATTR.equals(attributeName) ||
+               ORGANIZATIONS_ATTR.equals(attributeName) ||
+               PHONES_ATTR.equals(attributeName) ||
+               LOCATIONS_ATTR.equals(attributeName);
+    }
+    public static boolean hasAddOrRemoveOperations(AttributeDelta delta) {
+        return (delta.getValuesToAdd() != null && !delta.getValuesToAdd().isEmpty()) ||
+               (delta.getValuesToRemove() != null && !delta.getValuesToRemove().isEmpty());
+    }
+    private static Object getCurrentAttributeValue(User currentUser, String attributeName) {
+        if (currentUser == null) {
+            return null;
+        }
+        switch (attributeName) {
+            case IMS_ATTR:
+                return currentUser.getIms();
+            case EMAILS_ATTR:
+                return currentUser.getEmails();
+            case EXTERNAL_IDS_ATTR:
+                return currentUser.getExternalIds();
+            case RELATIONS_ATTR:
+                return currentUser.getRelations();
+            case ADDRESSES_ATTR:
+                return currentUser.getAddresses();
+            case ORGANIZATIONS_ATTR:
+                return currentUser.getOrganizations();
+            case PHONES_ATTR:
+                return currentUser.getPhones();
+            case LOCATIONS_ATTR:
+                return currentUser.getLocations();
+            default:
+                return null;
+        }
+    }
+    private static Object processMultiValuedAttribute(AttributeDelta delta, Object currentValue) {
+        // Check for replace operation first (if present, add/remove should not be present)
+        List<Object> valuesToReplace = delta.getValuesToReplace();
+        if (valuesToReplace != null) {
+            // Replace operation - replace all existing values
+            if (valuesToReplace.isEmpty()) {
+                return new ArrayList<>(); // Empty list means clear all values - return empty array, not null
+            }
+            Attribute tempAttr = AttributeBuilder.build(delta.getName(), valuesToReplace);
+            return GoogleAppsUtil.getStructAttr(tempAttr);
+        }
+        
+        // Add/Remove operations - need to merge with current values
+        List<Object> valuesToAdd = delta.getValuesToAdd();
+        List<Object> valuesToRemove = delta.getValuesToRemove();
+
+        // Convert current value to String list for processing
+        List<String> currentStringValues = convertToStringList(currentValue);
+        Set<String> newValues = new HashSet<>(currentStringValues);
+
+        // Process add operations
+        if (valuesToAdd != null) {
+            for (Object value : valuesToAdd) {
+                if (value instanceof String) {
+                    String addedValue = (String) value;
+                    if (newValues.stream().noneMatch(existing -> matchesJsonValue(existing, addedValue))) {
+                        newValues.add(addedValue);
+                    }
+                }
+            }
+        }
+
+        // Process remove operations
+        if (valuesToRemove != null) {
+            for (Object value : valuesToRemove) {
+                if (value instanceof String) {
+                    String valueToRemove = (String) value;
+                    // Find and remove matching values by normalizing JSON comparison
+                    newValues.removeIf(existingValue -> matchesJsonValue(existingValue, valueToRemove));
+                }
+            }
+        }
+
+        if (newValues.isEmpty()) {
+            return new ArrayList<>(); // All values removed - return empty array, not null
+        }
+
+        // Convert back to Google API format
+        Attribute tempAttr = AttributeBuilder.build(delta.getName(), new ArrayList<>(newValues));
+        return GoogleAppsUtil.getStructAttr(tempAttr);
+    }
+    private static List<String> convertToStringList(Object googleValue) {
+        List<String> result = new ArrayList<>();
+        if (googleValue instanceof Collection) {
+            Collection<?> collection = (Collection<?>) googleValue;
+            Gson gson = new GsonBuilder().create();
+            for (Object item : collection) {
+                if (item != null) {
+                    // Convert Google API object to JSON string for proper comparison
+                    result.add(gson.toJson(item));
+                }
+            }
+        }
+        return result;
+    }
+    private static boolean matchesJsonValue(String currentJsonValue, String valueToRemove) {
+        try {
+            // Parse both JSON strings into generic objects for structural comparison
+            Object currentObj = GoogleAppsUtil.parseJson(currentJsonValue);
+            Object removeObj = GoogleAppsUtil.parseJson(valueToRemove);
+            
+            // Compare the parsed objects (handles field ordering and null differences)
+            return Objects.equals(currentObj, removeObj);
+        } catch (Exception e) {
+            // If parsing fails, fall back to string comparison
+            return currentJsonValue.equals(valueToRemove);
+        }
+    }
+    public static User fetchCurrentUserData(GoogleApiExecutor executor, Uid uid, Set<String> requiredFields) {
+        try {
+            Directory.Users.Get request = executor.getDirectory().users().get(uid.getUidValue());
+            if (!requiredFields.isEmpty()) {
+                request.setFields("id," + String.join(",", requiredFields));
+            }
+            return executor.execute(request, new RequestResultHandler<Directory.Users.Get, User, User>() {
+                public User handleResult(Directory.Users.Get request, User value) {
+                    return value;
+                }
+
+                public User handleNotFound(Directory.Users.Get request) {
+                    return null;
+                }
+
+                public User handleDuplicate(Directory.Users.Get request) {
+                    return null;
+                }
+            });
+        } catch (IOException e) {
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static Set<AttributeDelta> executeUserUpdateDelta(GoogleApiExecutor executor, Uid uid, 
+            Set<AttributeDelta> modifications) {
+        final Set<AttributeDelta> sideEffectDeltas = new HashSet<>();
+        
+        // Separate special attributes that need special handling
+        Set<AttributeDelta> coreDeltas = new HashSet<>();
+        AttributeDelta aliasesDelta = null;
+        AttributeDelta photoDelta = null;
+        AttributeDelta isAdminDelta = null;
+        AttributeDelta groupsDelta = null;
+        
+        // Check if we need to fetch current user data for multi-valued attributes
+        boolean needsCurrentUserData = false;
+        Set<String> requiredFields = new HashSet<>();
+        
+        for (AttributeDelta delta : modifications) {
+            String attrName = delta.getName();
+            if (ALIASES_ATTR.equals(attrName)) {
+                aliasesDelta = delta;
+            } else if (PHOTO_ATTR.equals(attrName)) {
+                photoDelta = delta;
+            } else if (IS_ADMIN_ATTR.equals(attrName)) {
+                isAdminDelta = delta;
+            } else if (PredefinedAttributes.GROUPS_NAME.equals(attrName)) {
+                groupsDelta = delta;
+            } else {
+                coreDeltas.add(delta);
+                // Check if this is a multi-valued attribute with add/remove operations
+                if (isMultiValuedAttribute(attrName) && hasAddOrRemoveOperations(delta)) {
+                    needsCurrentUserData = true;
+                    requiredFields.add(attrName);
+                }
+            }
+        }
+        
+        // Fetch current user data if needed for multi-valued attributes
+        User currentUser = null;
+        if (needsCurrentUserData) {
+            currentUser = fetchCurrentUserData(executor, uid, requiredFields);
+        }
+        
+        // Update core user attributes
+        Uid uidAfterUpdate = uid;
+        if (!coreDeltas.isEmpty()) {
+            final Directory.Users.Update update = buildUserUpdateRequest(executor.getDirectory().users(), uid, coreDeltas, Optional.ofNullable(currentUser));
+            if (update != null) {
+                uidAfterUpdate = executor.execute(update,
+                        new RequestResultHandler<Directory.Users.Update, User, Uid>() {
+                            public Uid handleResult(Directory.Users.Update request, User value) {
+                                logger.ok("User is Updated:{0}", value.getId());
+                                return new Uid(value.getId());
+                            }
+
+                            public Uid handleNotFound(Directory.Users.Update request) {
+                                return uid;
+                            }
+
+                            public Uid handleDuplicate(Directory.Users.Update request) {
+                                return uid;
+                            }
+                        });
+            }
+        }
+        
+        // Handle special attributes
+        if (aliasesDelta != null) {
+            handleAliasesDelta(executor, uidAfterUpdate, aliasesDelta);
+        }
+        
+        if (photoDelta != null) {
+            // Check for replace operation or add operation (photo is single-valued)
+            List<Object> valuesToReplace = photoDelta.getValuesToReplace();
+            List<Object> valuesToAdd = photoDelta.getValuesToAdd();
+            
+            boolean shouldDelete = false;
+            byte[] photoData = null;
+            
+            if (valuesToReplace != null) {
+                if (valuesToReplace.isEmpty()) {
+                    // Empty list means delete the photo
+                    shouldDelete = true;
+                } else {
+                    Object photoObject = valuesToReplace.get(0);
+                    if (photoObject == null) {
+                        // Null value means delete the photo
+                        shouldDelete = true;
+                    } else if (photoObject instanceof byte[]) {
+                        photoData = (byte[]) photoObject;
+                        if (photoData.length == 0) {
+                            // Empty array means delete the photo
+                            shouldDelete = true;
+                        }
+                    }
+                }
+            } else if (valuesToAdd != null && !valuesToAdd.isEmpty()) {
+                Object photoObject = valuesToAdd.get(0);
+                if (photoObject instanceof byte[]) {
+                    photoData = (byte[]) photoObject;
+                }
+            }
+            
+            if (shouldDelete) {
+                // Handle photo deletion
+                handlePhotoDelete(executor, uidAfterUpdate);
+            } else if (photoData != null && photoData.length > 0) {
+                // Handle photo update
+                handlePhoto(executor, uidAfterUpdate, photoData);
+            }
+        }
+        
+        if (isAdminDelta != null) {
+            // isAdmin is single-valued boolean - only handle replace operation
+            List<Object> valuesToReplace = isAdminDelta.getValuesToReplace();
+            if (valuesToReplace != null && !valuesToReplace.isEmpty()) {
+                Object adminObject = valuesToReplace.get(0);
+                if (adminObject instanceof Boolean) {
+                    handleIsAdmin(executor, uidAfterUpdate, (Boolean) adminObject);
+                }
+            }
+        }
+        
+        if (groupsDelta != null) {
+            handleGroupsDelta(executor, uidAfterUpdate, groupsDelta);
+        }
+        
+        return sideEffectDeltas;
+    }
+    private static void handlePhoto(GoogleApiExecutor executor,
+                                   Uid uid, byte[] photoData) {
+        if (photoData == null || photoData.length == 0) {
+            return;
+        }
+        
+        try {
+            executor.execute(createUpdateUserPhoto(executor.getDirectory().users().photos(),
+                            uid.getUidValue(), photoData),
+                    new RequestResultHandler.NoOp<Directory.Users.Photos.Update, UserPhoto>());
+        } catch (Exception e) {
+            logger.warn(e, "Failed to handle photo for user: {0}", uid.getUidValue());
+            throw ConnectorException.wrap(e);
+        }
+    }
+    private static void handlePhotoDelete(GoogleApiExecutor executor, Uid uid) {
+        try {
+            executor.execute(createDeleteUserPhoto(executor.getDirectory().users().photos(),
+                            uid.getUidValue()),
+                    new RequestResultHandler.IgnoreMissing<Directory.Users.Photos.Delete, Void>());
+        } catch (Exception e) {
+            logger.warn(e, "Failed to delete photo for user: {0}", uid.getUidValue());
+            throw ConnectorException.wrap(e);
+        }
+    }
+    private static void handleIsAdmin(GoogleApiExecutor executor,
+                                      Uid uid, Boolean isAdminValue) {
+        if (isAdminValue == null) {
+            return;
+        }
+        
+        try {
+            UserMakeAdmin content = new UserMakeAdmin();
+            content.setStatus(isAdminValue);
+            executor.execute(executor.getDirectory().users().makeAdmin(uid.getUidValue(), content),
+                    new RequestResultHandler.NoOp<Directory.Users.MakeAdmin, Void>());
+        } catch (Exception e) {
+            logger.warn(e, "Failed to set admin status for user: {0}", uid.getUidValue());
+            throw ConnectorException.wrap(e);
+        }
+    }
+    private static void handleAliasesDelta(GoogleApiExecutor executor, 
+                                          Uid uid, AttributeDelta aliasesDelta) {
+        try {
+            final Directory.Users.Aliases aliasesService = executor.getDirectory().users().aliases();
+            
+            // Check for replace operation first
+            List<Object> valuesToReplace = aliasesDelta.getValuesToReplace();
+            if (valuesToReplace != null) {
+                // Replace operation - get current aliases and replace completely
+                Set<String> currentAliases = listAliases(executor, uid.getUidValue());
+                Set<String> newAliases = new HashSet<>();
+                for (Object alias : valuesToReplace) {
+                    if (alias instanceof String) {
+                        newAliases.add((String) alias);
+                    }
+                }
+                
+                // Delete aliases not in new set
+                for (String currentAlias : currentAliases) {
+                    if (!newAliases.contains(currentAlias)) {
+                        executor.execute(deleteUserAlias(aliasesService, uid.getUidValue(), currentAlias),
+                                new RequestResultHandler.IgnoreMissing<Directory.Users.Aliases.Delete, Alias>());
+                    }
+                }
+                
+                // Add new aliases
+                for (String newAlias : newAliases) {
+                    if (!currentAliases.contains(newAlias)) {
+                        executor.execute(createUserAlias(aliasesService, uid.getUidValue(), newAlias),
+                                new RequestResultHandler.NoOp<Directory.Users.Aliases.Insert, Alias>());
+                    }
+                }
+                return;
+            }
+            
+            // Handle add/remove operations
+            List<Object> valuesToAdd = aliasesDelta.getValuesToAdd();
+            List<Object> valuesToRemove = aliasesDelta.getValuesToRemove();
+            
+            // Add aliases
+            if (valuesToAdd != null && !valuesToAdd.isEmpty()) {
+                for (Object alias : valuesToAdd) {
+                    if (alias instanceof String) {
+                        executor.execute(createUserAlias(aliasesService, uid.getUidValue(), (String) alias),
+                                new RequestResultHandler.NoOp<Directory.Users.Aliases.Insert, Alias>());
+                    }
+                }
+            }
+            
+            // Remove aliases
+            if (valuesToRemove != null && !valuesToRemove.isEmpty()) {
+                for (Object alias : valuesToRemove) {
+                    if (alias instanceof String) {
+                        executor.execute(deleteUserAlias(aliasesService, uid.getUidValue(), (String) alias),
+                                new RequestResultHandler.IgnoreMissing<Directory.Users.Aliases.Delete, Alias>());
+                    }
+                }
+            }
+            
+        } catch (Exception e) {
+            logger.warn(e, "Failed to handle aliases delta for user: {0}", uid.getUidValue());
+            throw ConnectorException.wrap(e);
+        }
+    }
+    private static void handleGroupsDelta(GoogleApiExecutor executor,
+                                         Uid uid, AttributeDelta groupsDelta) {
+        try {
+            final Directory.Members service = executor.getDirectory().members();
+            
+            // Check for replace operation first
+            List<Object> valuesToReplace = groupsDelta.getValuesToReplace();
+            if (valuesToReplace != null) {
+                // Replace operation - get current group memberships and replace completely
+                Set<String> currentGroups = GroupConverter.listGroups(executor.getDirectory().groups(), uid.getUidValue());
+                Set<String> newGroups = new HashSet<>();
+                for (Object groupId : valuesToReplace) {
+                    if (groupId instanceof String) {
+                        newGroups.add((String) groupId);
+                    }
+                }
+                
+                // Remove user from groups not in new set
+                for (String currentGroup : currentGroups) {
+                    if (!newGroups.contains(currentGroup)) {
+                        try {
+                            executor.execute(service.delete(currentGroup, uid.getUidValue()),
+                                    new RequestResultHandler.IgnoreMissing<Directory.Members.Delete, Void>());
+                        } catch (Exception e) {
+                            logger.warn(e, "Failed to remove user {0} from group {1}", uid.getUidValue(), currentGroup);
+                            throw ConnectorException.wrap(e);
+                        }
+                    }
+                }
+                
+                // Add user to new groups
+                for (String newGroup : newGroups) {
+                    if (!currentGroups.contains(newGroup)) {
+                        try {
+                            executor.execute(createMemberById(service, newGroup, uid.getUidValue(), "MEMBER"),
+                                    new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
+                        } catch (Exception e) {
+                            logger.warn(e, "Failed to add user {0} to group {1}", uid.getUidValue(), newGroup);
+                            throw ConnectorException.wrap(e);
+                        }
+                    }
+                }
+                return;
+            }
+            
+            // Handle add/remove operations
+            List<Object> valuesToAdd = groupsDelta.getValuesToAdd();
+            List<Object> valuesToRemove = groupsDelta.getValuesToRemove();
+            
+            // Add group memberships
+            if (valuesToAdd != null && !valuesToAdd.isEmpty()) {
+                for (Object groupId : valuesToAdd) {
+                    if (groupId instanceof String) {
+                        try {
+                            executor.execute(createMemberById(service, (String) groupId, 
+                                    uid.getUidValue(), "MEMBER"),
+                                    new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
+                        } catch (Exception e) {
+                            logger.warn(e, "Failed to add user {0} to group {1}", uid.getUidValue(), groupId);
+                            throw ConnectorException.wrap(e);
+                        }
+                    }
+                }
+            }
+            
+            // Remove group memberships
+            if (valuesToRemove != null && !valuesToRemove.isEmpty()) {
+                for (Object groupId : valuesToRemove) {
+                    if (groupId instanceof String) {
+                        try {
+                            executor.execute(service.delete((String) groupId, uid.getUidValue()),
+                                    new RequestResultHandler.IgnoreMissing<Directory.Members.Delete, Void>());
+                        } catch (Exception e) {
+                            logger.warn(e, "Failed to remove user {0} from group {1}", uid.getUidValue(), groupId);
+                            throw ConnectorException.wrap(e);
+                        }
+                    }
+                }
+            }
+            
+        } catch (Exception e) {
+            logger.warn(e, "Failed to handle groups delta for user: {0}", uid.getUidValue());
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static Set<String> listAliases(GoogleApiExecutor executor, String userKey) {
+        final Set<String> result = CollectionUtil.newCaseInsensitiveSet();
+        final Gson gson = new GsonBuilder().create();
+        try {
+
+            final Directory.Users.Aliases aliasesService = executor.getDirectory().users().aliases();
+            Directory.Users.Aliases.List request = aliasesService.list(userKey);
+
+            String nextPageToken = null;
+            do {
+                //TODO user alias request has no page token, how to page?
+                /*if(StringUtil.isNotBlank(nextPageToken)){
+                    request.setPageToken(nextPageToken);
+                }*/
+                nextPageToken
+                        = executor.execute(request,
+                        new RequestResultHandler<Directory.Users.Aliases.List, Aliases, String>() {
+                            public String handleResult(Directory.Users.Aliases.List request, Aliases value) {
+                                if (null != value.getAliases()) {
+                                    for (Object alias : value.getAliases()) {
+                                        String toJson = gson.toJson(alias);
+                                        Alias fromJson = gson.fromJson(toJson, Alias.class);
+                                        result.add(fromJson.getAlias()); // return only alias parameter of json object
+                                    }
+                                }
+                                return null;
+                            }
+                        });
+
+            } while (StringUtil.isNotBlank(nextPageToken));
+            // } catch (HttpResponseException e){
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Aliases#List");
+            throw ConnectorException.wrap(e);
+        }
+        return result;
+    }
 }
