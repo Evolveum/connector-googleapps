@@ -24,6 +24,8 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
+
+
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.services.directory.model.OrgUnits;
 import org.identityconnectors.framework.common.objects.*;
@@ -318,6 +320,23 @@ public class OrgunitsHandler {
             return service.patch(MY_CUSTOMER_ID, uid.getUidValue(), resource).setFields(ORG_UNIT_PATH_ETAG);
         } catch (IOException e) {
             logger.warn(e, "Failed to create orgunit patch request");
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static Uid executeOrgUnitCreate(GoogleApiExecutor executor, Set<Attribute> createAttributes) {
+        final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
+
+        return executor.execute(createOrgunit(executor.getDirectory().orgunits(), accessor),
+                new RequestResultHandler.Create<>(ORG_UNIT,
+                        OrgunitsHandler::generateOrgUnitId));
+    }
+    public static void executeOrgUnitDelete(GoogleApiExecutor executor, Uid uid) {
+        try {
+            AbstractGoogleJsonClientRequest<Void> request = executor.getDirectory().orgunits().delete(MY_CUSTOMER_ID, uid.getUidValue());
+
+            executor.execute(request, new RequestResultHandler.Delete(uid, ORG_UNIT));
+
+        } catch (IOException e) {
             throw ConnectorException.wrap(e);
         }
     }

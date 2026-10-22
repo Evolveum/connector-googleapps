@@ -26,6 +26,8 @@ package com.evolveum.polygon.connector.googleapps;
 
 
 
+
+
 import com.google.api.services.licensing.LicensingRequest;
 import com.google.api.services.licensing.model.LicenseAssignmentList;
 import org.identityconnectors.framework.common.objects.*;
@@ -295,5 +297,28 @@ public class LicenseAssignmentsHandler {
             logger.warn(e, "Failed to create license assignment patch request");
             throw ConnectorException.wrap(e);
         }
+    }
+    public static Uid executeLicenseAssignmentCreate(GoogleApiExecutor executor, Set<Attribute> createAttributes) {
+        final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
+        
+        return executor.execute(
+                createLicenseAssignment(executor.getLicensing().licenseAssignments(), accessor),
+                new RequestResultHandler.Create<>(LICENSE_ASSIGNMENT, 
+                    LicenseAssignmentsHandler::generateLicenseAssignmentId));
+    }
+    public static void executeLicenseAssignmentDelete(GoogleApiExecutor executor, Uid uid) {
+        Licensing.LicenseAssignments.Delete deleteRequest = deleteLicenseAssignment(executor.getLicensing().licenseAssignments(), uid.getUidValue());
+
+        executor.execute(deleteRequest,
+                new RequestResultHandler<Licensing.LicenseAssignments.Delete, Void, Void>() {
+                    public Void handleResult(Licensing.LicenseAssignments.Delete request,
+                                             Void value) {
+                        return null;
+                    }
+
+                    public Void handleNotFound(final IOException e) {
+                        throw new UnknownUidException(uid, LICENSE_ASSIGNMENT);
+                    }
+                });
     }
 }

@@ -27,6 +27,9 @@ package com.evolveum.polygon.connector.googleapps;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.EMAIL_ETAG;
 
+
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.EMAIL_ETAG;
+
 import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.client.util.Data;
@@ -199,9 +202,10 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         builder.setType(ObjectClass.GROUP_NAME);
         builder.setDescription("A Google Group used as an email distribution list and membership container. "
                 + "Group memberships are represented separately by the Member object class.");
-        // email
+        // email (mapped to Name.NAME)
         builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setRequired(true)
-                .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE).build());
+                .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
+                .build());
         builder.addAttributeInfo(AttributeInfoBuilder.build(NAME_ATTR));
         builder.addAttributeInfo(PredefinedAttributeInfos.DESCRIPTION);
 
@@ -217,7 +221,7 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
 
         // Virtual Attribute
         builder.addAttributeInfo(AttributeInfoBuilder.define(MEMBERS_ATTR).setMultiValued(true)
-                .setReturnedByDefault(true).build());
+                .setReturnedByDefault(false).setUpdateable(false).setCreateable(false).build());
 
         return builder.build();
     }
@@ -461,6 +465,26 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
             return service.patch(uid.getUidValue(), group);
         } catch (IOException e) {
             logger.warn(e, "Failed to create group patch request");
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static Uid executeGroupCreate(GoogleApiExecutor executor, Set<Attribute> createAttributes) {
+        final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
+        
+        return executor.execute(createGroup(executor.getDirectory().groups(), accessor),
+                new RequestResultHandler.Create<>(ObjectClass.GROUP, 
+                    (Group group) -> new Uid(group.getId(), group.getEtag(), new Name(group.getEmail()))));
+    }
+    public static void executeGroupDelete(GoogleApiExecutor executor, ConnectorObjectsCache objectsCache, Uid uid) {
+        try {
+            AbstractGoogleJsonClientRequest<Void> request = executor.getDirectory().groups().delete(uid.getUidValue());
+
+            executor.execute(request, new RequestResultHandler.Delete(uid, ObjectClass.GROUP));
+            
+            // Remove from cache
+            objectsCache.removeGroup(uid.getUidValue());
+            
+        } catch (IOException e) {
             throw ConnectorException.wrap(e);
         }
     }

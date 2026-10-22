@@ -23,6 +23,8 @@
  */
 package com.evolveum.polygon.connector.googleapps;
 
+
+
 import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.client.util.Data;
@@ -573,18 +575,24 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         }
 
         // Optional
-        user.setIms(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(IMS_ATTR)));
-        user.setEmails(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(EMAILS_ATTR)));
-        user.setExternalIds(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(EXTERNAL_IDS_ATTR)));
-        user.setRelations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(RELATIONS_ATTR)));
-        user.setAddresses(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(ADDRESSES_ATTR)));
-        user.setOrganizations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(ORGANIZATIONS_ATTR)));
-        user.setPhones(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(PHONES_ATTR)));
-        user.setLocations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(LOCATIONS_ATTR)));
+        user.setIms(GoogleAppsUtil.getStructAttr(attributes.find(IMS_ATTR)));
+        user.setEmails(GoogleAppsUtil.getStructAttr(attributes.find(EMAILS_ATTR)));
+        user.setExternalIds(GoogleAppsUtil.getStructAttr(attributes.find(EXTERNAL_IDS_ATTR)));
+        user.setRelations(GoogleAppsUtil.getStructAttr(attributes.find(RELATIONS_ATTR)));
+        user.setAddresses(GoogleAppsUtil.getStructAttr(attributes.find(ADDRESSES_ATTR)));
+        user.setOrganizations(GoogleAppsUtil.getStructAttr(attributes.find(ORGANIZATIONS_ATTR)));
+        user.setPhones(GoogleAppsUtil.getStructAttr(attributes.find(PHONES_ATTR)));
+        user.setLocations(GoogleAppsUtil.getStructAttr(attributes.find(LOCATIONS_ATTR)));
 
-        Boolean suspended = attributes.findBoolean(SUSPENDED_ATTR);
-        Boolean enabled = attributes.findBoolean(ENABLE_NAME);
-        user.setSuspended(suspended != null ? suspended : enabled == null ? null : !enabled);
+        // Handle suspended/enabled with priority: suspended takes precedence over __ENABLED__
+        Boolean suspendedValue = attributes.findBoolean(SUSPENDED_ATTR);
+        if (suspendedValue != null) {
+            // suspended attribute is present - use it directly
+            user.setSuspended(suspendedValue);
+        } else if (Boolean.FALSE.equals(attributes.findBoolean(ENABLE_NAME))) {
+            // No suspended attribute, but __ENABLED__ = false - set suspended to true
+            user.setSuspended(true);
+        }
         user.setChangePasswordAtNextLogin(attributes
                 .findBoolean(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR));
         user.setIpWhitelisted(attributes.findBoolean(IP_WHITELISTED_ATTR));
@@ -1515,5 +1523,129 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
             throw ConnectorException.wrap(e);
         }
         return result;
+    }
+    public static Uid executeUserCreate(GoogleApiExecutor executor,
+                                       Set<Attribute> createAttributes) {
+        final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
+        
+        // Create the core user
+        Uid uid = executor.execute(createUser(executor.getDirectory().users(), accessor),
+                new RequestResultHandler.Create<>(ObjectClass.ACCOUNT, 
+                    (User user) -> new Uid(user.getId(), user.getEtag(), new Name(user.getPrimaryEmail()))));
+
+        // Handle special attributes using existing delta handlers
+        try {
+            // Handle aliases
+            List<Object> aliases = accessor.findList(ALIASES_ATTR);
+            if (aliases != null && !aliases.isEmpty()) {
+                handleAliasesCreate(executor, uid, aliases);
+            }
+
+            // Handle photo
+            Attribute photo = accessor.find(PHOTO_ATTR);
+            if (photo != null) {
+                Object photoObject = AttributeUtil.getSingleValue(photo);
+                if (photoObject instanceof byte[]) {
+                    handlePhoto(executor, uid, (byte[]) photoObject);
+                }
+            }
+
+            // Handle isAdmin
+            Attribute isAdmin = accessor.find(IS_ADMIN_ATTR);
+            if (isAdmin != null) {
+                Boolean isAdminValue = AttributeUtil.getBooleanValue(isAdmin);
+                if (isAdminValue != null && isAdminValue) {
+                    handleIsAdmin(executor, uid, isAdminValue);
+                }
+            }
+
+            // Handle groups
+            Attribute groups = accessor.find(PredefinedAttributes.GROUPS_NAME);
+            if (groups != null && groups.getValue() != null) {
+                handleGroupsCreate(executor, uid, groups.getValue());
+            }
+
+            // Handle license assignment if configured
+            if (Boolean.TRUE.equals(executor.getConfiguration().getAutoAddLicense())) {
+                handleLicenseCreate(executor, uid, accessor);
+            }
+
+        } catch (Exception e) {
+            logger.warn(e, "Failed to process special attributes during user creation: {0}", uid.getUidValue());
+            org.identityconnectors.framework.common.exceptions.RetryableException partial =
+                    org.identityconnectors.framework.common.exceptions.RetryableException.wrap(
+                            "User created but requested attributes could not be applied: " + uid.getUidValue(), uid);
+            partial.addSuppressed(e);
+            throw partial;
+        }
+
+        return uid;
+    }
+    private static void handleAliasesCreate(GoogleApiExecutor executor,
+                                           Uid uid, List<Object> aliases) {
+        final Directory.Users.Aliases aliasesService = executor.getDirectory().users().aliases();
+        for (Object member : aliases) {
+            if (member instanceof String) {
+                executor.execute(createUserAlias(aliasesService, uid.getUidValue(), (String) member),
+                        new RequestResultHandler.NoOp<Directory.Users.Aliases.Insert, Alias>());
+            }
+        }
+    }
+    private static void handleGroupsCreate(GoogleApiExecutor executor,
+                                          Uid uid, List<Object> groups) {
+        final Directory.Members service = executor.getDirectory().members();
+        for (Object groupId : groups) {
+            if (groupId instanceof String) {
+                executor.execute(createMemberById(service, (String) groupId, uid.getUidValue(), "MEMBER"),
+                        new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
+            }
+        }
+    }
+    private static void handleLicenseCreate(GoogleApiExecutor executor,
+                                           Uid uid, AttributesAccessor accessor) {
+        GoogleAppsConfiguration configuration = executor.getConfiguration();
+        try {
+            // license assignments
+            // add license https://developers.google.com/admin-sdk/licensing/v1/reference/licenseAssignments
+            Uid licId = executor.execute(
+                    LicenseAssignmentsHandler.createLicenseAssignment(configuration.getLicensing().licenseAssignments(),
+                            configuration.getProductId(), configuration.getSkuId(), 
+                            AttributeUtil.getAsStringValue(accessor.find("__NAME__"))),
+                    new RequestResultHandler<Licensing.LicenseAssignments.Insert, LicenseAssignment, Uid>() {
+                        public Uid handleResult(final Licensing.LicenseAssignments.Insert request,
+                                              final LicenseAssignment value) {
+                            logger.ok("LicenseAssignment is Created:{0}/{1}/{2}", value
+                                    .getProductId(), value.getSkuId(), value.getUserId());
+                            return LicenseAssignmentsHandler.generateLicenseAssignmentId(value);
+                        }
+
+                        @Override
+                        public Uid handleNotFound(IOException e) {
+                            throw new org.identityconnectors.framework.common.exceptions.UnknownUidException(e.getMessage(), e);
+                        }
+
+                        @Override
+                        public Uid handleDuplicate(IOException e) {
+                            logger.warn("License assignment already exists: {0}", e.getMessage());
+                            return null;
+                        }
+                    });
+        } catch (Exception e) {
+            logger.warn(e, "Failed to assign license to user: {0}", uid.getUidValue());
+            throw ConnectorException.wrap(e);
+        }
+    }
+    public static void executeAccountDelete(GoogleApiExecutor executor, ConnectorObjectsCache objectsCache, Uid uid) {
+        try {
+            AbstractGoogleJsonClientRequest<Void> request = executor.getDirectory().users().delete(uid.getUidValue());
+
+            executor.execute(request, new RequestResultHandler.Delete(uid, ObjectClass.ACCOUNT));
+            
+            // Remove from cache
+            objectsCache.removeUser(uid.getUidValue());
+            
+        } catch (IOException e) {
+            throw ConnectorException.wrap(e);
+        }
     }
 }

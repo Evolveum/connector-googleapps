@@ -191,344 +191,63 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      */
     public Uid create(final ObjectClass objectClass, final Set<Attribute> createAttributes,
                       final OperationOptions options) {
-        final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
-
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            // Delegate User creation to UserHandler (includes license assignment if configured)
+            return UserHandler.executeUserCreate(apiExecutor, createAttributes);
 
-            Uid uid
-                    = execute(createUser(configuration.getDirectory().users(), accessor),
-                    new RequestResultHandler<Directory.Users.Insert, User, Uid>() {
-                        public Uid handleResult(final Directory.Users.Insert request,
-                                                final User value) {
-                            logger.ok("New User is created:{0}", value.getId());
-                            return new Uid(value.getId(), value.getEtag());
-                        }
-                    });
-
-            List<Object> aliases = accessor.findList(ALIASES_ATTR);
-            if (null != aliases) {
-                final Directory.Users.Aliases aliasesService
-                        = configuration.getDirectory().users().aliases();
-                for (Object member : aliases) {
-                    if (member instanceof String) {
-
-                        String id
-                                = execute(createUserAlias(aliasesService, uid.getUidValue(),
-                                (String) member),
-                                new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
-                                    public String handleResult(
-                                            final Directory.Users.Aliases.Insert request,
-                                            final Alias value) {
-                                        if (null != value) {
-                                            return value.getId();
-                                        } else {
-                                            return null;
-                                        }
-                                    }
-                                });
-
-                        if (null == id) {
-                            // TODO make warn about failed update
-                        }
-                    } else if (null != member) {
-                        // Delete user and Error or
-                        RetryableException e
-                                = RetryableException.wrap("Invalid attribute value: "
-                                + String.valueOf(member), uid);
-                        e.initCause(new InvalidAttributeValueException(
-                                "Attribute 'aliases' must be a String list"));
-                        throw e;
-                    }
-                }
-            }
-
-            Attribute photo = accessor.find(PHOTO_ATTR);
-            if (null != photo) {
-                Object photoObject = AttributeUtil.getSingleValue(photo);
-                if (photoObject instanceof byte[]) {
-
-                    String id
-                            = execute(createUpdateUserPhoto(configuration.getDirectory().users()
-                                    .photos(), uid.getUidValue(), (byte[]) photoObject),
-                            new RequestResultHandler<Directory.Users.Photos.Update, UserPhoto, String>() {
-                                public String handleResult(
-                                        final Directory.Users.Photos.Update request,
-                                        final UserPhoto value) {
-                                    if (null != value) {
-                                        return value.getId();
-                                    } else {
-                                        return null;
-                                    }
-                                }
-                            });
-
-                    if (null == id) {
-                        // TODO make warn about failed update
-                    }
-
-                } else if (null != photoObject) {
-                    // Delete group and Error or
-                    RetryableException e
-                            = RetryableException.wrap("Invalid attribute value: "
-                            + String.valueOf(photoObject), uid);
-                    e.initCause(new InvalidAttributeValueException(
-                            "Attribute 'photo' must be a single Map value"));
-                    throw e;
-                }
-            }
-
-            Attribute isAdmin = accessor.find(IS_ADMIN_ATTR);
-            if (null != isAdmin) {
-                try {
-                    Boolean isAdminValue = AttributeUtil.getBooleanValue(isAdmin);
-                    if (null != isAdminValue && isAdminValue) {
-
-                        UserMakeAdmin content = new UserMakeAdmin();
-                        content.setStatus(isAdminValue);
-
-                        execute(configuration.getDirectory().users().makeAdmin(uid.getUidValue(),
-                                content),
-                                new RequestResultHandler<Directory.Users.MakeAdmin, Void, Void>() {
-                                    public Void handleResult(Directory.Users.MakeAdmin request,
-                                                             Void value) {
-                                        return null;
-                                    }
-                                });
-                    }
-                } catch (final Exception e) {
-                    // TODO Delete user and throw Exception
-                    throw ConnectorException.wrap(e);
-                }
-            }
-
-            // check if auto add license to user
-            if (configuration.getAutoAddLicense() == true) {
-                // license assignments
-                // add license https://developers.google.com/admin-sdk/licensing/v1/reference/licenseAssignments
-                Uid licId = execute(
-                        createLicenseAssignment(configuration.getLicensing().licenseAssignments(),
-                                configuration.getProductId(), configuration.getSkuId(), AttributeUtil.getAsStringValue(accessor.find("__NAME__"))),
-                        new RequestResultHandler<Licensing.LicenseAssignments.Insert, LicenseAssignment, Uid>() {
-                            public Uid handleResult(final Licensing.LicenseAssignments.Insert request,
-                                                    final LicenseAssignment value) {
-                                logger.ok("LicenseAssignment is Created:{0}/{1}/{2}", value
-                                        .getProductId(), value.getSkuId(), value.getUserId());
-                                return generateLicenseAssignmentId(value);
-                            }
-                        });
-            }
-
-            try {
-                // groups member
-                Attribute groups = accessor.find(PredefinedAttributes.GROUPS_NAME);
-                if (null != groups && null != groups.getValue()) {
-                    final Directory.Members service = configuration.getDirectory().members();
-                    for (Object groupId : groups.getValue()) {
-                        if (groupId instanceof String) {
-                            execute(createMemberById(service, (String) groupId, uid.getUidValue(), null),
-                                    new RequestResultHandler<Directory.Members.Insert, Member, String>() {
-                                        public String handleResult(
-                                                final Directory.Members.Insert request,
-                                                final Member value) {
-                                            return null;
-                                        }
-                                    });
-                        }
-                    }
-                }
-            } catch (Exception failure) {
-                RetryableException partial = RetryableException.wrap(
-                        "User created but requested groups could not be assigned: " + uid.getUidValue(), uid);
-                partial.addSuppressed(failure);
-                throw partial;
-            }
-
-            return uid;
         } else if (ObjectClass.GROUP.equals(objectClass)) {
-            // @formatter:off
-            /* AlreadyExistsException
-             {
-             "code" : 409,
-             "errors" : [ {
-             "domain" : "global",
-             "message" : "Entity already exists.",
-             "reason" : "duplicate"
-             } ],
-             "message" : "Entity already exists."
-             }
-             */
-            // @formatter:on
-            Uid uid
-                    = execute(createGroup(configuration.getDirectory().groups(), accessor),
-                    new RequestResultHandler<Directory.Groups.Insert, Group, Uid>() {
-                        public Uid handleResult(final Directory.Groups.Insert request,
-                                                final Group value) {
-                            logger.ok("New Group is created:{0}", value.getId());
-                            return new Uid(value.getId(), value.getEtag());
-                        }
-                    });
-            List<Object> members = accessor.findList(MEMBERS_ATTR);
-            if (null != members) {
-                final Directory.Members membersService = configuration.getDirectory().members();
-                for (Object member : members) {
-                    if (member instanceof Map) {
+            // Delegate Group creation to GroupHandler (member addition removed as not needed)
+            return GroupHandler.executeGroupCreate(apiExecutor, createAttributes);
 
-                        String email = (String) ((Map) member).get(EMAIL_ATTR);
-                        String role = (String) ((Map) member).get(ROLE_ATTR);
-
-                        String id
-                                = execute(createMemberByEmail(membersService, uid.getUidValue(), email, role),
-                                new RequestResultHandler<Directory.Members.Insert, Member, String>() {
-                                    public String handleResult(
-                                            final Directory.Members.Insert request,
-                                            final Member value) {
-                                        if (null != value) {
-                                            return value.getEmail();
-                                        } else {
-                                            return null;
-                                        }
-                                    }
-                                });
-
-                        if (null == id) {
-                            // TODO make warn about failed update
-                        }
-                    } else if (null != member) {
-                        // Delete group and Error or
-                        RetryableException e
-                                = RetryableException.wrap("Invalid attribute value: "
-                                + String.valueOf(member), uid);
-                        e.initCause(new InvalidAttributeValueException(
-                                "Attribute 'members' must be a Map list"));
-                        throw e;
-                    }
-                }
-            }
-
-            return uid;
         } else if (MEMBER.equals(objectClass)) {
+            // Delegate Member creation to MemberHandler
+            return MemberHandler.executeMemberCreate(apiExecutor, createAttributes);
 
-            return execute(createMember(configuration.getDirectory().members(), accessor),
-                    new RequestResultHandler<Directory.Members.Insert, Member, Uid>() {
-                        public Uid handleResult(final Directory.Members.Insert request,
-                                                final Member value) {
-                            logger.ok("New Member is created:{0}/{1}", request.getGroupKey(), value
-                                    .getEmail());
-                            return generateMemberId(request.getGroupKey(), value);
-                        }
-                    });
         } else if (ORG_UNIT.equals(objectClass)) {
+            // Delegate OrgUnit creation to OrgunitsHandler
+            return OrgunitsHandler.executeOrgUnitCreate(apiExecutor, createAttributes);
 
-            return execute(createOrgunit(configuration.getDirectory().orgunits(), accessor),
-                    new RequestResultHandler<Directory.Orgunits.Insert, OrgUnit, Uid>() {
-                        public Uid handleResult(final Directory.Orgunits.Insert request,
-                                                final OrgUnit value) {
-                            logger.ok("New OrgUnit is created:{0}", value.getName());
-                            return generateOrgUnitId(value);
-                        }
-                    });
         } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
-            // @formatter:off
-            /* AlreadyExistsException
-             {
-             "code" : 400,
-             "errors" : [ {
-             "domain" : "global",
-             "message" : "Invalid Ou Id",
-             "reason" : "invalid"
-             } ],
-             "message" : "Invalid Ou Id"
-             }
-             */
-            // @formatter:on
+            // Delegate LicenseAssignment creation to LicenseAssignmentsHandler
+            return LicenseAssignmentsHandler.executeLicenseAssignmentCreate(apiExecutor, createAttributes);
 
-            return execute(
-                    createLicenseAssignment(configuration.getLicensing().licenseAssignments(),
-                            accessor),
-                    new RequestResultHandler<Licensing.LicenseAssignments.Insert, LicenseAssignment, Uid>() {
-                        public Uid handleResult(final Licensing.LicenseAssignments.Insert request,
-                                                final LicenseAssignment value) {
-                            logger.ok("LicenseAssignment is Created:{0}/{1}/{2}", value
-                                    .getProductId(), value.getSkuId(), value.getUserId());
-                            return generateLicenseAssignmentId(value);
-                        }
-                    });
         } else {
             logger.warn("Create of type {0} is not supported", configuration.getConnectorMessages()
                     .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
             throw new UnsupportedOperationException("Create of type"
                     + objectClass.getObjectClassValue() + " is not supported");
         }
-
     }
 
     /**
      * {@inheritDoc}
      */
     public void delete(final ObjectClass objectClass, final Uid uid, final OperationOptions options) {
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            // Delegate Account deletion to UserHandler
+            UserHandler.executeAccountDelete(apiExecutor, objectsCache, uid);
 
-        AbstractGoogleJsonClientRequest request = null;
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            // Delegate Group deletion to GroupHandler
+            GroupHandler.executeGroupDelete(apiExecutor, objectsCache, uid);
 
-        try {
-            if (ObjectClass.ACCOUNT.equals(objectClass)) {
-                request = configuration.getDirectory().users().delete(uid.getUidValue());
-            } else if (ObjectClass.GROUP.equals(objectClass)) {
-                request = configuration.getDirectory().groups().delete(uid.getUidValue());
-            } else if (MEMBER.equals(objectClass)) {
-                // @formatter:off
-                /* Already deleted
-                 {
-                 "code" : 400,
-                 "errors" : [ {
-                 "domain" : "global",
-                 "message" : "Missing required field: memberKey",
-                 "reason" : "required"
-                 } ],
-                 "message" : "Missing required field: memberKey"
-                 }
-                 */
-                // @formatter:on
-                String[] ids = uid.getUidValue().split("/");
-                if (ids.length == 2) {
-                    request = configuration.getDirectory().members().delete(ids[0], ids[1]);
-                } else {
-                    throw new UnknownUidException("Invalid ID format");
-                }
-            } else if (ORG_UNIT.equals(objectClass)) {
-                request
-                        = configuration.getDirectory().orgunits().delete(MY_CUSTOMER_ID, uid.getUidValue());
-            } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
-                request
-                        = deleteLicenseAssignment(configuration.getLicensing().licenseAssignments(),
-                        uid.getUidValue());
-            }
-        } catch (IOException e) {
-            throw ConnectorException.wrap(e);
-        }
+        } else if (MEMBER.equals(objectClass)) {
+            // Delegate Member deletion to MemberHandler
+            MemberHandler.executeMemberDelete(apiExecutor, uid);
 
-        if (null == request) {
+        } else if (ORG_UNIT.equals(objectClass)) {
+            // Delegate OrgUnit deletion to OrgunitsHandler
+            OrgunitsHandler.executeOrgUnitDelete(apiExecutor, uid);
+
+        } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
+            // Delegate LicenseAssignment deletion to LicenseAssignmentsHandler
+            LicenseAssignmentsHandler.executeLicenseAssignmentDelete(apiExecutor, uid);
+
+        } else {
             logger.warn("Delete of type {0} is not supported", configuration.getConnectorMessages()
                     .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
             throw new UnsupportedOperationException("Delete of type"
                     + objectClass.getObjectClassValue() + " is not supported");
-        }
-
-        execute(request,
-                new RequestResultHandler<AbstractGoogleJsonClientRequest<Void>, Void, Void>() {
-                    public Void handleResult(AbstractGoogleJsonClientRequest<Void> request,
-                                             Void value) {
-                        return null;
-                    }
-
-                    public Void handleNotFound(final IOException e) {
-                        throw new UnknownUidException(uid, objectClass);
-                    }
-                });
-
-        if (ObjectClass.ACCOUNT.equals(objectClass)) {
-            objectsCache.removeUser(uid.getUidValue());
-        } else if (ObjectClass.GROUP.equals(objectClass)) {
-            objectsCache.removeGroup(uid.getUidValue());
         }
     }
 
