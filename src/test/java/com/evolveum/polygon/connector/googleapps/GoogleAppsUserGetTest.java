@@ -3,8 +3,7 @@ package com.evolveum.polygon.connector.googleapps;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserGetTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test get user by UID")
+    @Test(description = "Test get user by UID")
     public void testGetUserByUid() {
         // Setup mock response for specific user data
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/test001"))
@@ -65,8 +63,7 @@ public class GoogleAppsUserGetTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/test001")));
     }
 
-    @Test
-    @DisplayName("Test get user by Name (primaryEmail)")
+    @Test(description = "Test get user by Name (primaryEmail)")
     public void testGetUserByName() {
         // Setup mock response for Name search (Google uses direct user lookup for primaryEmail)
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/name001@example.com"))
@@ -110,8 +107,7 @@ public class GoogleAppsUserGetTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/name001@example.com")));
     }
 
-    @Test
-    @DisplayName("Test get non-existent user - 404 error handling")
+    @Test(description = "Test get non-existent user - 404 error handling")
     public void testGetNonExistentUser() {
         // Setup mock response for 404 error
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/nonexistent"))
@@ -145,8 +141,7 @@ public class GoogleAppsUserGetTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/nonexistent")));
     }
 
-    @Test
-    @DisplayName("Test get non-existent user by Name - 404 error handling")
+    @Test(description = "Test get non-existent user by Name - 404 error handling")
     public void testGetNonExistentUserByName() {
         // Setup mock response for 404 error when getting by email
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/nonexistent@example.com"))

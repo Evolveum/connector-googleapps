@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,11 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps User Search - Default Attributes Tests")
-class GoogleAppsUserSearchDefaultAttributesTest extends GoogleAppsConnectorTestBase {
+// Test suite: "GoogleApps User Search - Default Attributes Tests"
+public class GoogleAppsUserSearchDefaultAttributesTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test search with RETURN_DEFAULT_ATTRIBUTES = false")
+    @Test(description = "Test search with RETURN_DEFAULT_ATTRIBUTES = false")
     public void testSearchWithReturnDefaultAttributesFalse() {
         // This test verifies that with RETURN_DEFAULT_ATTRIBUTES=false,
         // only explicitly requested attributes plus mandatory fields are included.
@@ -102,8 +100,7 @@ class GoogleAppsUserSearchDefaultAttributesTest extends GoogleAppsConnectorTestB
         assertThat(actualFields).containsExactlyInAnyOrderElementsOf(expectedFields);
     }
 
-    @Test
-    @DisplayName("Test search with RETURN_DEFAULT_ATTRIBUTES = true")
+    @Test(description = "Test search with RETURN_DEFAULT_ATTRIBUTES = true")
     public void testSearchWithReturnDefaultAttributesTrue() {
         // This test verifies that when RETURN_DEFAULT_ATTRIBUTES=true,
         // all default attributes are included in the fields parameter
@@ -221,8 +218,7 @@ class GoogleAppsUserSearchDefaultAttributesTest extends GoogleAppsConnectorTestB
         assertThat(actualFields).containsExactlyInAnyOrderElementsOf(expectedDefaultFields);
     }
 
-    @Test
-    @DisplayName("Test search with RETURN_DEFAULT_ATTRIBUTES = true and explicit attributesToGet")
+    @Test(description = "Test search with RETURN_DEFAULT_ATTRIBUTES = true and explicit attributesToGet")
     public void testSearchWithReturnDefaultAttributesTrueAndAttributesToGet() {
         // This test verifies that when both RETURN_DEFAULT_ATTRIBUTES=true and
         // explicit attributesToGet are specified, both default and explicit attributes

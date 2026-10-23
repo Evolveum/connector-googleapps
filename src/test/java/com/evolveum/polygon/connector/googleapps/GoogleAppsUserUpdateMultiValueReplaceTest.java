@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.*;
 
@@ -20,8 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdateMultiValueReplaceTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test update user multi-valued attributes with replace operations")
+    @Test(description = "Test update user multi-valued attributes with replace operations")
     public void testUpdateUserMultiValuedAttributesReplace() {
         // Setup mock response for multi-valued attributes update
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test003"))
@@ -102,8 +100,7 @@ public class GoogleAppsUserUpdateMultiValueReplaceTest extends GoogleAppsConnect
                 .withRequestBody(containing("{\"value\":\"new-manager@example.com\",\"type\":\"manager\"}")));
     }
 
-    @Test
-    @DisplayName("Test clearing multi-valued attributes with replace operations")
+    @Test(description = "Test clearing multi-valued attributes with replace operations")
     public void testClearMultiValuedAttributesWithReplace() {
         // Setup mock response for clearing multi-valued attributes
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test001"))

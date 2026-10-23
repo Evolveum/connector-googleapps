@@ -3,8 +3,7 @@ package com.evolveum.polygon.connector.googleapps;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,12 +17,11 @@ import static org.assertj.core.api.Assertions.*;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps Organization Unit Tests")
+// Test suite: "GoogleApps Organization Unit Tests"
 public class GoogleAppsOrgUnitTest extends GoogleAppsConnectorTestBase {
 
 
-    @Test
-    @DisplayName("Test organization unit creation")
+    @Test(description = "Test organization unit creation")
     public void testCreateOrgUnit() {
         // Setup stub for org unit creation
         GoogleApiMockServer.stubFor(post(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits"))
@@ -64,8 +62,7 @@ public class GoogleAppsOrgUnitTest extends GoogleAppsConnectorTestBase {
         assertThat(createdUid.getUidValue()).isEqualTo("IT Department");
     }
 
-    @Test
-    @DisplayName("Test organization unit deletion")
+    @Test(description = "Test organization unit deletion")
     public void testDeleteOrgUnit() {
         // Setup stub for org unit deletion
         GoogleApiMockServer.stubFor(delete(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits/IT%20Department"))
@@ -82,8 +79,7 @@ public class GoogleAppsOrgUnitTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits/IT%20Department")));
     }
 
-    @Test
-    @DisplayName("Test organization unit name update")
+    @Test(description = "Test organization unit name update")
     public void testUpdateOrgUnitName() {
         // Setup stub for org unit update
         GoogleApiMockServer.stubFor(patch(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits/IT%20Department"))
@@ -116,8 +112,7 @@ public class GoogleAppsOrgUnitTest extends GoogleAppsConnectorTestBase {
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test organization unit parent path update")
+    @Test(description = "Test organization unit parent path update")
     public void testUpdateOrgUnitParentPath() {
         // Setup stub for org unit parent path update
         GoogleApiMockServer.stubFor(patch(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits/IT%20Department"))
@@ -150,8 +145,7 @@ public class GoogleAppsOrgUnitTest extends GoogleAppsConnectorTestBase {
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test get organization unit by UID")
+    @Test(description = "Test get organization unit by UID")
     public void testGetOrgUnit() {
         // Setup stub for org unit get
         GoogleApiMockServer.stubFor(get(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits/IT%20Department"))
@@ -190,8 +184,7 @@ public class GoogleAppsOrgUnitTest extends GoogleAppsConnectorTestBase {
         assertThat(result[0].getAttributeByName(BLOCK_INHERITANCE_ATTR).getValue().get(0)).isEqualTo(false);
     }
 
-    @Test
-    @DisplayName("Test search organization units")
+    @Test(description = "Test search organization units")
     public void testSearchOrgUnits() {
         // Setup stub for org units search
         GoogleApiMockServer.stubFor(get(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits"))
@@ -248,8 +241,7 @@ public class GoogleAppsOrgUnitTest extends GoogleAppsConnectorTestBase {
         assertThat(orgUnit2.getAttributeByName(BLOCK_INHERITANCE_ATTR).getValue().get(0)).isEqualTo(true);
     }
 
-    @Test
-    @DisplayName("Test organization unit not found error")
+    @Test(description = "Test organization unit not found error")
     public void testOrgUnitNotFound() {
         // Setup stub for org unit not found
         GoogleApiMockServer.stubFor(get(urlPathEqualTo("/admin/directory/v1/customer/my_customer/orgunits/NonExistent"))

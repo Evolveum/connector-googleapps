@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,8 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupCreateBasicTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test group creation with required attributes (email, name)")
+    @Test(description = "Test group creation with required attributes (email, name)")
     public void testCreateGroup() {
         // Setup mock response for group creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/groups"))
@@ -54,8 +52,7 @@ public class GoogleAppsGroupCreateBasicTest extends GoogleAppsConnectorTestBase 
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test group creation with all attributes (email, name, description)")
+    @Test(description = "Test group creation with all attributes (email, name, description)")
     public void testCreateGroupWithAllAttributes() {
         // Setup mock response for group creation with all attributes
         stubFor(post(urlPathEqualTo("/admin/directory/v1/groups"))

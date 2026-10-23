@@ -7,8 +7,7 @@ import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -23,13 +22,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps User Search - Filter Translation Tests")
+// Test suite: "GoogleApps User Search - Filter Translation Tests"
 public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase {
 
     // ========== EQUALS FILTER TESTS ==========
 
-    @Test
-    @DisplayName("Test EqualsFilter with givenName")
+    @Test(description = "Test EqualsFilter with givenName")
     public void testEqualsFilterGivenName() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -50,8 +48,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName=John")));
     }
 
-    @Test
-    @DisplayName("Test EqualsFilter with familyName")
+    @Test(description = "Test EqualsFilter with familyName")
     public void testEqualsFilterFamilyName() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -72,8 +69,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("familyName=Smith")));
     }
 
-    @Test
-    @DisplayName("Test EqualsFilter with email")
+    @Test(description = "Test EqualsFilter with email")
     public void testEqualsFilterEmail() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -94,8 +90,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("email=test@example.com")));
     }
 
-    @Test
-    @DisplayName("Test EqualsFilter with isAdmin")
+    @Test(description = "Test EqualsFilter with isAdmin")
     public void testEqualsFilterIsAdmin() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -118,8 +113,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     // ========== CONTAINS FILTER TESTS ==========
 
-    @Test
-    @DisplayName("Test ContainsFilter with givenName")
+    @Test(description = "Test ContainsFilter with givenName")
     public void testContainsFilterGivenName() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -140,8 +134,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName:John")));
     }
 
-    @Test
-    @DisplayName("Test ContainsFilter with familyName")
+    @Test(description = "Test ContainsFilter with familyName")
     public void testContainsFilterFamilyName() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -162,8 +155,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("familyName:Smith")));
     }
 
-    @Test
-    @DisplayName("Test ContainsFilter with email")
+    @Test(description = "Test ContainsFilter with email")
     public void testContainsFilterEmail() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -184,8 +176,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("email:example.com")));
     }
 
-    @Test
-    @DisplayName("Test ContainsFilter with __NAME__ (should map to email search)")
+    @Test(description = "Test ContainsFilter with __NAME__ (should map to email search)")
     public void testContainsFilterName() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -206,8 +197,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("email:admin")));
     }
 
-    @Test
-    @DisplayName("Test ContainsFilter with emails (should map to email search)")
+    @Test(description = "Test ContainsFilter with emails (should map to email search)")
     public void testContainsFilterEmails() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -231,8 +221,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     // ========== STARTSWITH FILTER TESTS ==========
 
-    @Test
-    @DisplayName("Test StartsWithFilter with givenName")
+    @Test(description = "Test StartsWithFilter with givenName")
     public void testStartsWithFilterGivenName() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -253,8 +242,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName:Jo*")));
     }
 
-    @Test
-    @DisplayName("Test StartsWithFilter with familyName")
+    @Test(description = "Test StartsWithFilter with familyName")
     public void testStartsWithFilterFamilyName() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -275,8 +263,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("familyName:Sm*")));
     }
 
-    @Test
-    @DisplayName("Test StartsWithFilter with email")
+    @Test(description = "Test StartsWithFilter with email")
     public void testStartsWithFilterEmail() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -299,8 +286,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     // ========== SPECIAL FILTER TESTS (Uid/Name) ==========
 
-    @Test
-    @DisplayName("Test EqualsFilter with Uid (read by ID)")
+    @Test(description = "Test EqualsFilter with Uid (read by ID)")
     public void testEqualsFilterWithUid() {
         // Setup minimal mock response
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/user123"))
@@ -319,8 +305,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/user123")));
     }
 
-    @Test
-    @DisplayName("Test EqualsFilter with Name (read by email)")
+    @Test(description = "Test EqualsFilter with Name (read by email)")
     public void testEqualsFilterWithName() {
         // Setup minimal mock response
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/name.user@example.com"))
@@ -341,8 +326,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     // ========== AND FILTER TESTS ==========
 
-    @Test
-    @DisplayName("Test AndFilter with multiple supported attributes")
+    @Test(description = "Test AndFilter with multiple supported attributes")
     public void testAndFilter() {
         // Test that AND filters are properly translated to space-separated query clauses
         // according to Google API specification: "multiple fields in a query, add each search clause, separated by a space"
@@ -369,8 +353,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName=John familyName=Doe")));
     }
 
-    @Test
-    @DisplayName("Test AndFilter with UID priority (UID + search filter)")
+    @Test(description = "Test AndFilter with UID priority (UID + search filter)")
     public void testAndFilterUidPriority() {
         // Test that AND filters with UID operations prioritize UID search
         // Since UID is unique, other conditions are redundant - UID search gives the intended result
@@ -396,8 +379,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/user123")));
     }
 
-    @Test
-    @DisplayName("Test AndFilter with Name priority (Name + search filter)")
+    @Test(description = "Test AndFilter with Name priority (Name + search filter)")
     public void testAndFilterNamePriority() {
         // Test that AND filters with Name operations prioritize Name search
         // Since Name is unique, other conditions are redundant - Name search gives the intended result
@@ -423,8 +405,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/test.user@example.com")));
     }
 
-    @Test
-    @DisplayName("Test AndFilter with UID priority over Name (UID + Name)")
+    @Test(description = "Test AndFilter with UID priority over Name (UID + Name)")
     public void testAndFilterUidOverNamePriority() {
         // Test that UID takes precedence over Name when both are present in AND filter
         // This tests the priority order: UID > Name > search filters
@@ -451,8 +432,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     // ========== NEGATIVE TESTS ==========
 
-    @Test
-    @DisplayName("Test unsupported field for EqualsFilter (should throw exception)")
+    @Test(description = "Test unsupported field for EqualsFilter (should throw exception)")
     public void testUnsupportedEqualsFilter() {
         Filter filter = FilterBuilder.equalTo(AttributeBuilder.build("orgUnitPath", "/TestOU"));
 
@@ -463,8 +443,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .hasMessageContaining("Field not supported for equals search: orgUnitPath");
     }
 
-    @Test
-    @DisplayName("Test unsupported field for ContainsFilter (should throw exception)")
+    @Test(description = "Test unsupported field for ContainsFilter (should throw exception)")
     public void testUnsupportedContainsFilter() {
         Filter filter = FilterBuilder.contains(AttributeBuilder.build("orgUnitPath", "Test"));
 
@@ -475,8 +454,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .hasMessageContaining("Field not supported for contains search: orgUnitPath");
     }
 
-    @Test
-    @DisplayName("Test unsupported field for StartsWithFilter (should throw exception)")
+    @Test(description = "Test unsupported field for StartsWithFilter (should throw exception)")
     public void testUnsupportedStartsWithFilter() {
         Filter filter = FilterBuilder.startsWith(AttributeBuilder.build("orgUnitPath", "Test"));
 
@@ -489,8 +467,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     // ========== CUSTOMER/DOMAIN PARAMETER TESTS ==========
 
-    @Test
-    @DisplayName("Test EqualsFilter with customer parameter")
+    @Test(description = "Test EqualsFilter with customer parameter")
     public void testEqualsFilterCustomer() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -511,8 +488,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("customer", equalTo("C01abc123")));
     }
 
-    @Test
-    @DisplayName("Test EqualsFilter with domain parameter")
+    @Test(description = "Test EqualsFilter with domain parameter")
     public void testEqualsFilterDomain() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -533,8 +509,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("domain", equalTo("example.com")));
     }
 
-    @Test
-    @DisplayName("Test conflicting customer and domain parameters (should throw exception)")
+    @Test(description = "Test conflicting customer and domain parameters (should throw exception)")
     public void testConflictingCustomerAndDomain() {
         // Test that customer and domain parameters cannot be used together in AND filter
         // GoogleFilter validates this conflict during query building
@@ -551,8 +526,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .hasMessageContaining("The 'customer' and 'domain' can not be in the same query");
     }
 
-    @Test
-    @DisplayName("Test AndFilter with three search attributes")
+    @Test(description = "Test AndFilter with three search attributes")
     public void testAndFilterThreeAttributes() {
         // Test that AND filters with three search attributes are properly translated
         // to space-separated query clauses
@@ -580,8 +554,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName=John familyName=Doe email=john.doe@example.com")));
     }
 
-    @Test
-    @DisplayName("Test conflicting customer and domain with additional search filter (should throw exception)")
+    @Test(description = "Test conflicting customer and domain with additional search filter (should throw exception)")
     public void testConflictingCustomerDomainWithSearchFilter() {
         // Test that customer/domain conflict is detected even with additional search conditions
         // The conflict should be detected during the processing of the nested AND structure
@@ -599,8 +572,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .hasMessageContaining("The 'customer' and 'domain' can not be in the same query");
     }
 
-    @Test
-    @DisplayName("Test AndFilter with UID priority over multiple search filters")
+    @Test(description = "Test AndFilter with UID priority over multiple search filters")
     public void testAndFilterUidPriorityMultiple() {
         // Test that UID takes precedence even when combined with multiple search filters
         // GoogleFilterTranslator should return UID filter, ignoring all other conditions
@@ -628,8 +600,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     // ========== QUERY ESCAPING TESTS ==========
 
-    @Test
-    @DisplayName("Test filter with spaces (should be quoted and escaped)")
+    @Test(description = "Test filter with spaces (should be quoted and escaped)")
     public void testFilterWithSpaces() {
         // Setup minimal mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -650,8 +621,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName='John David'")));
     }
 
-    @Test
-    @DisplayName("Test filter with single quotes (should be escaped)")
+    @Test(description = "Test filter with single quotes (should be escaped)")
     public void testFilterWithSingleQuotes() {
         // Setup minimal mock response (URL encoding changes John's to John%27s, handle both)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -686,8 +656,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
     // The existing GoogleFilter.STRING_ESCAPER (for single quotes) is sufficient.
     //
 
-    @Test
-    @DisplayName("Test filter with ampersand character (URL encoding)")
+    @Test(description = "Test filter with ampersand character (URL encoding)")
     public void testFilterWithAmpersand() {
         // Setup mock response - Google API Client should URL encode & as %26
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -707,8 +676,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName=Smith&Co")));
     }
 
-    @Test
-    @DisplayName("Test filter with equals character (URL encoding)")
+    @Test(description = "Test filter with equals character (URL encoding)")
     public void testFilterWithEquals() {
         // Setup mock response - Google API Client should URL encode = as %3D
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -729,8 +697,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName=A=B")));
     }
 
-    @Test
-    @DisplayName("Test filter with plus character (URL encoding)")
+    @Test(description = "Test filter with plus character (URL encoding)")
     public void testFilterWithPlus() {
         // Setup mock response - Google API Client should URL encode + as %2B
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -751,8 +718,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName=A+B")));
     }
 
-    @Test
-    @DisplayName("Test filter with percent character (URL encoding)")
+    @Test(description = "Test filter with percent character (URL encoding)")
     public void testFilterWithPercent() {
         // Setup mock response - Google API Client should URL encode % as %25
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -772,8 +738,7 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("query", equalTo("givenName=100%")));
     }
 
-    @Test
-    @DisplayName("Test filter with hash character (URL encoding)")
+    @Test(description = "Test filter with hash character (URL encoding)")
     public void testFilterWithHash() {
         // Setup mock response - Google API Client should URL encode # as %23
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))

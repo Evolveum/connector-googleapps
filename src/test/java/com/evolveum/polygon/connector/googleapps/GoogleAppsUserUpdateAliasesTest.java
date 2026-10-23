@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -23,8 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdateAliasesTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Update aliases - Replace all aliases")
+    @Test(description = "Update aliases - Replace all aliases")
     public void testUpdateAliasesReplace() {
         // Setup mock for aliases list (current state)
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/user003/aliases"))
@@ -80,8 +78,7 @@ public class GoogleAppsUserUpdateAliasesTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"alias\":\"new1@example.com\"")));
     }
 
-    @Test
-    @DisplayName("Update aliases - Add aliases")
+    @Test(description = "Update aliases - Add aliases")
     public void testUpdateAliasesAdd() {
         // Setup mocks for alias additions
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users/user004/aliases"))
@@ -126,8 +123,7 @@ public class GoogleAppsUserUpdateAliasesTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"alias\":\"added2@example.com\"")));
     }
 
-    @Test
-    @DisplayName("Update aliases - Remove aliases")
+    @Test(description = "Update aliases - Remove aliases")
     public void testUpdateAliasesRemove() {
         // Setup mocks for alias deletions
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/users/user005/aliases/remove1@example.com"))
@@ -153,8 +149,7 @@ public class GoogleAppsUserUpdateAliasesTest extends GoogleAppsConnectorTestBase
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/admin/directory/v1/users/user005/aliases/remove2@example.com")));
     }
 
-    @Test
-    @DisplayName("Update aliases - Clear all aliases")
+    @Test(description = "Update aliases - Clear all aliases")
     public void testUpdateAliasesClear() {
         // Setup mock for aliases list (current state)
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/user006/aliases"))
@@ -194,8 +189,7 @@ public class GoogleAppsUserUpdateAliasesTest extends GoogleAppsConnectorTestBase
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/admin/directory/v1/users/user006/aliases/clear2@example.com")));
     }
 
-    @Test
-    @DisplayName("Update aliases - Mixed add and remove operations")
+    @Test(description = "Update aliases - Mixed add and remove operations")
     public void testUpdateAliasesMixedAddRemove() {
         // Setup mock for alias addition
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users/user007/aliases"))

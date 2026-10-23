@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -19,8 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserCreatePhotoTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Create user with photo")
+    @Test(description = "Create user with photo")
     public void testCreateUserWithPhoto() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))

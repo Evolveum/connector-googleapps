@@ -6,8 +6,7 @@ import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,8 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupGetTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test get group by UID")
+    @Test(description = "Test get group by UID")
     public void testGetGroupByUid() {
         // Setup mock response for single group get by UID
         stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/group001"))
@@ -71,8 +69,7 @@ public class GoogleAppsGroupGetTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group001")));
     }
 
-    @Test
-    @DisplayName("Test get group by Name (email)")
+    @Test(description = "Test get group by Name (email)")
     public void testGetGroupByName() {
         // Setup mock response for single group get by Name (email)
         stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/testgroup@example.com"))
@@ -113,8 +110,7 @@ public class GoogleAppsGroupGetTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/testgroup@example.com")));
     }
 
-    @Test
-    @DisplayName("Test get non-existent group - 404 error handling")
+    @Test(description = "Test get non-existent group - 404 error handling")
     public void testGetNonExistentGroup() {
         // Setup mock response for 404 error
         stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/nonexistent"))
@@ -148,8 +144,7 @@ public class GoogleAppsGroupGetTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/nonexistent")));
     }
 
-    @Test
-    @DisplayName("Test get non-existent group by Name - 404 error handling")
+    @Test(description = "Test get non-existent group by Name - 404 error handling")
     public void testGetNonExistentGroupByName() {
         // Setup mock response for 404 error when getting by email
         stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/nonexistent@example.com"))

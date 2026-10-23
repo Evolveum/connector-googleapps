@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserCreateGroupsTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Create user with single group")
+    @Test(description = "Create user with single group")
     public void testCreateUserWithSingleGroup() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -69,8 +67,7 @@ public class GoogleAppsUserCreateGroupsTest extends GoogleAppsConnectorTestBase 
                 .withRequestBody(containing("\"role\":\"MEMBER\"")));
     }
 
-    @Test
-    @DisplayName("Create user with multiple groups")
+    @Test(description = "Create user with multiple groups")
     public void testCreateUserWithMultipleGroups() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -128,8 +125,7 @@ public class GoogleAppsUserCreateGroupsTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(postRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group002@example.com/members")));
     }
 
-    @Test
-    @DisplayName("Create user with empty groups list - no group operations")
+    @Test(description = "Create user with empty groups list - no group operations")
     public void testCreateUserWithEmptyGroups() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))

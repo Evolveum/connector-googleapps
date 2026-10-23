@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -15,8 +14,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  */
 public class GoogleAppsGroupDeleteTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test group deletion")
+    @Test(description = "Test group deletion")
     public void testDeleteGroup() {
         // Setup mock response for group deletion
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/groups/group001"))

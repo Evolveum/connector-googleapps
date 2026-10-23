@@ -3,8 +3,7 @@ package com.evolveum.polygon.connector.googleapps;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -25,8 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserEnabledAttributeTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test create user with __ENABLED__ = false (suspended)")
+    @Test(description = "Test create user with __ENABLED__ = false (suspended)")
     public void testCreateDisabledUser() {
         // Setup mock response for disabled user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -73,8 +71,7 @@ public class GoogleAppsUserEnabledAttributeTest extends GoogleAppsConnectorTestB
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test create user with __ENABLED__ = true (not suspended)")
+    @Test(description = "Test create user with __ENABLED__ = true (not suspended)")
     public void testCreateEnabledUser() {
         // Setup mock response for enabled user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -113,8 +110,7 @@ public class GoogleAppsUserEnabledAttributeTest extends GoogleAppsConnectorTestB
                 .withRequestBody(not(containing("suspended"))));  // Verify suspended field is NOT present
     }
 
-    @Test
-    @DisplayName("Test update user to disable (__ENABLED__ = false)")
+    @Test(description = "Test update user to disable (__ENABLED__ = false)")
     public void testUpdateUserToDisable() {
         // Setup mock response for disable update
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test001"))
@@ -147,8 +143,7 @@ public class GoogleAppsUserEnabledAttributeTest extends GoogleAppsConnectorTestB
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test update user to enable (__ENABLED__ = true)")
+    @Test(description = "Test update user to enable (__ENABLED__ = true)")
     public void testUpdateUserToEnable() {
         // Setup mock response for enable update
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test001"))
@@ -181,8 +176,7 @@ public class GoogleAppsUserEnabledAttributeTest extends GoogleAppsConnectorTestB
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test read user __ENABLED__ attribute from suspended field")
+    @Test(description = "Test read user __ENABLED__ attribute from suspended field")
     public void testReadEnabledAttributeFromSuspended() {
         // Setup mock response for suspended user
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/suspended001"))
@@ -225,8 +219,7 @@ public class GoogleAppsUserEnabledAttributeTest extends GoogleAppsConnectorTestB
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/suspended001")));
     }
 
-    @Test
-    @DisplayName("Test read user __ENABLED__ attribute when not suspended")
+    @Test(description = "Test read user __ENABLED__ attribute when not suspended")
     public void testReadEnabledAttributeWhenNotSuspended() {
         // Setup mock response for active (not suspended) user
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/active001"))
@@ -269,8 +262,7 @@ public class GoogleAppsUserEnabledAttributeTest extends GoogleAppsConnectorTestB
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users/active001")));
     }
 
-    @Test
-    @DisplayName("Test interaction between __ENABLED__ and suspended attributes")
+    @Test(description = "Test interaction between __ENABLED__ and suspended attributes")
     public void testEnabledSuspendedAttributeInteraction() {
         // Setup mock response for update with both __ENABLED__ and suspended
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test001"))

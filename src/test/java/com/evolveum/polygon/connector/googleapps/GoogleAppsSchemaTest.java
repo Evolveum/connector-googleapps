@@ -3,8 +3,7 @@ package com.evolveum.polygon.connector.googleapps;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.ObjectClassInfo;
 import org.identityconnectors.framework.common.objects.Schema;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Set;
 
@@ -17,8 +16,7 @@ import static org.assertj.core.api.Assertions.*;
  */
 public class GoogleAppsSchemaTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test schema retrieval and structure")
+    @Test(description = "Test schema retrieval and structure")
     public void testSchema() {
         // Get schema
         Schema schema = connectorFacade.schema();
@@ -57,8 +55,7 @@ public class GoogleAppsSchemaTest extends GoogleAppsConnectorTestBase {
         assertThat(licenseClass.getAttributeInfo()).isNotEmpty();
     }
 
-    @Test
-    @DisplayName("Test configuration validation")
+    @Test(description = "Test configuration validation")
     public void testConfigurationValidation() {
         // Verify configuration is validated correctly
         GoogleAppsConfiguration config = createTestConfiguration();
@@ -74,8 +71,7 @@ public class GoogleAppsSchemaTest extends GoogleAppsConnectorTestBase {
                 .hasMessageContaining("Domain cannot be null");
     }
 
-    @Test
-    @DisplayName("Test ACCOUNT class attributes")
+    @Test(description = "Test ACCOUNT class attributes")
     public void testAccountClassAttributes() {
         Schema schema = connectorFacade.schema();
         ObjectClassInfo accountClass = schema.findObjectClassInfo(ObjectClass.ACCOUNT_NAME);
@@ -95,8 +91,7 @@ public class GoogleAppsSchemaTest extends GoogleAppsConnectorTestBase {
                 .anyMatch(attr -> attr.getName().equals("__PHOTO__"))).isTrue();
     }
 
-    @Test
-    @DisplayName("Test GROUP class attributes")
+    @Test(description = "Test GROUP class attributes")
     public void testGroupClassAttributes() {
         Schema schema = connectorFacade.schema();
         ObjectClassInfo groupClass = schema.findObjectClassInfo(ObjectClass.GROUP_NAME);

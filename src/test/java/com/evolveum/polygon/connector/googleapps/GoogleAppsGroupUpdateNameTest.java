@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,8 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupUpdateNameTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test group name (__NAME__) update - email address change")
+    @Test(description = "Test group name (__NAME__) update - email address change")
     public void testUpdateGroupEmail() {
         // Setup mock response for group email update
         stubFor(patch(urlPathEqualTo("/admin/directory/v1/groups/group001"))

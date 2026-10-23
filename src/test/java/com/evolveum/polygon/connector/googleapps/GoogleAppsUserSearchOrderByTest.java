@@ -2,8 +2,8 @@ package com.evolveum.polygon.connector.googleapps;
 
 import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
@@ -14,7 +14,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  */
 public class GoogleAppsUserSearchOrderByTest extends GoogleAppsConnectorTestBase {
 
-    @BeforeEach
+    @BeforeMethod(alwaysRun = true)
     public void setUp() {
         super.setUp();
 

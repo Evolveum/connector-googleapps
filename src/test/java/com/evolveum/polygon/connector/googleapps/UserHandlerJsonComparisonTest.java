@@ -1,7 +1,6 @@
 package com.evolveum.polygon.connector.googleapps;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.lang.reflect.Method;
 
@@ -23,8 +22,7 @@ public class UserHandlerJsonComparisonTest {
         return (Boolean) method.invoke(null, currentJsonValue, valueToRemove);
     }
 
-    @Test
-    @DisplayName("Identical JSON objects should match")
+    @Test(description = "Identical JSON objects should match")
     public void testIdenticalJsonMatch() throws Exception {
         String json1 = "{\"address\":\"test@example.com\",\"type\":\"work\",\"primary\":true}";
         String json2 = "{\"address\":\"test@example.com\",\"type\":\"work\",\"primary\":true}";
@@ -32,8 +30,7 @@ public class UserHandlerJsonComparisonTest {
         assertThat(matchesJsonValue(json1, json2)).isTrue();
     }
 
-    @Test
-    @DisplayName("Different field ordering should still match")
+    @Test(description = "Different field ordering should still match")
     public void testDifferentFieldOrderingMatch() throws Exception {
         String json1 = "{\"address\":\"test@example.com\",\"type\":\"work\",\"primary\":true}";
         String json2 = "{\"primary\":true,\"address\":\"test@example.com\",\"type\":\"work\"}";
@@ -41,8 +38,7 @@ public class UserHandlerJsonComparisonTest {
         assertThat(matchesJsonValue(json1, json2)).isTrue();
     }
 
-    @Test
-    @DisplayName("Different formatting should still match")
+    @Test(description = "Different formatting should still match")
     public void testDifferentFormattingMatch() throws Exception {
         String json1 = "{\"address\":\"test@example.com\",\"type\":\"work\"}";
         String json2 = "{ \"address\" : \"test@example.com\" , \"type\" : \"work\" }";
@@ -50,8 +46,7 @@ public class UserHandlerJsonComparisonTest {
         assertThat(matchesJsonValue(json1, json2)).isTrue();
     }
 
-    @Test
-    @DisplayName("Null field vs absent field should NOT match")
+    @Test(description = "Null field vs absent field should NOT match")
     public void testNullVsAbsentFieldNoMatch() throws Exception {
         String jsonWithNull = "{\"address\":\"test@example.com\",\"type\":\"work\",\"customType\":null}";
         String jsonWithoutField = "{\"address\":\"test@example.com\",\"type\":\"work\"}";
@@ -60,8 +55,7 @@ public class UserHandlerJsonComparisonTest {
         assertThat(matchesJsonValue(jsonWithoutField, jsonWithNull)).isFalse();
     }
 
-    @Test
-    @DisplayName("Different field sets should NOT match")
+    @Test(description = "Different field sets should NOT match")
     public void testDifferentFieldSetsNoMatch() throws Exception {
         String json1 = "{\"address\":\"test@example.com\",\"type\":\"work\",\"primary\":true}";
         String json2 = "{\"address\":\"test@example.com\",\"type\":\"work\",\"customType\":\"business\"}";
@@ -69,8 +63,7 @@ public class UserHandlerJsonComparisonTest {
         assertThat(matchesJsonValue(json1, json2)).isFalse();
     }
 
-    @Test
-    @DisplayName("Partial match should NOT match")
+    @Test(description = "Partial match should NOT match")
     public void testPartialMatchNoMatch() throws Exception {
         String fullJson = "{\"address\":\"test@example.com\",\"type\":\"work\",\"primary\":true}";
         String partialJson = "{\"type\":\"work\"}";
@@ -79,8 +72,7 @@ public class UserHandlerJsonComparisonTest {
         assertThat(matchesJsonValue(partialJson, fullJson)).isFalse();
     }
 
-    @Test
-    @DisplayName("Different values should NOT match")
+    @Test(description = "Different values should NOT match")
     public void testDifferentValuesNoMatch() throws Exception {
         String json1 = "{\"address\":\"test1@example.com\",\"type\":\"work\"}";
         String json2 = "{\"address\":\"test2@example.com\",\"type\":\"work\"}";
@@ -88,8 +80,7 @@ public class UserHandlerJsonComparisonTest {
         assertThat(matchesJsonValue(json1, json2)).isFalse();
     }
 
-    @Test
-    @DisplayName("Empty objects should match")
+    @Test(description = "Empty objects should match")
     public void testEmptyObjectsMatch() throws Exception {
         String json1 = "{}";
         String json2 = "{}";

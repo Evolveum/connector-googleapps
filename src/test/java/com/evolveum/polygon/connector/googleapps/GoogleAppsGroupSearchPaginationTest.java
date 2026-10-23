@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupSearchPaginationTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test page size configuration")
+    @Test(description = "Test page size configuration")
     public void testPageSizeConfiguration() {
         // Setup mock response with different page size
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -66,8 +64,7 @@ public class GoogleAppsGroupSearchPaginationTest extends GoogleAppsConnectorTest
                 .withQueryParam("maxResults", equalTo("5")));
     }
 
-    @Test
-    @DisplayName("Test full pagination without page size limit")
+    @Test(description = "Test full pagination without page size limit")
     public void testFullPaginationWithoutPageSizeLimit() {
         // Setup mock responses for pagination without explicit page size limit
         // First page
@@ -156,8 +153,7 @@ public class GoogleAppsGroupSearchPaginationTest extends GoogleAppsConnectorTest
                 .withQueryParam("pageToken", equalTo("unlimited_page2_token")));
     }
 
-    @Test
-    @DisplayName("Test paged search with page size limit")
+    @Test(description = "Test paged search with page size limit")
     public void testPagedSearchWithPageSizeLimit() {
         // Setup mock responses for limited pagination
         // First page with explicit page size

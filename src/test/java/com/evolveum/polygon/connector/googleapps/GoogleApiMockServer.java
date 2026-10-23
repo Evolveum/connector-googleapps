@@ -5,9 +5,6 @@ import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.common.ConsoleNotifier;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
-import org.junit.jupiter.api.extension.AfterAllCallback;
-import org.junit.jupiter.api.extension.BeforeAllCallback;
-import org.junit.jupiter.api.extension.ExtensionContext;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -16,17 +13,16 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
 /**
  * WireMock-based Google API mock server
- * Automatically starts and stops as JUnit 5 extension
+ * Started and stopped by the inherited TestNG class fixtures
  *
  * @author Hiroyuki Wada
  */
-public class GoogleApiMockServer implements BeforeAllCallback, AfterAllCallback {
+public class GoogleApiMockServer {
 
     private static WireMockServer wireMockServer;
     private static int port;
 
-    @Override
-    public void beforeAll(ExtensionContext context) throws Exception {
+    public static void start() {
         if (wireMockServer == null) {
             // Start WireMock server on random port
             wireMockServer = new WireMockServer(WireMockConfiguration.options()
@@ -43,8 +39,7 @@ public class GoogleApiMockServer implements BeforeAllCallback, AfterAllCallback 
         }
     }
 
-    @Override
-    public void afterAll(ExtensionContext context) throws Exception {
+    public static void stop() {
         if (wireMockServer != null) {
             wireMockServer.stop();
             wireMockServer = null;
@@ -64,14 +59,14 @@ public class GoogleApiMockServer implements BeforeAllCallback, AfterAllCallback 
     /**
      * Setup only essential endpoints required for all tests
      */
-    private void setupEssentialEndpoints() {
+    private static void setupEssentialEndpoints() {
         setupOAuth2Endpoints();
     }
 
     /**
      * Setup OAuth2 endpoints
      */
-    private void setupOAuth2Endpoints() {
+    private static void setupOAuth2Endpoints() {
         // OAuth2 token refresh endpoint
         wireMockServer.stubFor(post(urlEqualTo("/token"))
                 .willReturn(aResponse()
@@ -106,11 +101,12 @@ public class GoogleApiMockServer implements BeforeAllCallback, AfterAllCallback 
     }
 
     /**
-     * Helper method to reset request history
+     * Reset requests and stubs, then restore the shared OAuth endpoint
      */
-    public static void resetRequests() {
+    public static void reset() {
         if (wireMockServer != null) {
-            wireMockServer.resetRequests();
+            wireMockServer.resetAll();
+            setupEssentialEndpoints();
         }
     }
 

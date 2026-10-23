@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,8 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserCreateSingleValueTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test create user with basic single-valued attributes")
+    @Test(description = "Test create user with basic single-valued attributes")
     public void testCreateUserWithBasicAttributes() {
         // Setup mock response for basic user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))

@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -20,8 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserCreateAliasesTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Create user with single alias")
+    @Test(description = "Create user with single alias")
     public void testCreateUserWithSingleAlias() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -71,8 +69,7 @@ public class GoogleAppsUserCreateAliasesTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"alias\":\"alias1@example.com\"")));
     }
 
-    @Test
-    @DisplayName("Create user with multiple aliases")
+    @Test(description = "Create user with multiple aliases")
     public void testCreateUserWithMultipleAliases() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))

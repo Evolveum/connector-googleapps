@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.List;
 
@@ -23,11 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps User Get - Structured Attributes JSON Format Tests")
-class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnectorTestBase {
+// Test suite: "GoogleApps User Get - Structured Attributes JSON Format Tests"
+public class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test structured attributes return proper JSON format with colons and sorted keys")
+    @Test(description = "Test structured attributes return proper JSON format with colons and sorted keys")
     public void testStructuredAttributesJsonFormat() {
         // Setup mock response with various structured attributes
         // Keys are intentionally in non-alphabetical order in the response
@@ -217,8 +215,7 @@ class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnectorTestB
         assertThat(im2).isEqualTo("{\"customProtocol\":\"skype-personal\",\"im\":\"struct.home\",\"protocol\":\"skype\",\"type\":\"home\"}");
     }
 
-    @Test
-    @DisplayName("Test empty values are included in JSON")
+    @Test(description = "Test empty values are included in JSON")
     public void testEmptyValuesIncluded() {
         // Setup mock response with some empty/null values
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users/empty001"))

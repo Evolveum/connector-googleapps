@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -19,8 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupUpdateSingleValueTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test group update with basic attributes")
+    @Test(description = "Test group update with basic attributes")
     public void testUpdateGroup() {
         // Setup mock response for group update
         stubFor(patch(urlPathEqualTo("/admin/directory/v1/groups/group001"))
@@ -55,8 +53,7 @@ public class GoogleAppsGroupUpdateSingleValueTest extends GoogleAppsConnectorTes
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test update group name attribute")
+    @Test(description = "Test update group name attribute")
     public void testUpdateGroupName() {
         // Setup mock response for group name update
         stubFor(patch(urlPathEqualTo("/admin/directory/v1/groups/group011"))
@@ -87,8 +84,7 @@ public class GoogleAppsGroupUpdateSingleValueTest extends GoogleAppsConnectorTes
                 .withRequestBody(containing("\"name\":\"New Group Name\"")));
     }
 
-    @Test
-    @DisplayName("Test update group description attribute")
+    @Test(description = "Test update group description attribute")
     public void testUpdateGroupDescription() {
         // Setup mock response for group description update
         stubFor(patch(urlPathEqualTo("/admin/directory/v1/groups/group012"))
@@ -119,8 +115,7 @@ public class GoogleAppsGroupUpdateSingleValueTest extends GoogleAppsConnectorTes
                 .withRequestBody(containing("\"description\":\"New description for testing\"")));
     }
 
-    @Test
-    @DisplayName("Test clear group description")
+    @Test(description = "Test clear group description")
     public void testClearGroupDescription() {
         // Setup mock response for group description clearing
         stubFor(patch(urlPathEqualTo("/admin/directory/v1/groups/group013"))

@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserSearchPaginationCookieTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test cookie-based pagination with pageToken")
+    @Test(description = "Test cookie-based pagination with pageToken")
     public void testCookieBasedPagination() {
         // Setup mock response for pageToken request
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -77,8 +75,7 @@ public class GoogleAppsUserSearchPaginationCookieTest extends GoogleAppsConnecto
                 .withQueryParam("maxResults", equalTo("2")));
     }
 
-    @Test
-    @DisplayName("Test cookie-based pagination without pageSize")
+    @Test(description = "Test cookie-based pagination without pageSize")
     public void testCookieWithoutPageSize() {
         // Setup mock response
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))

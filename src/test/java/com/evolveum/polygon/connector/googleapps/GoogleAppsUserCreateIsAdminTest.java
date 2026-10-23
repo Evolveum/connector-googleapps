@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -20,8 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserCreateIsAdminTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Create user with isAdmin=true")
+    @Test(description = "Create user with isAdmin=true")
     public void testCreateUserWithIsAdminTrue() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -67,8 +65,7 @@ public class GoogleAppsUserCreateIsAdminTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"status\":true")));
     }
 
-    @Test
-    @DisplayName("Create user with isAdmin=false")
+    @Test(description = "Create user with isAdmin=false")
     public void testCreateUserWithIsAdminFalse() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -104,8 +101,7 @@ public class GoogleAppsUserCreateIsAdminTest extends GoogleAppsConnectorTestBase
         GoogleApiMockServer.verify(0, postRequestedFor(urlPathEqualTo("/admin/directory/v1/users/regular001/makeAdmin")));
     }
 
-    @Test
-    @DisplayName("Create user with all special attributes including isAdmin")
+    @Test(description = "Create user with all special attributes including isAdmin")
     public void testCreateUserWithAllSpecialAttributesIncludingAdmin() {
         // Setup mock for user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))

@@ -5,8 +5,9 @@ import org.identityconnectors.framework.api.APIConfiguration;
 import org.identityconnectors.framework.api.ConnectorFacade;
 import org.identityconnectors.framework.api.ConnectorFacadeFactory;
 import org.identityconnectors.test.common.TestHelpers;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterClass;
 
 /**
  * Base class for GoogleAppsConnector tests
@@ -14,16 +15,25 @@ import org.junit.jupiter.api.extension.ExtendWith;
  *
  * @author Hiroyuki Wada
  */
-@ExtendWith(GoogleApiMockServer.class)
 public abstract class GoogleAppsConnectorTestBase {
+
+    @BeforeClass(alwaysRun = true)
+    public void startMockServer() {
+        GoogleApiMockServer.start();
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void stopMockServer() {
+        GoogleApiMockServer.stop();
+    }
 
     protected ConnectorFacade connectorFacade;
     protected GoogleAppsConfiguration configuration;
 
-    @BeforeEach
+    @BeforeMethod(alwaysRun = true)
     public void setUp() {
-        // Reset WireMock request history before each test to ensure test isolation
-        GoogleApiMockServer.resetRequests();
+        // Reset WireMock requests and stubs before each test to ensure test isolation
+        GoogleApiMockServer.reset();
 
         configuration = createTestConfiguration();
         connectorFacade = createConnectorFacade(configuration);
