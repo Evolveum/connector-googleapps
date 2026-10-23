@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -23,8 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdatePhotoTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Update photo - Add new photo")
+    @Test(description = "Update photo - Add new photo")
     public void testUpdatePhotoNew() {
         // Setup mock for photo upload
         stubFor(put(urlPathEqualTo("/admin/directory/v1/users/photo002/photos/thumbnail"))
@@ -53,8 +51,7 @@ public class GoogleAppsUserUpdatePhotoTest extends GoogleAppsConnectorTestBase {
                 .withRequestBody(containing("\"photoData\"")));
     }
 
-    @Test
-    @DisplayName("Update photo - Replace existing photo")
+    @Test(description = "Update photo - Replace existing photo")
     public void testUpdatePhotoReplace() {
         // Setup mock for photo upload (same as new, Google API handles it the same way)
         stubFor(put(urlPathEqualTo("/admin/directory/v1/users/photo003/photos/thumbnail"))
@@ -83,8 +80,7 @@ public class GoogleAppsUserUpdatePhotoTest extends GoogleAppsConnectorTestBase {
                 .withRequestBody(containing("\"photoData\"")));
     }
 
-    @Test
-    @DisplayName("Update photo - Add operation (single-valued attribute)")
+    @Test(description = "Update photo - Add operation (single-valued attribute)")
     public void testUpdatePhotoAdd() {
         // Setup mock for photo upload
         stubFor(put(urlPathEqualTo("/admin/directory/v1/users/photo004/photos/thumbnail"))
@@ -115,8 +111,7 @@ public class GoogleAppsUserUpdatePhotoTest extends GoogleAppsConnectorTestBase {
                 .withRequestBody(containing("\"photoData\"")));
     }
 
-    @Test
-    @DisplayName("Delete photo with empty byte array")
+    @Test(description = "Delete photo with empty byte array")
     public void testUpdatePhotoWithEmptyData() {
         // Setup mock for photo deletion
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/users/photo005/photos/thumbnail"))
@@ -142,8 +137,7 @@ public class GoogleAppsUserUpdatePhotoTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verify(0, putRequestedFor(urlPathEqualTo("/admin/directory/v1/users/photo005/photos/thumbnail")));
     }
 
-    @Test
-    @DisplayName("Update photo with other attributes")
+    @Test(description = "Update photo with other attributes")
     public void testUpdatePhotoWithOtherAttributes() {
         // Setup mock for user update
         stubFor(put(urlPathEqualTo("/admin/directory/v1/users/photo006"))
@@ -191,8 +185,7 @@ public class GoogleAppsUserUpdatePhotoTest extends GoogleAppsConnectorTestBase {
                 .withRequestBody(containing("\"photoData\"")));
     }
 
-    @Test
-    @DisplayName("Delete user photo with empty replace")
+    @Test(description = "Delete user photo with empty replace")
     public void testDeleteUserPhoto() {
         // Setup mock for photo deletion
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/users/photo007/photos/thumbnail"))
@@ -214,8 +207,7 @@ public class GoogleAppsUserUpdatePhotoTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verify(0, putRequestedFor(urlPathEqualTo("/admin/directory/v1/users/photo007")));
     }
 
-    @Test
-    @DisplayName("Delete user photo with null value in replace")
+    @Test(description = "Delete user photo with null value in replace")
     public void testDeleteUserPhotoWithNullValue() {
         // Setup mock for photo deletion
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/users/photo008/photos/thumbnail"))

@@ -3,8 +3,7 @@ package com.evolveum.polygon.connector.googleapps;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,12 +17,11 @@ import static org.assertj.core.api.Assertions.*;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps License Assignment Tests")
+// Test suite: "GoogleApps License Assignment Tests"
 public class GoogleAppsLicenseAssignmentTest extends GoogleAppsConnectorTestBase {
 
 
-    @Test
-    @DisplayName("Test license assignment creation")
+    @Test(description = "Test license assignment creation")
     public void testCreateLicenseAssignment() {
         // Setup stub for license assignment creation (correct Google Licensing API endpoint)
         GoogleApiMockServer.stubFor(post(urlPathEqualTo("/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-20GB/user"))
@@ -60,8 +58,7 @@ public class GoogleAppsLicenseAssignmentTest extends GoogleAppsConnectorTestBase
         assertThat(createdUid.getUidValue()).isEqualTo("Google-Drive-storage/sku/Google-Drive-storage-20GB/user/user001@example.com");
     }
 
-    @Test
-    @DisplayName("Test license assignment deletion")
+    @Test(description = "Test license assignment deletion")
     public void testDeleteLicenseAssignment() {
         // Setup stub for license assignment deletion
         GoogleApiMockServer.stubFor(delete(urlPathEqualTo("/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-20GB/user/user001@example.com"))
@@ -78,8 +75,7 @@ public class GoogleAppsLicenseAssignmentTest extends GoogleAppsConnectorTestBase
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-20GB/user/user001@example.com")));
     }
 
-    @Test
-    @DisplayName("Test license assignment SKU update")
+    @Test(description = "Test license assignment SKU update")
     public void testUpdateLicenseSkuId() {
         // Setup stub for license assignment update (PATCH request)
         GoogleApiMockServer.stubFor(patch(urlPathEqualTo("/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-20GB/user/user001@example.com"))
@@ -110,8 +106,7 @@ public class GoogleAppsLicenseAssignmentTest extends GoogleAppsConnectorTestBase
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test get license assignment by UID")
+    @Test(description = "Test get license assignment by UID")
     public void testGetLicenseAssignment() {
         // Setup stub for license assignment get
         GoogleApiMockServer.stubFor(get(urlPathEqualTo("/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-20GB/user/user001@example.com"))
@@ -146,8 +141,7 @@ public class GoogleAppsLicenseAssignmentTest extends GoogleAppsConnectorTestBase
         assertThat(result[0].getAttributeByName(PRODUCT_ID_ATTR).getValue().get(0)).isEqualTo("Google-Drive-storage");
     }
 
-    @Test
-    @DisplayName("Test search license assignments")
+    @Test(description = "Test search license assignments")
     public void testSearchLicenseAssignments() {
         // Search without productId filter should fail (implementation requires productId)
         // Note: The current implementation has a limitation where productId must be provided
@@ -169,8 +163,7 @@ public class GoogleAppsLicenseAssignmentTest extends GoogleAppsConnectorTestBase
         // current regex fix.
     }
 
-    @Test
-    @DisplayName("Test license assignment validation errors")
+    @Test(description = "Test license assignment validation errors")
     public void testLicenseValidationErrors() {
         // Test missing productId validation
         Set<Attribute> attributes = new HashSet<>();

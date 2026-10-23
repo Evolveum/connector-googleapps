@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -15,11 +14,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("Google Apps Connection Test")
+// Test suite: "Google Apps Connection Test"
 public class GoogleAppsTestTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test connection - success")
+    @Test(description = "Test connection - success")
     public void testConnectionSuccess() {
         // Setup mock for test connection endpoint
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users"))
@@ -40,8 +38,7 @@ public class GoogleAppsTestTest extends GoogleAppsConnectorTestBase {
                 .withQueryParam("fields", equalTo("users(id)")));
     }
 
-    @Test
-    @DisplayName("Test connection - failure (network error)")
+    @Test(description = "Test connection - failure (network error)")
     public void testConnectionFailureNetworkError() {
         // Setup mock for test connection endpoint to return network error
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users"))
@@ -63,8 +60,7 @@ public class GoogleAppsTestTest extends GoogleAppsConnectorTestBase {
                 .withQueryParam("fields", equalTo("users(id)")));
     }
 
-    @Test
-    @DisplayName("Test connection - failure (authentication error)")
+    @Test(description = "Test connection - failure (authentication error)")
     public void testConnectionFailureAuthError() {
         // Setup mock for test connection endpoint to return authentication error
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users"))
@@ -86,8 +82,7 @@ public class GoogleAppsTestTest extends GoogleAppsConnectorTestBase {
                 .withQueryParam("fields", equalTo("users(id)")));
     }
 
-    @Test
-    @DisplayName("Test connection - failure (forbidden)")
+    @Test(description = "Test connection - failure (forbidden)")
     public void testConnectionFailureForbidden() {
         // Setup mock for test connection endpoint to return forbidden error
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users"))
@@ -109,8 +104,7 @@ public class GoogleAppsTestTest extends GoogleAppsConnectorTestBase {
                 .withQueryParam("fields", equalTo("users(id)")));
     }
 
-    @Test
-    @DisplayName("Test connection - empty response handling")
+    @Test(description = "Test connection - empty response handling")
     public void testConnectionEmptyResponse() {
         // Setup mock for test connection endpoint to return empty users list
         stubFor(get(urlPathEqualTo("/admin/directory/v1/users"))

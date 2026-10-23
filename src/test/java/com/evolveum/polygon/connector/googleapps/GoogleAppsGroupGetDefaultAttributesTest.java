@@ -4,8 +4,7 @@ import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,8 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupGetDefaultAttributesTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test get by UID with RETURN_DEFAULT_ATTRIBUTES = true and explicit attributesToGet")
+    @Test(description = "Test get by UID with RETURN_DEFAULT_ATTRIBUTES = true and explicit attributesToGet")
     public void testGetByUidWithReturnDefaultAttributesTrueAndAttributesToGet() {
         // This test verifies that when retrieving a single group by UID with both
         // RETURN_DEFAULT_ATTRIBUTES=true and explicit attributesToGet specified,
@@ -143,8 +141,7 @@ public class GoogleAppsGroupGetDefaultAttributesTest extends GoogleAppsConnector
         assertThat(memberRequests.get(0).getUrl()).contains("/admin/directory/v1/groups/getuid001/members");
     }
 
-    @Test
-    @DisplayName("Test get by Name with RETURN_DEFAULT_ATTRIBUTES = true and explicit attributesToGet")
+    @Test(description = "Test get by Name with RETURN_DEFAULT_ATTRIBUTES = true and explicit attributesToGet")
     public void testGetByNameWithReturnDefaultAttributesTrueAndAttributesToGet() {
         // This test verifies that when retrieving a single group by Name (email) with both
         // RETURN_DEFAULT_ATTRIBUTES=true and explicit attributesToGet specified,

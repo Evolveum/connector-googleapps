@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdateIsAdminTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Update isAdmin to true")
+    @Test(description = "Update isAdmin to true")
     public void testUpdateIsAdminToTrue() {
         // Setup mock for makeAdmin API call
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users/user001/makeAdmin"))
@@ -49,8 +47,7 @@ public class GoogleAppsUserUpdateIsAdminTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"status\":true")));
     }
 
-    @Test
-    @DisplayName("Update isAdmin to false")
+    @Test(description = "Update isAdmin to false")
     public void testUpdateIsAdminToFalse() {
         // Setup mock for makeAdmin API call (removing admin privileges)
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users/user002/makeAdmin"))
@@ -77,8 +74,7 @@ public class GoogleAppsUserUpdateIsAdminTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"status\":false")));
     }
 
-    @Test
-    @DisplayName("Update isAdmin with other attributes")
+    @Test(description = "Update isAdmin with other attributes")
     public void testUpdateIsAdminWithOtherAttributes() {
         // Setup mock for user update
         stubFor(put(urlPathEqualTo("/admin/directory/v1/users/user003"))

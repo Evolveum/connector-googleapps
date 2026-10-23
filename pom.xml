@@ -105,6 +105,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.3</version>
                 <configuration>
+                    <failIfNoTests>true</failIfNoTests>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
@@ -154,20 +155,24 @@
         </dependency>
 
         <!-- Test dependencies -->
+        <!-- The inherited contract library brings JUnit engines that select the wrong test provider. -->
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.13.4</version>
+            <groupId>net.tirasa.connid</groupId>
+            <artifactId>connector-framework-contract</artifactId>
+            <version>${connId.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-engine</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-params</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
-        
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-params</artifactId>
-            <version>5.13.4</version>
-            <scope>test</scope>
-        </dependency>
-        
+
         <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock</artifactId>

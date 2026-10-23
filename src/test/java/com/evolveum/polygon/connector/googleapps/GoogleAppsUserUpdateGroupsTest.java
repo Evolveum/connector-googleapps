@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -21,8 +20,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  */
 public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Update user - add single group")
+    @Test(description = "Update user - add single group")
     public void testUpdateUserAddSingleGroup() {
         // Setup mock for group membership addition
         stubFor(post(urlPathEqualTo("/admin/directory/v1/groups/group003@example.com/members"))
@@ -51,8 +49,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
                 .withRequestBody(containing("\"role\":\"MEMBER\"")));
     }
 
-    @Test
-    @DisplayName("Update user - add multiple groups")
+    @Test(description = "Update user - add multiple groups")
     public void testUpdateUserAddMultipleGroups() {
         // Setup mock for first group membership addition
         stubFor(post(urlPathEqualTo("/admin/directory/v1/groups/group004@example.com/members"))
@@ -92,8 +89,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(postRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group005@example.com/members")));
     }
 
-    @Test
-    @DisplayName("Update user - remove single group")
+    @Test(description = "Update user - remove single group")
     public void testUpdateUserRemoveSingleGroup() {
         // Setup mock for group membership removal
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/groups/group006@example.com/members/user006"))
@@ -113,8 +109,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group006@example.com/members/user006")));
     }
 
-    @Test
-    @DisplayName("Update user - remove multiple groups")
+    @Test(description = "Update user - remove multiple groups")
     public void testUpdateUserRemoveMultipleGroups() {
         // Setup mock for first group membership removal
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/groups/group007@example.com/members/user007"))
@@ -140,8 +135,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group008@example.com/members/user007")));
     }
 
-    @Test
-    @DisplayName("Update user - mixed add and remove operations")
+    @Test(description = "Update user - mixed add and remove operations")
     public void testUpdateUserMixedAddRemoveGroups() {
         // Setup mock for group membership addition
         stubFor(post(urlPathEqualTo("/admin/directory/v1/groups/group009@example.com/members"))
@@ -174,8 +168,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group010@example.com/members/user008")));
     }
 
-    @Test
-    @DisplayName("Update user - replace groups operation")
+    @Test(description = "Update user - replace groups operation")
     public void testUpdateUserReplaceGroups() {
         // Setup mock for getting current groups (user009 is currently in group010@example.com and group013@example.com)
         stubFor(get(urlPathEqualTo("/admin/directory/v1/groups"))
@@ -253,8 +246,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(postRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group012/members")));
     }
 
-    @Test
-    @DisplayName("Update user - add to non-existent group should handle error")
+    @Test(description = "Update user - add to non-existent group should handle error")
     public void testUpdateUserAddToNonExistentGroup() {
         // Setup mock for group membership addition - return 404 Not Found
         stubFor(post(urlPathEqualTo("/admin/directory/v1/groups/nonexistent@example.com/members"))
@@ -281,8 +273,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
         GoogleApiMockServer.verifyRequest(postRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/nonexistent@example.com/members")));
     }
 
-    @Test
-    @DisplayName("Update user - remove from non-existent group should handle error")
+    @Test(description = "Update user - remove from non-existent group should handle error")
     public void testUpdateUserRemoveFromNonExistentGroup() {
         // Setup mock for group membership removal - return 404 Not Found
         stubFor(delete(urlPathEqualTo("/admin/directory/v1/groups/nonexistent@example.com/members/user011"))

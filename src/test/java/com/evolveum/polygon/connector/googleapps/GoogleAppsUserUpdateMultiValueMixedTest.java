@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdateMultiValueMixedTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Add+1 & Remove-1 → same count mixed operations (1→1)")
+    @Test(description = "Add+1 & Remove-1 → same count mixed operations (1→1)")
     public void testMixedAddOneRemoveOneFromSingle() {
         // Setup mock response for getting current user data (single values for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/mixedtest001"))
@@ -124,8 +122,7 @@ public class GoogleAppsUserUpdateMultiValueMixedTest extends GoogleAppsConnector
                 .withRequestBody(not(containing("Old Manager"))));
     }
 
-    @Test
-    @DisplayName("Add+2 & Remove-1 → increase operations (1→2)")
+    @Test(description = "Add+2 & Remove-1 → increase operations (1→2)")
     public void testMixedAddTwoRemoveOneFromSingle() {
         // Setup mock response for getting current user data (single values)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/mixedtest002"))
@@ -255,8 +252,7 @@ public class GoogleAppsUserUpdateMultiValueMixedTest extends GoogleAppsConnector
                 .withRequestBody(not(containing("Old Manager"))));
     }
 
-    @Test
-    @DisplayName("Add+1 & Remove-2 → decrease operations (2→1)")
+    @Test(description = "Add+1 & Remove-2 → decrease operations (2→1)")
     public void testMixedAddOneRemoveTwoFromDual() {
         // Setup mock response for getting current user data (dual values)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/mixedtest003"))
@@ -407,8 +403,7 @@ public class GoogleAppsUserUpdateMultiValueMixedTest extends GoogleAppsConnector
                 .withRequestBody(not(containing("Old Assistant"))));
     }
 
-    @Test
-    @DisplayName("Add+2 & Remove-2 → same count complex operations (2→2)")
+    @Test(description = "Add+2 & Remove-2 → same count complex operations (2→2)")
     public void testMixedAddTwoRemoveTwoFromDual() {
         // Setup mock response for getting current user data (dual values)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/mixedtest004"))
@@ -587,8 +582,7 @@ public class GoogleAppsUserUpdateMultiValueMixedTest extends GoogleAppsConnector
                 .withRequestBody(not(containing("Old Assistant"))));
     }
 
-    @Test
-    @DisplayName("Add+2 & Remove-3 → complex decrease operations (3→2)")
+    @Test(description = "Add+2 & Remove-3 → complex decrease operations (3→2)")
     public void testMixedAddTwoRemoveThreeFromTriple() {
         // Setup mock response for getting current user data (triple values)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/mixedtest005"))

@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,11 +17,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("Google Apps User Create License Tests")
+// Test suite: "Google Apps User Create License Tests"
 public class GoogleAppsUserCreateLicenseTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Create user with autoAddLicense enabled")
+    @Test(description = "Create user with autoAddLicense enabled")
     public void testCreateUserWithAutoAddLicenseEnabled() {
         // Enable autoAddLicense in configuration
         configuration.setAutoAddLicense(true);
@@ -75,8 +73,7 @@ public class GoogleAppsUserCreateLicenseTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"userId\":\"license001@example.com\"")));
     }
 
-    @Test
-    @DisplayName("Create user with autoAddLicense disabled")
+    @Test(description = "Create user with autoAddLicense disabled")
     public void testCreateUserWithAutoAddLicenseDisabled() {
         // Ensure autoAddLicense is disabled (default)
         configuration.setAutoAddLicense(false);
@@ -115,8 +112,7 @@ public class GoogleAppsUserCreateLicenseTest extends GoogleAppsConnectorTestBase
         GoogleApiMockServer.verify(0, postRequestedFor(urlPathMatching("/apps/licensing/.*")));
     }
 
-    @Test
-    @DisplayName("Create user with license assignment failure handling")
+    @Test(description = "Create user with license assignment failure handling")
     public void testLicenseAssignmentFailureHandling() {
         // Enable autoAddLicense
         configuration.setAutoAddLicense(true);
@@ -173,8 +169,7 @@ public class GoogleAppsUserCreateLicenseTest extends GoogleAppsConnectorTestBase
                 .withRequestBody(containing("\"userId\":\"licensefail001@example.com\"")));
     }
 
-    @Test
-    @DisplayName("Create user with license assignment - duplicate license handling")
+    @Test(description = "Create user with license assignment - duplicate license handling")
     public void testLicenseAssignmentDuplicateHandling() {
         // Enable autoAddLicense
         configuration.setAutoAddLicense(true);

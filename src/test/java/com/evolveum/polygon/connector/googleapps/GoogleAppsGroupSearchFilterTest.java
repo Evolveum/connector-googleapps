@@ -6,8 +6,7 @@ import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -23,13 +22,12 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps Group Search - Filter Translation Tests")
+// Test suite: "GoogleApps Group Search - Filter Translation Tests"
 public class GoogleAppsGroupSearchFilterTest extends GoogleAppsConnectorTestBase {
 
     // ========== EQUALS FILTER TESTS ==========
 
-    @Test
-    @DisplayName("Test EqualsFilter with UID - should trigger single group GET")
+    @Test(description = "Test EqualsFilter with UID - should trigger single group GET")
     public void testFilterByUid() {
         // Setup mock response for single group get by UID
         stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/filter001"))
@@ -62,8 +60,7 @@ public class GoogleAppsGroupSearchFilterTest extends GoogleAppsConnectorTestBase
                 .withQueryParam("customer", equalTo("my_customer")));
     }
 
-    @Test
-    @DisplayName("Test EqualsFilter with Name (email) - should trigger single group GET")
+    @Test(description = "Test EqualsFilter with Name (email) - should trigger single group GET")
     public void testFilterByName() {
         // Setup mock response for single group get by Name (email)
         stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/namefilter@example.com"))
@@ -96,8 +93,7 @@ public class GoogleAppsGroupSearchFilterTest extends GoogleAppsConnectorTestBase
                 .withQueryParam("customer", equalTo("my_customer")));
     }
 
-    @Test
-    @DisplayName("Test EqualsFilter with domain attribute - should trigger search with domain parameter")
+    @Test(description = "Test EqualsFilter with domain attribute - should trigger search with domain parameter")
     public void testFilterByDomain() {
         // Setup mock response for groups search with domain parameter
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -136,8 +132,7 @@ public class GoogleAppsGroupSearchFilterTest extends GoogleAppsConnectorTestBase
                 .withQueryParam("customer", equalTo("my_customer")));
     }
 
-    @Test
-    @DisplayName("Test ContainsFilter with __NAME__ attribute - should use query parameter with prefix search")
+    @Test(description = "Test ContainsFilter with __NAME__ attribute - should use query parameter with prefix search")
     public void testContainsFilterByNameWithQuery() {
         // Setup mock response for groups search with query parameter
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))

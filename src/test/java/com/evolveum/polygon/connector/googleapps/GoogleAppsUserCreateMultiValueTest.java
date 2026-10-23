@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -20,8 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserCreateMultiValueTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test create user with all multi-valued attributes")
+    @Test(description = "Test create user with all multi-valued attributes")
     public void testCreateUserWithAllMultiValuedAttributes() {
         // Setup mock response for full user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -98,8 +96,7 @@ public class GoogleAppsUserCreateMultiValueTest extends GoogleAppsConnectorTestB
                 .withRequestBody(containing("\"relations\":[{\"value\":\"manager@example.com\",\"type\":\"manager\"}]")));
     }
 
-    @Test
-    @DisplayName("Test multi-valued attributes with multiple values")
+    @Test(description = "Test multi-valued attributes with multiple values")
     public void testMultiValuedAttributesWithMultipleValues() {
         // Setup mock response for multi-valued attributes
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))

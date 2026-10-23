@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -20,8 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdateSingleValueTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test user update with basic attributes")
+    @Test(description = "Test user update with basic attributes")
     public void testUpdateUser() {
         // Setup mock response for update
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test001"))
@@ -61,8 +59,7 @@ public class GoogleAppsUserUpdateSingleValueTest extends GoogleAppsConnectorTest
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test update user with basic single-valued attributes")
+    @Test(description = "Test update user with basic single-valued attributes")
     public void testUpdateUserWithBasicAttributes() {
         // Setup mock response for basic user update
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test001"))
@@ -116,8 +113,7 @@ public class GoogleAppsUserUpdateSingleValueTest extends GoogleAppsConnectorTest
                 .withRequestBody(containing("\"password\":\"UpdatedPassword123\"")));
     }
 
-    @Test
-    @DisplayName("Test clear single-valued attributes")
+    @Test(description = "Test clear single-valued attributes")
     public void testClearSingleValuedAttributes() {
         // Setup mock response for clearing single-valued attributes
         stubFor(put(urlPathMatching("/admin/directory/v1/users/test005"))

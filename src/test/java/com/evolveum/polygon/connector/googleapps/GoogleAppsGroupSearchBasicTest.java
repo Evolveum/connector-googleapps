@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupSearchBasicTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test search all groups")
+    @Test(description = "Test search all groups")
     public void testSearchGroups() {
         // Setup mock response for groups search
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -91,8 +89,7 @@ public class GoogleAppsGroupSearchBasicTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("customer", equalTo("my_customer")));
     }
 
-    @Test
-    @DisplayName("Test search groups with pagination")
+    @Test(description = "Test search groups with pagination")
     public void testSearchGroupsWithPagination() {
         // Setup mock response for first page (without pageToken)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -159,8 +156,7 @@ public class GoogleAppsGroupSearchBasicTest extends GoogleAppsConnectorTestBase 
                 .withQueryParam("pageToken", absent()));
     }
 
-    @Test
-    @DisplayName("Test search groups with empty results")
+    @Test(description = "Test search groups with empty results")
     public void testSearchGroupsEmpty() {
         // Setup mock response for empty groups search
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))

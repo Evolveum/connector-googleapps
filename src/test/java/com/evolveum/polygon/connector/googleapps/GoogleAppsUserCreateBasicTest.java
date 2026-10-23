@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.List;
@@ -19,8 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserCreateBasicTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test user creation with required attributes (primaryEmail, password, givenName, familyName)")
+    @Test(description = "Test user creation with required attributes (primaryEmail, password, givenName, familyName)")
     public void testCreateUserWithRequiredAttributes() {
         // Setup mock response for user creation with required attributes
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))
@@ -64,8 +62,7 @@ public class GoogleAppsUserCreateBasicTest extends GoogleAppsConnectorTestBase {
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test create user with all possible creatable attributes")
+    @Test(description = "Test create user with all possible creatable attributes")
     public void testCreateUserWithAllAttributes() {
         // Setup mock response for full user creation
         stubFor(post(urlPathEqualTo("/admin/directory/v1/users"))

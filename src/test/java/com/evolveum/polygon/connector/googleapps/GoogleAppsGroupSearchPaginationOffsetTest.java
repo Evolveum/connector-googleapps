@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test offset=1, pageSize=2 (first page)")
+    @Test(description = "Test offset=1, pageSize=2 (first page)")
     public void testOffsetFirstPage() {
         // Setup data phase directly (no skip needed for offset=1)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -75,8 +73,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("maxResults", equalTo("2")));
     }
 
-    @Test
-    @DisplayName("Test offset=3, pageSize=2 (skip 2, get next 2)")
+    @Test(description = "Test offset=3, pageSize=2 (skip 2, get next 2)")
     public void testOffsetWithSkip() {
         // Setup skip phase - skip 2 records with minimal fields
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -148,8 +145,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("fields", matching("nextPageToken,groups\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test offset=201, pageSize=50 (exceeds config max 200)")
+    @Test(description = "Test offset=201, pageSize=50 (exceeds config max 200)")
     public void testOffsetExceedsConfigMax() {
         // Setup first skip page - use config max (200)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -206,8 +202,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("pageToken", equalTo("skip_token_200")));
     }
 
-    @Test
-    @DisplayName("Test offset=1, pageSize=250 (exceeds config max 200)")
+    @Test(description = "Test offset=1, pageSize=250 (exceeds config max 200)")
     public void testPageSizeExceedsConfigMax() {
         // Setup first data phase - should use config max (200) not pageSize (250)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -263,8 +258,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("pageToken", equalTo("data_token_200")));
     }
 
-    @Test
-    @DisplayName("Test offset exceeds total records")
+    @Test(description = "Test offset exceeds total records")
     public void testOffsetExceedsTotalRecords() {
         // Setup skip phase - return fewer records than expected, no nextPageToken
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -303,8 +297,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("pageToken", matching(".*")));
     }
 
-    @Test
-    @DisplayName("Test offset=601, pageSize=10 (multiple skip phases)")
+    @Test(description = "Test offset=601, pageSize=10 (multiple skip phases)")
     public void testMultipleSkipPhases() {
         // Setup first skip phase - skip 200 records (config max)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -405,8 +398,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("fields", matching("nextPageToken,groups\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test offset=201, pageSize=5 (boundary: exactly one page + 1)")
+    @Test(description = "Test offset=201, pageSize=5 (boundary: exactly one page + 1)")
     public void testBoundaryOffsetExactlyOnePlusOne() {
         // Setup first skip phase - skip exactly 200 records (config max)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -465,8 +457,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("fields", matching("nextPageToken,groups\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test offset=202, pageSize=5 (boundary: one page + 2)")
+    @Test(description = "Test offset=202, pageSize=5 (boundary: one page + 2)")
     public void testBoundaryOffsetOnePlusTwo() {
         // Setup first skip phase - skip 200 records (config max)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
@@ -546,8 +537,7 @@ public class GoogleAppsGroupSearchPaginationOffsetTest extends GoogleAppsConnect
                 .withQueryParam("fields", matching("nextPageToken,groups\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test multiple page skipping with config max")
+    @Test(description = "Test multiple page skipping with config max")
     public void testMultiplePageSkipWithConfigMax() {
         // Setup first skip page - use config max (200)
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))

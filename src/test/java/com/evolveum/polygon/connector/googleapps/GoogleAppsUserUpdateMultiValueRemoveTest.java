@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Remove single value from empty multi-valued attributes (0→0, no error)")
+    @Test(description = "Remove single value from empty multi-valued attributes (0→0, no error)")
     public void testRemoveSingleValueFromEmpty() {
         // Setup mock response for getting current user data (empty multi-valued attributes)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/removetest001"))
@@ -113,8 +111,7 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
                 .withRequestBody(containing("\"relations\":[]")));
     }
 
-    @Test
-    @DisplayName("Remove single value from single-valued attributes (1→0)")
+    @Test(description = "Remove single value from single-valued attributes (1→0)")
     public void testRemoveSingleValueFromSingle() {
         // Setup mock response for getting current user data (1 value for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/removetest002"))
@@ -226,8 +223,7 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
                 .withRequestBody(containing("\"relations\":[]")));
     }
 
-    @Test
-    @DisplayName("Remove single value from dual-valued attributes (2→1)")
+    @Test(description = "Remove single value from dual-valued attributes (2→1)")
     public void testRemoveSingleValueFromDual() {
         // Setup mock response for getting current user data (2 values for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/removetest003"))
@@ -360,8 +356,7 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
                 .withRequestBody(not(containing("remove-manager@example.com"))));
     }
 
-    @Test
-    @DisplayName("Remove two values from empty multi-valued attributes (0→0, no error)")
+    @Test(description = "Remove two values from empty multi-valued attributes (0→0, no error)")
     public void testRemoveTwoValuesFromEmpty() {
         // Setup mock response for getting current user data (empty multi-valued attributes)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/removetest004"))
@@ -459,8 +454,7 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
                 .withRequestBody(containing("\"relations\":[]")));
     }
 
-    @Test
-    @DisplayName("Remove two values from single-valued attributes (1→0, over-removal)")
+    @Test(description = "Remove two values from single-valued attributes (1→0, over-removal)")
     public void testRemoveTwoValuesFromSingle() {
         // Setup mock response for getting current user data (1 value for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/removetest005"))
@@ -513,8 +507,7 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
                 .withRequestBody(containing("\"emails\":[]")));
     }
 
-    @Test
-    @DisplayName("Remove two values from dual-valued attributes (2→0)")
+    @Test(description = "Remove two values from dual-valued attributes (2→0)")
     public void testRemoveTwoValuesFromDual() {
         // Setup mock response for getting current user data (2 values for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/removetest006"))
@@ -640,8 +633,7 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
                 .withRequestBody(containing("\"relations\":[]")));
     }
 
-    @Test
-    @DisplayName("Remove two values from triple-valued attributes (3→1)")
+    @Test(description = "Remove two values from triple-valued attributes (3→1)")
     public void testRemoveTwoValuesFromTriple() {
         // Setup mock response for getting current user data (3 values for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/removetest007"))

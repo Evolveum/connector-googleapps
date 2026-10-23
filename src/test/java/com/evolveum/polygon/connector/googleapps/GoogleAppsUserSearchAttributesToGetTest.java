@@ -2,8 +2,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,11 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps User Search - AttributesToGet Tests")
-class GoogleAppsUserSearchAttributesToGetTest extends GoogleAppsConnectorTestBase {
+// Test suite: "GoogleApps User Search - AttributesToGet Tests"
+public class GoogleAppsUserSearchAttributesToGetTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test search with specific attributesToGet")
+    @Test(description = "Test search with specific attributesToGet")
     public void testSearchWithAttributesToGet() {
         // This test verifies that when specific attributes are requested,
         // the connector includes them plus mandatory fields (id, etag, primaryEmail)
@@ -112,8 +110,7 @@ class GoogleAppsUserSearchAttributesToGetTest extends GoogleAppsConnectorTestBas
         assertThat(actualFields).containsExactlyInAnyOrderElementsOf(expectedFields);
     }
 
-    @Test
-    @DisplayName("Test search with comprehensive attributesToGet - all available attributes")
+    @Test(description = "Test search with comprehensive attributesToGet - all available attributes")
     public void testSearchWithComprehensiveAttributes() {
         // This test verifies that ALL available attributes can be properly requested via attributesToGet,
         // correctly mapped to Google API fields, and properly converted to ConnectorObject attributes.

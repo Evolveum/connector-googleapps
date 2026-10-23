@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test offset=1, pageSize=2 (first page)")
+    @Test(description = "Test offset=1, pageSize=2 (first page)")
     public void testOffsetFirstPage() {
         // Setup data phase directly (no skip needed for offset=1, skipCount=0)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -79,8 +77,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("maxResults", equalTo("2")));
     }
 
-    @Test
-    @DisplayName("Test offset=3, pageSize=2 (skip 2, get next 2)")
+    @Test(description = "Test offset=3, pageSize=2 (skip 2, get next 2)")
     public void testOffsetWithSkip() {
         // Setup skip phase - skip 2 records with minimal fields
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -156,8 +153,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("fields", matching("nextPageToken,users\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test offset=6, pageSize=2 (skip multiple pages)")
+    @Test(description = "Test offset=6, pageSize=2 (skip multiple pages)")
     public void testOffsetMultiplePageSkip() {
         // Setup first skip page - skip 5 records (maxResults limited to 5)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -232,8 +228,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("pageToken", equalTo("skip_token_5")));
     }
 
-    @Test
-    @DisplayName("Test offset=501, pageSize=10 (large skip using config max)")
+    @Test(description = "Test offset=501, pageSize=10 (large skip using config max)")
     public void testLargeOffsetUsingConfigMax() {
         // Setup first skip page - use config max (500)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -291,8 +286,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("pageToken", equalTo("skip_token_500")));
     }
 
-    @Test
-    @DisplayName("Test offset exceeds total records")
+    @Test(description = "Test offset exceeds total records")
     public void testOffsetExceedsTotalRecords() {
         // Setup skip phase - return fewer records than expected, no nextPageToken
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -331,8 +325,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("pageToken", matching(".*")));
     }
 
-    @Test
-    @DisplayName("Test offset=1201, pageSize=10 (multiple skip phases)")
+    @Test(description = "Test offset=1201, pageSize=10 (multiple skip phases)")
     public void testMultipleSkipPhases() {
         // Setup first skip phase - skip 500 records (config max)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -433,8 +426,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("fields", matching("nextPageToken,users\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test offset=501, pageSize=5 (boundary: exactly one page + 1)")
+    @Test(description = "Test offset=501, pageSize=5 (boundary: exactly one page + 1)")
     public void testBoundaryOffsetExactlyOnePlusOne() {
         // Setup first skip phase - skip exactly 500 records (config max)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -493,8 +485,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("fields", matching("nextPageToken,users\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test offset=502, pageSize=5 (boundary: one page + 2)")
+    @Test(description = "Test offset=502, pageSize=5 (boundary: one page + 2)")
     public void testBoundaryOffsetOnePlusTwo() {
         // Setup first skip phase - skip 500 records (config max)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
@@ -574,8 +565,7 @@ public class GoogleAppsUserSearchPaginationOffsetTest extends GoogleAppsConnecto
                 .withQueryParam("fields", matching("nextPageToken,users\\(.*\\)")));
     }
 
-    @Test
-    @DisplayName("Test offset=1, pageSize=600 (exceeds config max)")
+    @Test(description = "Test offset=1, pageSize=600 (exceeds config max)")
     public void testPageSizeExceedsConfigMax() {
         // Setup data phase - should use config max (500) not pageSize (600)
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))

@@ -1,8 +1,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.*;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,11 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps User Search - Incomplete Attributes Tests")
-class GoogleAppsUserSearchIncompleteAttributesTest extends GoogleAppsConnectorTestBase {
+// Test suite: "GoogleApps User Search - Incomplete Attributes Tests"
+public class GoogleAppsUserSearchIncompleteAttributesTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test search with incomplete attributes handling")
+    @Test(description = "Test search with incomplete attributes handling")
     public void testSearchWithIncompleteAttributes() {
         // This test verifies proper handling when non-default attributes (photo, groups) are requested
         // with AllowPartialAttributeValues=true. These attributes have setReturnedByDefault(false)

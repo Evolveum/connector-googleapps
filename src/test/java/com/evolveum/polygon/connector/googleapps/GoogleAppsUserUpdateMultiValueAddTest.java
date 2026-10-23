@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.objects.AttributeDelta;
 import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Add single value to empty multi-valued attributes (0→1)")
+    @Test(description = "Add single value to empty multi-valued attributes (0→1)")
     public void testAddSingleValueToEmpty() {
         // Setup mock response for getting current user data (empty multi-valued attributes)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/addtest001"))
@@ -120,8 +118,7 @@ public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTe
                 .withRequestBody(containing("{\"value\":\"first-manager@example.com\",\"type\":\"manager\"}")));
     }
 
-    @Test
-    @DisplayName("Add single value to existing multi-valued attributes (1→2)")
+    @Test(description = "Add single value to existing multi-valued attributes (1→2)")
     public void testAddSingleValueToExisting() {
         // Setup mock response for getting current user data (1 value for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/addtest002"))
@@ -247,8 +244,7 @@ public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTe
                 .withRequestBody(containing("{\"value\":\"second-manager@example.com\",\"type\":\"manager\"}")));
     }
 
-    @Test
-    @DisplayName("Add two values to empty multi-valued attributes (0→2)")
+    @Test(description = "Add two values to empty multi-valued attributes (0→2)")
     public void testAddTwoValuesToEmpty() {
         // Setup mock response for getting current user data (empty multi-valued attributes)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/addtest003"))
@@ -360,8 +356,7 @@ public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTe
                 .withRequestBody(containing("{\"value\":\"second-manager@example.com\",\"type\":\"manager\"}")));
     }
 
-    @Test
-    @DisplayName("Add two values to existing multi-valued attributes (2→4)")
+    @Test(description = "Add two values to existing multi-valued attributes (2→4)")
     public void testAddTwoValuesToExisting() {
         // Setup mock response for getting current user data (2 values for each multi-valued attribute)
         stubFor(get(urlPathMatching("/admin/directory/v1/users/addtest004"))

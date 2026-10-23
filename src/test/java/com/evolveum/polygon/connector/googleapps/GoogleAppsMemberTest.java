@@ -4,8 +4,7 @@ import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -19,11 +18,10 @@ import static org.assertj.core.api.Assertions.*;
  *
  * @author Hiroyuki Wada
  */
-@DisplayName("GoogleApps Member Tests")
+// Test suite: "GoogleApps Member Tests"
 public class GoogleAppsMemberTest extends GoogleAppsConnectorTestBase {
 
-    @Test
-    @DisplayName("Test member creation")
+    @Test(description = "Test member creation")
     public void testCreateMember() {
         // Setup stub for member creation
         GoogleApiMockServer.stubFor(post(urlPathEqualTo("/admin/directory/v1/groups/group001/members"))
@@ -59,8 +57,7 @@ public class GoogleAppsMemberTest extends GoogleAppsConnectorTestBase {
         assertThat(createdUid.getUidValue()).isEqualTo("group001/member001@example.com");
     }
 
-    @Test
-    @DisplayName("Test member deletion")
+    @Test(description = "Test member deletion")
     public void testDeleteMember() {
         // Setup stub for member deletion
         GoogleApiMockServer.stubFor(delete(urlPathEqualTo("/admin/directory/v1/groups/group001/members/member001@example.com"))
@@ -77,8 +74,7 @@ public class GoogleAppsMemberTest extends GoogleAppsConnectorTestBase {
         GoogleApiMockServer.verifyRequest(deleteRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group001/members/member001@example.com")));
     }
 
-    @Test
-    @DisplayName("Test member role update")
+    @Test(description = "Test member role update")
     public void testUpdateMemberRole() {
         // Setup stub for member update (PATCH request)
         GoogleApiMockServer.stubFor(patch(urlPathEqualTo("/admin/directory/v1/groups/group001/members/member001@example.com"))
@@ -111,8 +107,7 @@ public class GoogleAppsMemberTest extends GoogleAppsConnectorTestBase {
                         "}")));
     }
 
-    @Test
-    @DisplayName("Test get member by UID")
+    @Test(description = "Test get member by UID")
     public void testGetMember() {
         // Setup stub for member get (no query parameters)
         GoogleApiMockServer.stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/group001/members/member001@example.com"))
@@ -147,8 +142,7 @@ public class GoogleAppsMemberTest extends GoogleAppsConnectorTestBase {
         assertThat(result[0].getAttributeByName(TYPE_ATTR).getValue().get(0)).isEqualTo("USER");
     }
 
-    @Test
-    @DisplayName("Test search members")
+    @Test(description = "Test search members")
     public void testSearchMembers() {
         // Setup stub for member search (group members list)
         GoogleApiMockServer.stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/group001/members"))
@@ -198,8 +192,7 @@ public class GoogleAppsMemberTest extends GoogleAppsConnectorTestBase {
         assertThat(member2.getAttributeByName(ROLE_ATTR).getValue().get(0)).isEqualTo("MANAGER");
     }
 
-    @Test
-    @DisplayName("Test member not found error")
+    @Test(description = "Test member not found error")
     public void testMemberNotFound() {
         // Setup stub for member not found
         GoogleApiMockServer.stubFor(get(urlPathEqualTo("/admin/directory/v1/groups/group001/members/nonexistent@example.com"))
