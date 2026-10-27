@@ -198,7 +198,16 @@ public class LicenseAssignmentsHandler {
         if (!modifications.isEmpty()) {
             final Licensing.LicenseAssignments.Patch patch = buildLicenseAssignmentUpdateRequest(executor.getLicensing().licenseAssignments(), uid, modifications);
             if (patch != null) {
-                executor.execute(patch, new RequestResultHandler.NoOp<Licensing.LicenseAssignments.Patch, LicenseAssignment>());
+                executor.execute(patch, new RequestResultHandler<Licensing.LicenseAssignments.Patch, LicenseAssignment, Object>() {
+                    @Override
+                    public Object handleResult(Licensing.LicenseAssignments.Patch request, LicenseAssignment value) {
+                        String newUid = generateLicenseAssignmentId(value).getUidValue();
+                        if (!uid.getUidValue().equals(newUid)) {
+                            sideEffectDeltas.add(AttributeDeltaBuilder.build(Uid.NAME, newUid));
+                        }
+                        return null;
+                    }
+                });
             }
         }
         
