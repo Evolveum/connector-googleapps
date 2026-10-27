@@ -35,6 +35,7 @@ import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -274,25 +275,34 @@ public class MemberHandler {
             Directory.Members.List request = executor.getDirectory().members().list(groupKey);
 
             // Handle pagination
-            if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                request.setMaxResults(options.getPageSize());
+            boolean paged = options.getPageSize() != null && options.getPageSize() > 0;
+            if (paged) {
+                request.setMaxResults(Math.min(options.getPageSize(), 200));
             }
             request.setPageToken(options.getPagedResultsCookie());
 
-            executor.execute(request,
+            String nextPageToken;
+            do {
+                nextPageToken = executor.execute(request,
                     new RequestResultHandler<Directory.Members.List, Members, String>() {
                         public String handleResult(
                                 final Directory.Members.List request,
                                 final Members value) {
                             if (null != value.getMembers()) {
                                 for (Member member : value.getMembers()) {
-                                    handler.handle(fromMember(request
-                                            .getGroupKey(), member));
+                                    if (!handler.handle(fromMember(request.getGroupKey(), member))) {
+                                        return null;
+                                    }
                                 }
                             }
                             return value.getNextPageToken();
                         }
                     });
+                request.setPageToken(nextPageToken);
+            } while (!paged && StringUtil.isNotBlank(nextPageToken));
+            if (handler instanceof SearchResultsHandler) {
+                ((SearchResultsHandler) handler).handleResult(new SearchResult(nextPageToken, -1));
+            }
 
         } catch (IOException e) {
             logger.warn(e, "Failed to initialize Members#List");
