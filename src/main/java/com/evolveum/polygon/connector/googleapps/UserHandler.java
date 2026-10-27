@@ -1045,7 +1045,7 @@ public class UserHandler {
                 for (String currentAlias : currentAliases) {
                     if (!newAliases.contains(currentAlias)) {
                         executor.execute(deleteUserAlias(aliasesService, uid.getUidValue(), currentAlias),
-                                new RequestResultHandler.NoOp<Directory.Users.Aliases.Delete, Alias>());
+                                new RequestResultHandler.IgnoreMissing<Directory.Users.Aliases.Delete, Void>());
                     }
                 }
                 
@@ -1078,7 +1078,7 @@ public class UserHandler {
                 for (Object alias : valuesToRemove) {
                     if (alias instanceof String) {
                         executor.execute(deleteUserAlias(aliasesService, uid.getUidValue(), (String) alias),
-                                new RequestResultHandler.NoOp<Directory.Users.Aliases.Delete, Alias>());
+                                new RequestResultHandler.IgnoreMissing<Directory.Users.Aliases.Delete, Void>());
                     }
                 }
             }
