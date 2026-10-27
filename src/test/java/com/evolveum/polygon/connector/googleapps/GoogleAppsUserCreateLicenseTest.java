@@ -153,12 +153,15 @@ public class GoogleAppsUserCreateLicenseTest extends GoogleAppsConnectorTestBase
         attributes.add(AttributeBuilder.build("givenName", "LicenseFail"));
         attributes.add(AttributeBuilder.build("familyName", "User"));
 
-        // Execute user creation - should succeed even if license assignment fails
-        Uid createdUid = connectorFacade.create(ObjectClass.ACCOUNT, attributes, null);
-
-        // Verify response - user creation should succeed
-        assertThat(createdUid).isNotNull();
-        assertThat(createdUid.getUidValue()).isEqualTo("licensefail001");
+        // Report partial completion and keep the created UID available for recovery.
+        org.identityconnectors.framework.common.exceptions.RetryableException failure =
+                org.testng.Assert.expectThrows(
+                        org.identityconnectors.framework.common.exceptions.RetryableException.class,
+                        () -> connectorFacade.create(ObjectClass.ACCOUNT, attributes, null));
+        assertThat(failure.getCause()).isInstanceOf(
+                org.identityconnectors.framework.common.exceptions.AlreadyExistsException.class);
+        assertThat(((org.identityconnectors.framework.common.exceptions.AlreadyExistsException)
+                failure.getCause()).getUid().getUidValue()).isEqualTo("licensefail001");
 
         // Verify user creation request
         GoogleApiMockServer.verifyRequest(postRequestedFor(urlPathEqualTo("/admin/directory/v1/users"))
