@@ -29,15 +29,16 @@ package com.evolveum.polygon.connector.googleapps;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
-import com.google.api.client.http.HttpStatusCodes;
+import com.google.api.client.util.Sleeper;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.licensing.Licensing;
-import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.RetryableException;
 
-import java.util.Random;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Executor for Google API requests with error handling and retry logic.
@@ -53,9 +54,13 @@ import java.util.Random;
 public class GoogleApiExecutor {
 
     private static final Log logger = Log.getLog(GoogleApiExecutor.class);
-    private static final Random random = new Random();
+
+    private static final int MAX_RETRY_INDEX = 3;
+    private static final long BASE_DELAY_MS = 1_000L;
+    private static final long JITTER_BOUND_MS = 1_000L;
 
     private final GoogleAppsConfiguration configuration;
+    private final Sleeper sleeper;
 
     /**
      * Create a new GoogleApiExecutor instance for the given configuration.
@@ -63,20 +68,13 @@ public class GoogleApiExecutor {
      * @param configuration the Google Apps configuration containing authentication and API settings
      */
     public GoogleApiExecutor(GoogleAppsConfiguration configuration) {
+        this(configuration, Sleeper.DEFAULT);
+    }
+
+    // Allow retry tests to observe backoff without waiting in real time.
+    GoogleApiExecutor(GoogleAppsConfiguration configuration, Sleeper sleeper) {
         this.configuration = configuration;
-    }
-
-    private static long nextLong(long n) {
-        return (long) (random.nextDouble() * n);
-    }
-
-    /**
-     * Execute a Google API request with default retry behavior (instance method).
-     */
-    public <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
-                                                                       RequestResultHandler<G, T, R> handler) {
-        return execute(Assertions.nullChecked(request, "Google Json ClientRequest"),
-                Assertions.nullChecked(handler, "handler"), -1);
+        this.sleeper = Objects.requireNonNull(sleeper, "sleeper");
     }
 
     public GoogleAppsConfiguration getConfiguration() {
@@ -101,91 +99,135 @@ public class GoogleApiExecutor {
         return configuration.getLicensing();
     }
 
+    public <T, G extends AbstractGoogleJsonClientRequest<T>, R> R execute(
+            G request,
+            RequestResultHandler<G, T, R> handler) {
+
+        return execute(request, handler, -1);
+    }
+
     /**
-     * Execute a Google API request with specified retry count (instance method).
-     * This is the complete implementation copied from GoogleAppsConnector.
+     * Executes a request with bounded retries (one initial attempt and at most four retries).
+     *
+     * @param retry -1 for the initial attempt; 0..3 for a retry attempt
      */
-    public <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
-                                                                       RequestResultHandler<G, T, R> handler,
-                                                                       int retry) {
-        try {
-            if (retry >= 0) {
-                long sleep = (long) ((1000 * Math.pow(2, retry)) + nextLong(1000));
-                try {
-                    Thread.sleep(sleep);
-                } catch (InterruptedException e) {
-                    throw ConnectorException.wrap(e);
-                }
-            }
-            return handler.handleResult(request, (T) request.execute());
-        } catch (GoogleJsonResponseException e) {
-            GoogleJsonError details = e.getDetails();
-            if (null != details && null != details.getErrors()) {
-                GoogleJsonError.ErrorInfo errorInfo = details.getErrors().get(0);
-                // error: 403
-                if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN) {
-                    if ("userRateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())
-                            || "rateLimitExceeded".equalsIgnoreCase(errorInfo.getReason())) {
-                        logger.info("System should retry");
-                        throw RetryableException.wrap(e.getMessage(), e);
-                    } else {
-                        //if we are forbidden to do something we should not try again
-                        return handler.handleError(e);
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_NOT_FOUND) {
-                    if ("notFound".equalsIgnoreCase(errorInfo.getReason())) {
-                        return handler.handleNotFound(e);
-                    }
-                } else if (e.getStatusCode() == 409) {
-                    if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
-                        // Already Exists
-                        handler.handleDuplicate(e);
-                    }
-                } else if (e.getStatusCode() == 400) {
-                    if ("invalid".equalsIgnoreCase(errorInfo.getReason())) {
-                        // Already Exists "Invalid Ou Id"
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE) {
-                    if ("backendError".equalsIgnoreCase(errorInfo.getReason()) && retry < 3) {
-                        logger.warn("retrying 503 backendError retry number " + retry);
-                        return execute(request, handler, ++retry);
-                    } else {
-                        throw RetryableException.wrap(e.getMessage(), e);
-                    }
-                } else if (e.getStatusCode() == HttpStatusCodes.STATUS_CODE_SERVER_ERROR) {
-                    if ("backendError".equalsIgnoreCase(errorInfo.getReason())
-                            || "internalError".equalsIgnoreCase(errorInfo.getReason()) && retry < 3) {
-                        logger.warn("retrying 500" + errorInfo.getReason() + "retry number " + retry);
-                        return execute(request, handler, ++retry);
-                    } else {
-                        throw RetryableException.wrap(e.getMessage(), e);
-                    }
-                } else {
-                    if (retry < 3) { //last resort retry. We must right all wrongs!
-                        logger.warn("retrying " + e.getStatusCode() + " " + errorInfo.getReason() + " retry number " + retry);
-                        return execute(request, handler, ++retry);
-                    } else {
-                        if (e.getStatusCode() == 409) {
-                            if ("duplicate".equalsIgnoreCase(errorInfo.getReason())) {
-                                // Already Exists
-                                logger.warn("handling duplicate");
-                                handler.handleDuplicate(e);
-                            }
-                        } else {
+    public <T, G extends AbstractGoogleJsonClientRequest<T>, R> R execute(
+            G request,
+            RequestResultHandler<G, T, R> handler,
+            int retry) {
+
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(handler, "handler");
+
+        if (retry < -1 || retry > MAX_RETRY_INDEX) {
+            throw new IllegalArgumentException(
+                    "retry must be between -1 and " + MAX_RETRY_INDEX);
+        }
+
+        for (int retryIndex = retry; ; retryIndex++) {
+            waitBeforeRetry(retryIndex);
+
+            final T result;
+            try {
+                result = request.execute();
+            } catch (GoogleJsonResponseException e) {
+                int status = e.getStatusCode();
+
+                switch (status) {
+                    case 403:
+                        if (hasReason(e,
+                                "userRateLimitExceeded",
+                                "rateLimitExceeded",
+                                "quotaExceeded")) {
                             throw RetryableException.wrap(e.getMessage(), e);
                         }
-                    }
+                        return handler.handleError(e);
+
+                    case 404:
+                        // Error details are optional; the HTTP status defines the not-found contract.
+                        return handler.handleNotFound(e);
+
+                    case 409:
+                        if (hasReason(e, "duplicate")) {
+                            return handler.handleDuplicate(e);
+                        }
+                        return handler.handleError(e);
+
+                    case 429:
+                        throw RetryableException.wrap(e.getMessage(), e);
+
+                    case 500:
+                    case 502:
+                    case 503:
+                    case 504:
+                        if (retryIndex >= MAX_RETRY_INDEX) {
+                            throw RetryableException.wrap(e.getMessage(), e);
+                        }
+                        logger.warn(
+                                "Retrying Google API request after HTTP "
+                                        + status + "; retry index "
+                                        + (retryIndex + 1));
+                        break;
+
+                    default:
+                        return handler.handleError(e);
+                }
+
+                continue;
+            } catch (IOException e) {
+                if (retryIndex >= MAX_RETRY_INDEX) {
+                    return handler.handleError(e);
+                }
+
+                logger.warn(
+                        "Retrying Google API request after IOException"
+                                + "; retry index " + (retryIndex + 1));
+                continue;
+            }
+
+            // Result handling is outside the request retry boundary.
+            return handler.handleResult(request, result);
+        }
+    }
+
+    private void waitBeforeRetry(int retryIndex) {
+        if (retryIndex < 0) {
+            return;
+        }
+
+        // retryIndex is validated as 0..3 before reaching this method.
+        long delayMillis = (BASE_DELAY_MS << retryIndex)
+                + ThreadLocalRandom.current().nextLong(JITTER_BOUND_MS);
+
+        try {
+            sleeper.sleep(delayMillis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw ConnectorException.wrap(e);
+        }
+    }
+
+    private static boolean hasReason(
+            GoogleJsonResponseException exception,
+            String... expectedReasons) {
+
+        GoogleJsonError details = exception.getDetails();
+        if (details == null || details.getErrors() == null) {
+            return false;
+        }
+
+        for (GoogleJsonError.ErrorInfo error : details.getErrors()) {
+            if (error == null) {
+                continue;
+            }
+
+            for (String expected : expectedReasons) {
+                if (expected.equalsIgnoreCase(error.getReason())) {
+                    return true;
                 }
             }
-            throw ConnectorException.wrap(e);
-        } catch (java.io.IOException e) {
-            // https://developers.google.com/admin-sdk/directory/v1/limits
-            // rateLimitExceeded or userRateLimitExceeded
-            if (retry < 3) {
-                return execute(request, handler, ++retry);
-            } else {
-                return handler.handleError(e);
-            }
         }
+
+        return false;
     }
 }

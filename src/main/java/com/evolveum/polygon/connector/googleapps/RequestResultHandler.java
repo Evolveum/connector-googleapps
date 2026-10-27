@@ -70,11 +70,18 @@ public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientReq
             return null;
         }
         
+    }
+
+    /** A repeated delete is successful when the relationship or photo is already absent. */
+    public static class IgnoreMissing<G extends AbstractGoogleJsonClientRequest, T> extends NoOp<G, T> {
         @Override
         public Object handleNotFound(IOException e) {
             return null;
         }
-        
+    }
+
+    /** Adding an existing membership does not need to change its role. */
+    public static class IgnoreDuplicate<G extends AbstractGoogleJsonClientRequest, T> extends NoOp<G, T> {
         @Override
         public Object handleDuplicate(IOException e) {
             return null;
