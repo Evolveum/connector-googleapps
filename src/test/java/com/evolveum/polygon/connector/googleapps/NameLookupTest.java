@@ -36,7 +36,7 @@ public class NameLookupTest {
         config.setDomain("example.com");config.setAllowCache(false);
         GoogleAppsConnector c=new GoogleAppsConnector();c.init(config);
         List<ConnectorObject> results=new ArrayList<>();
-        c.executeQuery(type,FilterBuilder.equalTo(new Name("user@example.com")),o->{results.add(o);return true;},
+        c.executeQuery(type,c.createFilterTranslator(type, new OperationOptionsBuilder().build()).translate(FilterBuilder.equalTo(new Name("user@example.com"))).get(0),o->{results.add(o);return true;},
                 new OperationOptionsBuilder().setAttributesToGet("__NAME__").build());
         assertThat(urls).hasSize(1);assertThat(urls.get(0)).contains("/"+collection+"/user@example.com");
         assertThat(results).hasSize(1);assertThat(results.get(0).getUid().getUidValue()).isEqualTo("immutable-id");

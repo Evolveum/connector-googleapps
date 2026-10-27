@@ -27,40 +27,83 @@ import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
-import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.services.directory.Directory;
-import com.google.api.services.directory.model.*;
+import com.google.api.services.directory.model.Alias;
+import com.google.api.services.directory.model.Aliases;
+import com.google.api.services.directory.model.Group;
+import com.google.api.services.directory.model.Groups;
+import com.google.api.services.directory.model.Member;
+import com.google.api.services.directory.model.Members;
+import com.google.api.services.directory.model.OrgUnit;
+import com.google.api.services.directory.model.OrgUnits;
+import com.google.api.services.directory.model.User;
+import com.google.api.services.directory.model.UserPhoto;
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.LicensingRequest;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentList;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.identityconnectors.common.Assertions;
 import org.identityconnectors.common.CollectionUtil;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
-import org.identityconnectors.framework.common.exceptions.RetryableException;
-import org.identityconnectors.framework.common.exceptions.UnknownUidException;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeUtil;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.OperationOptionInfo;
+import org.identityconnectors.framework.common.objects.OperationOptionInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.PredefinedAttributes;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
 import org.identityconnectors.framework.common.objects.Schema;
-import org.identityconnectors.framework.common.objects.*;
-import org.identityconnectors.framework.common.objects.filter.*;
+import org.identityconnectors.framework.common.objects.SchemaBuilder;
+import org.identityconnectors.framework.common.objects.SearchResult;
+import org.identityconnectors.framework.common.objects.Uid;
+import org.identityconnectors.framework.common.objects.filter.AttributeFilter;
+import org.identityconnectors.framework.common.objects.filter.EqualsFilter;
+import org.identityconnectors.framework.common.objects.filter.Filter;
+import org.identityconnectors.framework.common.objects.filter.FilterTranslator;
+import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
 import org.identityconnectors.framework.spi.Configuration;
 import org.identityconnectors.framework.spi.Connector;
 import org.identityconnectors.framework.spi.ConnectorClass;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
-import org.identityconnectors.framework.spi.operations.*;
+import org.identityconnectors.framework.spi.operations.CreateOp;
+import org.identityconnectors.framework.spi.operations.DeleteOp;
+import org.identityconnectors.framework.spi.operations.SchemaOp;
+import org.identityconnectors.framework.spi.operations.SearchOp;
+import org.identityconnectors.framework.spi.operations.TestOp;
+import org.identityconnectors.framework.spi.operations.UpdateDeltaOp;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.regex.Matcher;
 
-import static com.evolveum.polygon.connector.googleapps.GroupHandler.*;
-import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.*;
-import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.*;
-import static com.evolveum.polygon.connector.googleapps.UserHandler.*;
+import static com.evolveum.polygon.connector.googleapps.GroupHandler.fromMember;
+import static com.evolveum.polygon.connector.googleapps.GroupHandler.getGroupClassInfo;
+import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.LICENSE_NAME_PATTERN;
+import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.fromLicenseAssignment;
+import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.getLicenseAssignmentClassInfo;
+import static com.evolveum.polygon.connector.googleapps.MemberHandler.getMemberClassInfo;
+import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.fromOrgunit;
+import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.getOrgunitClassInfo;
+import static com.evolveum.polygon.connector.googleapps.UserHandler.getUserClassInfo;
 import static org.identityconnectors.framework.common.objects.OperationalAttributes.ENABLE_NAME;
 
 /**
@@ -69,7 +112,7 @@ import static org.identityconnectors.framework.common.objects.OperationalAttribu
 @ConnectorClass(displayNameKey = "GoogleApps.connector.display",
         configurationClass = GoogleAppsConfiguration.class)
 public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, SchemaOp,
-        SearchOp<Filter>, TestOp, UpdateDeltaOp {
+        SearchOp<GoogleFilter>, TestOp, UpdateDeltaOp {
 
     /**
      * Setup logging for the {@link GoogleAppsConnector}.
@@ -146,6 +189,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     private GoogleAppsConfiguration configuration;
     private ConnectorObjectsCache objectsCache;
     private Schema schema = null;
+    private Map<ObjectClass, SchemaDefinition> schemaCache = new HashMap<>();
     private GoogleApiExecutor apiExecutor;
 
     /**
@@ -177,6 +221,8 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public void dispose() {
         configuration = null;
         apiExecutor = null;
+        schema = null;
+        schemaCache.clear();
     }
 
     /**
@@ -275,16 +321,25 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
 
             builder.defineOperationOption(OperationOptionInfoBuilder.buildAttributesToGet(),
                     SearchOp.class);
+            builder.defineOperationOption(OperationOptionInfoBuilder.buildAllowPartialAttributeValues(),
+                    SearchOp.class);
             builder.defineOperationOption(OperationOptionInfoBuilder.buildPageSize(),
+                    SearchOp.class);
+            builder.defineOperationOption(OperationOptionInfoBuilder.buildPagedResultsOffset(),
                     SearchOp.class);
             builder.defineOperationOption(OperationOptionInfoBuilder.buildPagedResultsCookie(),
                     SearchOp.class);
             builder.defineOperationOption(OperationOptionInfoBuilder.buildSortKeys(),
                     SearchOp.class);
+            builder.defineOperationOption(OperationOptionInfoBuilder.buildReturnDefaultAttributes(),
+                    SearchOp.class);
             builder.defineOperationOption(
                     new OperationOptionInfo(SHOW_DELETED_PARAM, Boolean.class), SearchOp.class);
 
             schema = builder.build();
+
+            // Initialize schema cache
+            initializeSchemaCache();
         }
         return schema;
     }
@@ -292,89 +347,21 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     /**
      * {@inheritDoc}
      */
-    public FilterTranslator<Filter> createFilterTranslator(ObjectClass objectClass,
-                                                           OperationOptions options) {
-        return new FilterTranslator<Filter>() {
-            public List<Filter> translate(Filter filter) {
-                return CollectionUtil.newList(filter);
-            }
-        };
+    public FilterTranslator<GoogleFilter> createFilterTranslator(ObjectClass objectClass, OperationOptions options) {
+        if (ObjectClass.ACCOUNT.equals(objectClass)) return new GoogleFilterTranslator(objectClass);
+        return filter -> Collections.singletonList(new GoogleFilter(filter));
     }
 
     /**
      * {@inheritDoc}
      */
-    public void executeQuery(ObjectClass objectClass, Filter query, final ResultsHandler handler,
-                             OperationOptions options) {
-        final long startTime = System.currentTimeMillis();
-        final Set<String> attributesToGet = getAttributesToGet(objectClass, options);
-        Uid uid = null;
-        if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Uid) {
-            // Read request
-            uid = (Uid) ((EqualsFilter) query).getAttribute();
-        }
-        Name name = null;
-        if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Name) {
-            // Read request
-            name = (Name) ((EqualsFilter) query).getAttribute();
-        }
-        logger.info("executeQuery() - objectClass: " + objectClass +
-                ", uid: " + (uid == null ? "null" : uid.getUidValue()) +
-                ", name: " + (name == null ? "null" : name.getNameValue()));
-
+    public void executeQuery(ObjectClass objectClass, GoogleFilter filter, ResultsHandler handler, OperationOptions options) {
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
-            if (null == uid && null == name) {
-                // Search request
-                executeAccountSearchQuery(query, handler, options, attributesToGet);
-            } else if (uid != null) {
-                // Read request
-                executeAccountReadQuery(uid, handler, options, attributesToGet);
-            } else {
-                // Read request
-                executeAccountReadQuery(name, handler, options, attributesToGet);
-            }
-        } else if (ObjectClass.GROUP.equals(objectClass)) {
-            if (null == uid && null == name) {
-                // Search request
-                executeGroupSearchQuery(query, handler, options, attributesToGet);
-            } else if (uid != null) {
-                // Read request
-                executeGroupReadQuery(uid, handler, options, attributesToGet);
-            } else {
-                executeGroupReadQuery(name, handler, options, attributesToGet);
-            }
-        } else if (MEMBER.equals(objectClass)) {
-            if (null == uid) {
-                // Search request
-                executeMemberSearchQuery(query, handler, options);
-            } else {
-                // Read request
-                executeMemberReadQuery(uid, handler);
-            }
-        } else if (ORG_UNIT.equals(objectClass)) {
-            if (null == uid) {
-                // Search request
-                executeOrgUnitSearchQuery(query, handler, options, attributesToGet);
-            } else {
-                // Read request
-                executeOrgUnitReadQuery(uid, handler, options, attributesToGet);
-            }
-        } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
-            if (null == uid) {
-                // Search request
-                executeLicenseAssignmentSearchQuery(handler, options);
-            } else {
-                // Read request
-                executeLicenseAssignmentReadQuery(uid, handler);
-            }
+            UserHandler.executeQuery(apiExecutor, objectsCache, filter == null ? GoogleFilter.EMPTY : filter,
+                    handler, options, getSchemaDefinition(objectClass));
         } else {
-            logger.warn("Search of type {0} is not supported", configuration.getConnectorMessages()
-                    .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
-            throw new UnsupportedOperationException("Search of type"
-                    + objectClass.getObjectClassValue() + " is not supported");
+            executeLegacyQuery(objectClass, filter == null ? null : filter.getFilter(), handler, options);
         }
-
-        logger.info("executeQuery() - finished in " + timeFrom(startTime));
     }
 
     private void executeLicenseAssignmentReadQuery(Uid uid, final ResultsHandler handler) {
@@ -755,145 +742,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     }
 
     private void executeAccountReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            // Try the cache first
-            ConnectorObject cachedUser = objectsCache.getUser(uid.getUidValue());
-            if (cachedUser != null) {
-                handler.handle(cachedUser);
-                return;
-            }
-
-            // No success in cache, do the remote call
-            Directory.Users.Get request
-                    = configuration.getDirectory().users().get(uid.getUidValue());
-            request.setFields(getFields(ObjectClass.ACCOUNT, options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR));
-
-            execute(request,
-                    new RequestResultHandler<Directory.Users.Get, User, Boolean>() {
-                        public Boolean handleResult(final Directory.Users.Get request,
-                                                    final User value) {
-                            ConnectorObject user = fromUser(value, attributesToGet,
-                                    configuration.getDirectory().groups());
-                            objectsCache.addUser(user);
-                            return handler.handle(user);
-                        }
-
-                        public Boolean handleNotFound(IOException e) {
-                            // Do nothing if not found
-                            return true;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#Get");
-            throw ConnectorException.wrap(e);
-        }
+        UserHandler.executeAccountReadQuery(apiExecutor, objectsCache, uid, handler, options, getSchemaDefinition(ObjectClass.ACCOUNT));
     }
 
     private void executeAccountSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            Directory.Users.List request = configuration.getDirectory().users().list();
-            if (null != query) {
-                StringBuilder queryBuilder = query.accept(new UserHandler(), request);
-                if (null != queryBuilder) {
-                    String queryString = queryBuilder.toString();
-                    logger.ok("Executing Query: {0}", queryString);
-                    request.setQuery(queryString);
-                }
-                if (null == request.getDomain() && null == request.getCustomer()) {
-                    request.setCustomer(MY_CUSTOMER_ID);
-                }
-            } else {
-                request.setCustomer(MY_CUSTOMER_ID);
-            }
-
-            // Implementation to support the 'OP_PAGE_SIZE'
-            boolean paged = false;
-            if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                if (options.getPageSize() >= 1 && options.getPageSize() <= 500) {
-                    request.setMaxResults(options.getPageSize());
-                    paged = true;
-                } else {
-                    //throw new IllegalArgumentException("Invalid pageSize value. Default is 100. Max allowed is 500 (integer, 1-500)");
-                }
-            }
-            // Implementation to support the 'OP_PAGED_RESULTS_COOKIE'
-            request.setPageToken(options.getPagedResultsCookie());
-
-            // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-            String fields = getFields(ObjectClass.ACCOUNT, options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR);
-            if (null != fields) {
-                request.setFields("nextPageToken,users(" + fields + ")");
-            }
-
-            if (options.getOptions().get(SHOW_DELETED_PARAM) instanceof Boolean) {
-                request.setShowDeleted(options.getOptions().get(SHOW_DELETED_PARAM)
-                        .toString());
-            }
-
-            // Implementation to support the 'OP_SORT_KEYS'
-            if (null != options.getSortKeys()) {
-                for (SortKey sortKey : options.getSortKeys()) {
-                    String orderBy = null;
-                    if (sortKey.getField().equalsIgnoreCase(EMAIL_ATTR)
-                            || sortKey.getField().equalsIgnoreCase(PRIMARY_EMAIL_ATTR)
-                            || sortKey.getField().equalsIgnoreCase(ALIASES_ATTR)
-                            || sortKey.getField().equalsIgnoreCase(ALIAS_ATTR)) {
-                        orderBy = EMAIL_ATTR;
-                    } else if (sortKey.getField().equalsIgnoreCase(GIVEN_NAME_ATTR)) {
-                        orderBy = GIVEN_NAME_ATTR;
-                    } else if (sortKey.getField().equalsIgnoreCase(FAMILY_NAME_ATTR)) {
-                        orderBy = FAMILY_NAME_ATTR;
-                    } else {
-                        logger.ok("Unsupported SortKey:{0}", sortKey);
-                        continue;
-                    }
-
-                    request.setOrderBy(orderBy);
-                    if (sortKey.isAscendingOrder()) {
-                        request.setSortOrder(ASCENDING_ORDER);
-                    } else {
-                        request.setSortOrder(DESCENDING_ORDER);
-                    }
-                    break;
-                }
-            }
-
-            String nextPageToken = null;
-            do {
-                if (StringUtil.isNotBlank(nextPageToken)) {
-                    request.setPageToken(nextPageToken);
-                }
-                nextPageToken
-                        = execute(request,
-                        new RequestResultHandler<Directory.Users.List, Users, String>() {
-                            public String handleResult(
-                                    final Directory.Users.List request,
-                                    final Users value) {
-                                if (null != value.getUsers()) {
-                                    for (User user : value.getUsers()) {
-                                        handler.handle(fromUser(user,
-                                                attributesToGet, configuration
-                                                        .getDirectory().groups()));
-                                    }
-                                }
-                                return value.getNextPageToken();
-                            }
-                        });
-                request.setPageToken(nextPageToken);
-            } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-            if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                logger.info("Paged Search was requested and next token is:{0}",
-                        nextPageToken);
-                ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                        nextPageToken, 0));
-            }
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#List");
-            throw ConnectorException.wrap(e);
-        }
+        UserHandler.executeAccountSearchQuery(apiExecutor, new GoogleFilter(query), handler, options, getSchemaDefinition(ObjectClass.ACCOUNT));
     }
 
     protected Set<String> getAttributesToGet(ObjectClass objectClass, OperationOptions options) {
@@ -1043,378 +896,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     /**
      * {@inheritDoc}
      */
-    public Uid update(ObjectClass objectClass, Uid uid, Set<Attribute> replaceAttributes,
-                      OperationOptions options) {
-        final AttributesAccessor attributesAccessor = new AttributesAccessor(replaceAttributes);
 
-        Uid uidAfterUpdate = uid;
-        if (ObjectClass.ACCOUNT.equals(objectClass)) {
-
-            final Directory.Users.Patch patch
-                    = updateUser(configuration.getDirectory().users(), uid,
-                    attributesAccessor);
-            if (null != patch) {
-                uidAfterUpdate
-                        = execute(patch,
-                        new RequestResultHandler<Directory.Users.Patch, User, Uid>() {
-                            public Uid handleResult(Directory.Users.Patch request,
-                                                    User value) {
-                                logger.ok("User is Updated:{0}", value.getId());
-                                return new Uid(value.getId(), value.getEtag());
-                            }
-                        });
-            }
-            // aliases
-            if (null != attributesAccessor.findStringList(ALIASES_ATTR)) {
-                List<String> aliases = new ArrayList(attributesAccessor.findStringList(ALIASES_ATTR));
-                final Directory.Users.Aliases aliasesService = configuration.getDirectory().users().aliases();
-                Set<String> currentAliases = listAliases(aliasesService, uid.getUidValue());
-
-                List<String> aliasesToDel = new ArrayList(currentAliases);
-                aliasesToDel.removeAll(aliases);
-                aliases.removeAll(currentAliases); // aliases var now contains values to add
-
-                for (Object member : aliases) { // ADD alias
-                    if (member instanceof String) {
-
-                        String id
-                                = execute(createUserAlias(aliasesService, uid.getUidValue(),
-                                (String) member),
-                                new RequestResultHandler<Directory.Users.Aliases.Insert, Alias, String>() {
-                                    public String handleResult(
-                                            final Directory.Users.Aliases.Insert request,
-                                            final Alias value) {
-                                        if (null != value) {
-                                            return value.getId();
-                                        } else {
-                                            return null;
-                                        }
-                                    }
-                                });
-
-                        if (null == id) {
-                            // TODO make warn about failed update
-                        }
-                    } else if (null != member) {
-                        // Delete user and Error or
-                        RetryableException e
-                                = RetryableException.wrap("Invalid attribute value: "
-                                + String.valueOf(member), uid);
-                        e.initCause(new InvalidAttributeValueException(
-                                "Attribute 'aliases' must be a String list"));
-                        throw e;
-                    }
-                }
-
-                for (Object member : aliasesToDel) { // DEL alias
-                    if (member instanceof String) {
-
-                        String id
-                                = execute(deleteUserAlias(aliasesService, uid.getUidValue(),
-                                (String) member),
-                                new RequestResultHandler<Directory.Users.Aliases.Delete, Alias, String>() {
-                                    public String handleResult(
-                                            final Directory.Users.Aliases.Delete request,
-                                            final Alias value) {
-                                        if (null != value) {
-                                            return value.getId();
-                                        } else {
-                                            return null;
-                                        }
-                                    }
-                                });
-                        if (null == id) {
-                            // TODO make warn about failed update
-                        }
-                    } else if (null != member) {
-                        // Delete user and Error or
-                        RetryableException e
-                                = RetryableException.wrap("Invalid attribute value: "
-                                + String.valueOf(member), uid);
-                        e.initCause(new InvalidAttributeValueException(
-                                "Attribute 'aliases' must be a String list"));
-                        throw e;
-                    }
-                }
-            }
-
-            // groups member
-            Attribute groups = attributesAccessor.find(PredefinedAttributes.GROUPS_NAME);
-            if (null != groups) {
-                final Directory.Members service = configuration.getDirectory().members();
-                if (groups.getValue() == null || groups.getValue().isEmpty()) {
-                    // Remove all membership
-                    for (String groupKey : listGroups(configuration.getDirectory().groups(),
-                            uidAfterUpdate.getUidValue())) {
-
-                        execute(deleteMembers(service, groupKey, uidAfterUpdate.getUidValue()),
-                                new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
-                                    public Object handleResult(Directory.Members.Delete request,
-                                                               Void value) {
-                                        return null;
-                                    }
-
-                                    public Object handleNotFound(IOException e) {
-                                        // It may be an indirect membership,
-                                        // not able to delete
-                                        return null;
-                                    }
-                                });
-                    }
-                } else {
-                    final Set<String> activeGroups
-                            = listGroups(configuration.getDirectory().groups(), uidAfterUpdate
-                            .getUidValue());
-
-                    final List<Directory.Members.Insert> addGroups
-                            = new ArrayList<Directory.Members.Insert>();
-                    final Set<String> keepGroups = CollectionUtil.newCaseInsensitiveSet();
-
-                    for (Object member : groups.getValue()) {
-                        if (member instanceof String) {
-                            if (activeGroups.contains(member)) {
-                                keepGroups.add((String) member);
-                            } else {
-                                addGroups.add(createMemberById(service, (String) member, uidAfterUpdate
-                                        .getUidValue(), null));
-                            }
-                        } else if (null != member) {
-                            // throw error/revert?
-                            throw new InvalidAttributeValueException(
-                                    "Attribute '__GROUPS__' must be a String list");
-                        }
-                    }
-
-                    // Add new Member object
-                    for (Directory.Members.Insert insert : addGroups) {
-                        execute(insert,
-                                new RequestResultHandler<Directory.Members.Insert, Member, Object>() {
-                                    public Object handleResult(Directory.Members.Insert request,
-                                                               Member value) {
-                                        return null;
-                                    }
-
-                                    public Object handleDuplicate(IOException e) {
-                                        // Do nothing
-                                        return null;
-                                    }
-                                });
-                    }
-
-                    // Delete existing Member object
-                    if (activeGroups.removeAll(keepGroups)) {
-                        for (String groupKey : activeGroups) {
-                            execute(deleteMembers(service, groupKey, uidAfterUpdate.getUidValue()),
-                                    new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
-                                        public Object handleResult(
-                                                Directory.Members.Delete request, Void value) {
-                                            return null;
-                                        }
-
-                                        public Object handleNotFound(IOException e) {
-                                            // It may be an indirect membership,
-                                            // not able to delete
-                                            return null;
-                                        }
-                                    });
-                        }
-                    }
-
-                }
-            }
-        } else if (ObjectClass.GROUP.equals(objectClass)) {
-
-            final Directory.Groups.Patch patch
-                    = updateGroup(configuration.getDirectory().groups(), uid.getUidValue(),
-                    attributesAccessor);
-            if (null != patch) {
-                uidAfterUpdate
-                        = execute(patch,
-                        new RequestResultHandler<Directory.Groups.Patch, Group, Uid>() {
-                            public Uid handleResult(Directory.Groups.Patch request,
-                                                    Group value) {
-                                logger.ok("Group is Updated:{0}", value.getId());
-                                return new Uid(value.getId(), value.getEtag());
-                            }
-                        });
-            }
-            Attribute members = attributesAccessor.find(MEMBERS_ATTR);
-            if (null != members) {
-                final Directory.Members service = configuration.getDirectory().members();
-                if (null == members.getValue() || members.getValue().isEmpty()) {
-                    // Remove all membership
-                    logger.info("Null or empty membership, so removing all members from: " + uid.getUidValue());
-                    for (String member : listMembers(service, uidAfterUpdate.getUidValue(), null)) {
-
-                        execute(deleteMembers(service, uidAfterUpdate.getUidValue(), member),
-                                new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
-                                    public Object handleResult(Directory.Members.Delete request,
-                                                               Void value) {
-                                        return null;
-                                    }
-
-                                    public Object handleNotFound(IOException e) {
-                                        // Do nothing
-                                        return null;
-                                    }
-                                });
-                    }
-                } else {
-                    final List<String> activeMembership
-                            = listMembers(service, uidAfterUpdate.getUidValue(), null);
-                    final List<String> deleteMembers
-                            = new ArrayList<String>();
-                    deleteMembers.addAll(activeMembership);
-
-                    final List<Directory.Members.Insert> addMembership
-                            = new ArrayList<Directory.Members.Insert>();
-                    final List<Directory.Members.Patch> patchMembership
-                            = new ArrayList<Directory.Members.Patch>();
-
-
-                    //TODO add other kind of roles but MEMBER
-                    for (Object member : members.getValue()) {
-                        if (member instanceof String) {
-
-                            String email = (String) member;
-
-                            boolean notMember = true;
-                            for (String a : activeMembership) {
-                                if (email.equalsIgnoreCase(a)) {
-                                    notMember = false;
-                                    if (deleteMembers.contains(a)) {
-                                        deleteMembers.remove(a);
-                                    }
-                                    break;
-                                }
-                            }
-                            if (notMember) {
-                                addMembership.add(createMemberByEmail(service, uidAfterUpdate
-                                        .getUidValue(), email, "MEMBER"));
-                            }
-                        } else if (null != member) {
-                            // throw error/revert?
-                            throw new InvalidAttributeValueException(
-                                    "Attribute 'members' must be a Map list");
-                        }
-                    }
-
-                    // Add new Member object
-                    for (Directory.Members.Insert insert : addMembership) {
-                        execute(insert,
-                                new RequestResultHandler<Directory.Members.Insert, Member, Object>() {
-                                    public Object handleResult(Directory.Members.Insert request,
-                                                               Member value) {
-                                        return null;
-                                    }
-
-                                    public Object handleDuplicate(IOException e) {
-                                        // Do nothing
-                                        return null;
-                                    }
-                                });
-                    }
-
-                    // Update existing Member object
-                    for (Directory.Members.Patch request : patchMembership) {
-                        execute(request,
-                                new RequestResultHandler<Directory.Members.Patch, Member, Object>() {
-                                    public Object handleResult(Directory.Members.Patch request,
-                                                               Member value) {
-                                        return null;
-                                    }
-                                });
-                    }
-
-                    // Delete existing Member object
-                    for (String a : deleteMembers) {
-                        execute(deleteMembers(service, uidAfterUpdate.getUidValue(), a),
-                                new RequestResultHandler<Directory.Members.Delete, Void, Object>() {
-                                    public Object handleResult(
-                                            Directory.Members.Delete request, Void value) {
-                                        return null;
-                                    }
-
-                                    public Object handleNotFound(IOException e) {
-                                        // Do nothing
-                                        return null;
-                                    }
-                                });
-                    }
-                }
-            }
-        } else if (MEMBER.equals(objectClass)) {
-
-            String role = attributesAccessor.findString(ROLE_ATTR);
-            if (StringUtil.isNotBlank(role)) {
-                String[] ids = uid.getUidValue().split("/");
-                if (ids.length == 2) {
-                    final Directory.Members.Patch patch
-                            = updateMembers(configuration.getDirectory().members(), ids[0], ids[1],
-                            role).setFields(EMAIL_ETAG);
-                    uidAfterUpdate
-                            = execute(patch,
-                            new RequestResultHandler<Directory.Members.Patch, Member, Uid>() {
-                                public Uid handleResult(Directory.Members.Patch request,
-                                                        Member value) {
-                                    logger.ok("Member is updated:{0}/{1}", request
-                                            .getGroupKey(), value.getEmail());
-                                    return generateMemberId(request.getGroupKey(), value);
-                                }
-                            });
-                } else {
-                    throw new UnknownUidException("Invalid ID format");
-                }
-            }
-        } else if (ORG_UNIT.equals(objectClass)) {
-
-            final Directory.Orgunits.Patch patch
-                    = updateOrgunit(configuration.getDirectory().orgunits(), uid.getUidValue(),
-                    attributesAccessor);
-            if (null != patch) {
-                uidAfterUpdate
-                        = execute(patch,
-                        new RequestResultHandler<Directory.Orgunits.Patch, OrgUnit, Uid>() {
-                            public Uid handleResult(Directory.Orgunits.Patch request,
-                                                    OrgUnit value) {
-                                logger.ok("OrgUnit is updated:{0}", value.getName());
-                                return generateOrgUnitId(value);
-                            }
-                        });
-            }
-        } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
-
-            final Licensing.LicenseAssignments.Patch patch
-                    = updateLicenseAssignment(configuration.getLicensing().licenseAssignments(), uid
-                    .getUidValue(), attributesAccessor);
-            if (null != patch) {
-                uidAfterUpdate
-                        = execute(patch,
-                        new RequestResultHandler<Licensing.LicenseAssignments.Patch, LicenseAssignment, Uid>() {
-                            public Uid handleResult(
-                                    Licensing.LicenseAssignments.Patch request,
-                                    LicenseAssignment value) {
-                                logger.ok("LicenseAssignment is Updated:{0}/{1}/{2}", value
-                                        .getProductId(), value.getSkuId(), value
-                                        .getUserId());
-                                return generateLicenseAssignmentId(value);
-                            }
-                        });
-            }
-        } else {
-            logger.warn("Update of type {0} is not supported", configuration.getConnectorMessages()
-                    .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
-            throw new UnsupportedOperationException("Update of type"
-                    + objectClass.getObjectClassValue() + " is not supported");
-        }
-
-        if (ObjectClass.ACCOUNT.equals(objectClass)) {
-            objectsCache.markUserAsUpdatedNow(uidAfterUpdate.getUidValue());
-        } else if (ObjectClass.GROUP.equals(objectClass)) {
-            objectsCache.markGroupAsUpdatedNow(uidAfterUpdate.getUidValue());
-        }
-        return uidAfterUpdate;
-    }
 
     protected ConnectorObject fromUser(User user, Set<String> attributesToGet,
                                        Directory.Groups service) {
@@ -1804,31 +1286,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         return val;
     }
     private void executeAccountReadQuery(Name name, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            Directory.Users.Get request
-                    = configuration.getDirectory().users().get(name.getNameValue());
-            request.setFields(getFields(ObjectClass.ACCOUNT, options, ID_ATTR, ETAG_ATTR, PRIMARY_EMAIL_ATTR));
-
-            execute(request,
-                    new RequestResultHandler<Directory.Users.Get, User, Boolean>() {
-                        public Boolean handleResult(final Directory.Users.Get request,
-                                                    final User value) {
-                            ConnectorObject user = fromUser(value, attributesToGet,
-                                    configuration.getDirectory().groups());
-                            objectsCache.addUser(user);
-                            return handler.handle(user);
-                        }
-
-                        public Boolean handleNotFound(IOException e) {
-                            // Do nothing if not found
-                            return true;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Users#Get");
-            throw ConnectorException.wrap(e);
-        }
+        UserHandler.executeAccountReadQuery(apiExecutor, objectsCache, name, handler, options, getSchemaDefinition(ObjectClass.ACCOUNT));
     }
     private void executeGroupReadQuery(Name name, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
         try {
@@ -1861,62 +1319,133 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         return apiExecutor;
     }
     @Override
-    public Set<AttributeDelta> updateDelta(ObjectClass objectClass, Uid uid,
-            Set<AttributeDelta> modifications, OperationOptions options) {
-        if (ObjectClass.ACCOUNT.equals(objectClass)) {
-            Set<AttributeDelta> result = UserHandler.executeUserUpdateDelta(apiExecutor, uid, modifications);
+    public Set<AttributeDelta> updateDelta(ObjectClass objclass, Uid uid, Set<AttributeDelta> modifications, OperationOptions options) {
+        if (ObjectClass.ACCOUNT.equals(objclass)) {
+            // Delegate User updateDelta to UserHandler
+            Set<AttributeDelta> sideEffectDeltas = UserHandler.executeUserUpdateDelta(apiExecutor, uid, modifications);
+
+            // Update cache
             objectsCache.markUserAsUpdatedNow(uid.getUidValue());
-            return result;
-        }
 
-        if (LICENSE_ASSIGNMENT.equals(objectClass)) {
-            Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(apiExecutor, uid, modifications);
-            
-            return result;
-        }
+            return sideEffectDeltas;
 
-        if (ORG_UNIT.equals(objectClass)) {
-            Set<AttributeDelta> result = OrgunitsHandler.executeOrgunitUpdateDelta(apiExecutor, uid, modifications);
-            
-            return result;
-        }
+        } else if (ObjectClass.GROUP.equals(objclass)) {
+            // Delegate Group updateDelta to GroupHandler
+            Set<AttributeDelta> sideEffectDeltas = GroupHandler.executeGroupUpdateDelta(apiExecutor, uid, modifications);
 
-        if (MEMBER.equals(objectClass)) {
-            Set<AttributeDelta> result = MemberHandler.executeMemberUpdateDelta(apiExecutor, uid, modifications);
-            
-            return result;
-        }
-
-        if (ObjectClass.GROUP.equals(objectClass)) {
-            Set<AttributeDelta> result = GroupHandler.executeGroupUpdateDelta(apiExecutor, uid, modifications);
+            // Update cache
             objectsCache.markGroupAsUpdatedNow(uid.getUidValue());
-            return result;
-        }
 
-        Set<Attribute> replacements = new HashSet<>();
-        for (AttributeDelta delta : modifications) {
-            if (delta.getValuesToReplace() != null) {
-                replacements.add(AttributeBuilder.build(delta.getName(), delta.getValuesToReplace()));
-            } else {
-                List<ConnectorObject> found = new ArrayList<>();
-                executeQuery(objectClass, FilterBuilder.equalTo(uid), object -> { found.add(object); return false; },
-                        new OperationOptionsBuilder().setAttributesToGet(delta.getName()).build());
-                if (found.isEmpty()) throw new UnknownUidException(uid.getUidValue());
-                Attribute current = found.get(0).getAttributeByName(delta.getName());
-                List<Object> values = new ArrayList<>();
-                if (current != null && current.getValue() != null) values.addAll(current.getValue());
-                if (delta.getValuesToRemove() != null) values.removeAll(delta.getValuesToRemove());
-                if (delta.getValuesToAdd() != null) for (Object value : delta.getValuesToAdd()) {
-                    if (!values.contains(value)) values.add(value);
-                }
-                replacements.add(AttributeBuilder.build(delta.getName(), values));
-            }
+            return sideEffectDeltas;
+        } else if (MEMBER.equals(objclass)) {
+            // Delegate MEMBER updateDelta to MemberHandler
+            return MemberHandler.executeMemberUpdateDelta(apiExecutor, uid, modifications);
+
+        } else if (ORG_UNIT.equals(objclass)) {
+            // Delegate ORG_UNIT updateDelta to OrgunitsHandler
+            return OrgunitsHandler.executeOrgunitUpdateDelta(apiExecutor, uid, modifications);
+
+        } else if (LICENSE_ASSIGNMENT.equals(objclass)) {
+            // Delegate LICENSE_ASSIGNMENT updateDelta to LicenseAssignmentsHandler
+            return LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(apiExecutor, uid, modifications);
+
+        } else {
+            logger.warn("UpdateDelta of type {0} is not supported", configuration.getConnectorMessages()
+                    .format(objclass.getDisplayNameKey(), objclass.getObjectClassValue()));
+            throw new UnsupportedOperationException("UpdateDelta of type"
+                    + objclass.getObjectClassValue() + " is not supported");
         }
-        Uid updated = update(objectClass, uid, replacements, options == null ? new OperationOptionsBuilder().build() : options);
-        if (updated != null && !updated.getUidValue().equals(uid.getUidValue())) {
-            return Collections.singleton(AttributeDeltaBuilder.build(Uid.NAME, updated.getUidValue()));
-        }
-        return Collections.emptySet();
     }
 
+    private void executeLegacyQuery(ObjectClass objectClass, Filter query, final ResultsHandler handler,
+                             OperationOptions options) {
+        final long startTime = System.currentTimeMillis();
+        final Set<String> attributesToGet = getAttributesToGet(objectClass, options);
+        Uid uid = null;
+        if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Uid) {
+            // Read request
+            uid = (Uid) ((EqualsFilter) query).getAttribute();
+        }
+        Name name = null;
+        if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Name) {
+            // Read request
+            name = (Name) ((EqualsFilter) query).getAttribute();
+        }
+        logger.info("executeQuery() - objectClass: " + objectClass +
+                ", uid: " + (uid == null ? "null" : uid.getUidValue()) +
+                ", name: " + (name == null ? "null" : name.getNameValue()));
+
+        if (ObjectClass.ACCOUNT.equals(objectClass)) {
+            if (null == uid && null == name) {
+                // Search request
+                executeAccountSearchQuery(query, handler, options, attributesToGet);
+            } else if (uid != null) {
+                // Read request
+                executeAccountReadQuery(uid, handler, options, attributesToGet);
+            } else {
+                // Read request
+                executeAccountReadQuery(name, handler, options, attributesToGet);
+            }
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            if (null == uid && null == name) {
+                // Search request
+                executeGroupSearchQuery(query, handler, options, attributesToGet);
+            } else if (uid != null) {
+                // Read request
+                executeGroupReadQuery(uid, handler, options, attributesToGet);
+            } else {
+                executeGroupReadQuery(name, handler, options, attributesToGet);
+            }
+        } else if (MEMBER.equals(objectClass)) {
+            if (null == uid) {
+                // Search request
+                executeMemberSearchQuery(query, handler, options);
+            } else {
+                // Read request
+                executeMemberReadQuery(uid, handler);
+            }
+        } else if (ORG_UNIT.equals(objectClass)) {
+            if (null == uid) {
+                // Search request
+                executeOrgUnitSearchQuery(query, handler, options, attributesToGet);
+            } else {
+                // Read request
+                executeOrgUnitReadQuery(uid, handler, options, attributesToGet);
+            }
+        } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
+            if (null == uid) {
+                // Search request
+                executeLicenseAssignmentSearchQuery(handler, options);
+            } else {
+                // Read request
+                executeLicenseAssignmentReadQuery(uid, handler);
+            }
+        } else {
+            logger.warn("Search of type {0} is not supported", configuration.getConnectorMessages()
+                    .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
+            throw new UnsupportedOperationException("Search of type"
+                    + objectClass.getObjectClassValue() + " is not supported");
+        }
+
+        logger.info("executeQuery() - finished in " + timeFrom(startTime));
+    }
+    private void initializeSchemaCache() {
+        for (ObjectClassInfo oci : schema.getObjectClassInfo()) {
+            ObjectClass objectClass = new ObjectClass(oci.getType());
+            SchemaDefinition schemaDef = new SchemaDefinition(oci);
+            schemaCache.put(objectClass, schemaDef);
+        }
+        logger.info("Schema cache initialized for {0} object classes", schemaCache.size());
+    }
+    public SchemaDefinition getSchemaDefinition(ObjectClass objectClass) {
+        SchemaDefinition schemaDef = schemaCache.get(objectClass);
+        if (schemaDef == null) {
+            // If schema cache is empty, initialize it first
+            if (schemaCache.isEmpty()) {
+                schema(); // This will initialize the schema cache
+                schemaDef = schemaCache.get(objectClass);
+            }
+        }
+        return schemaDef;
+    }
 }
