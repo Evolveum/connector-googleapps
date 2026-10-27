@@ -202,9 +202,14 @@ public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientReq
         if (valuesToReplace.isEmpty()) {
             return null; // Clear the attribute (empty list means remove all values)
         }
+        if (valuesToReplace.size() != 1) {
+            throw new InvalidAttributeValueException("Single-valued attribute '" + delta.getName()
+                    + "' requires exactly one replacement value or an empty list to clear it.");
+        }
         Object rawValue = valuesToReplace.get(0);
         if (rawValue != null && !type.isInstance(rawValue)) {
-            throw new InvalidAttributeValueException("Attribute '" + delta.getName() + "' requires a value of type " + type.getSimpleName());
+            throw new InvalidAttributeValueException("Attribute '" + delta.getName()
+                    + "' requires a value of type " + type.getSimpleName() + ".");
         }
         return rawValue != null ? type.cast(rawValue) : null;
     }
