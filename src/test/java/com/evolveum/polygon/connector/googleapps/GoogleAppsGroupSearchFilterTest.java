@@ -132,8 +132,8 @@ public class GoogleAppsGroupSearchFilterTest extends GoogleAppsConnectorTestBase
                 .withQueryParam("customer", equalTo("my_customer")));
     }
 
-    @Test(description = "Test ContainsFilter with __NAME__ attribute - should use query parameter with prefix search")
-    public void testContainsFilterByNameWithQuery() {
+    @Test(description = "Test StartsWithFilter with __NAME__ attribute - should use query parameter with prefix search")
+    public void testStartsWithFilterByNameWithQuery() {
         // Setup mock response for groups search with query parameter
         stubFor(get(urlPathMatching("/admin/directory/v1/groups"))
                 .withQueryParam("customer", equalTo("my_customer"))
@@ -157,10 +157,10 @@ public class GoogleAppsGroupSearchFilterTest extends GoogleAppsConnectorTestBase
                                 "  ]\n" +
                                 "}")));
 
-        // Create ContainsFilter for __NAME__ attribute
-        Filter filter = FilterBuilder.contains(AttributeBuilder.build(Name.NAME, "admin"));
+        // Create StartsWithFilter for __NAME__ attribute
+        Filter filter = FilterBuilder.startsWith(AttributeBuilder.build(Name.NAME, "admin"));
 
-        // Execute search with contains name filter
+        // Execute search with prefix name filter
         connectorFacade.search(ObjectClass.GROUP, filter, obj -> true, null);
 
         // Verify request was sent to groups search endpoint with both customer and query parameters

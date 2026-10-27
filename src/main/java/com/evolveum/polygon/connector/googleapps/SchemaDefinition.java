@@ -27,7 +27,12 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.common.logging.Log;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.AttributeInfo;
+import org.identityconnectors.framework.common.objects.AttributeUtil;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.PredefinedAttributes;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -92,7 +97,7 @@ public class SchemaDefinition {
             attributesToGet.addAll(returnedByDefaultAttributesSet);
         }
 
-        return attributesToGet.isEmpty() ? null : attributesToGet;
+        return attributesToGet;
     }
 
 
