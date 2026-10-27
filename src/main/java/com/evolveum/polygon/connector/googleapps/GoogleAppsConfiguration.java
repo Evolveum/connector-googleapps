@@ -599,6 +599,8 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
         return new HttpRequestInitializer() {
             @Override
             public void initialize(HttpRequest httpRequest) throws IOException {
+                httpRequest.setConnectTimeout(httpConnectTimeout != null ? httpConnectTimeout : 10000);
+                httpRequest.setReadTimeout(httpSocketTimeout != null ? httpSocketTimeout : 10000);
                 credentialsAdapter.initialize(httpRequest);
             }
         };
