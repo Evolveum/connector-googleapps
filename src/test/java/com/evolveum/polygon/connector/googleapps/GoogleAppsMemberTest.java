@@ -99,10 +99,9 @@ public class GoogleAppsMemberTest extends GoogleAppsConnectorTestBase {
                 connectorFacade.updateDelta(MEMBER, uid, modifications, null));
 
         // Verify PATCH request was sent correctly
-        // The implementation also sends email along with role
+        // Updating the role must not reinterpret the member key as an email address.
         GoogleApiMockServer.verifyRequest(patchRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/group001/members/member001@example.com"))
                 .withRequestBody(equalToJson("{\n" +
-                        "  \"email\": \"member001@example.com\",\n" +
                         "  \"role\": \"MANAGER\"\n" +
                         "}")));
     }
