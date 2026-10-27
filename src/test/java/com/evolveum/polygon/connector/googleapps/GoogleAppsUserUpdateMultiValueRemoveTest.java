@@ -334,19 +334,19 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
         GoogleApiMockServer.verifyRequest(putRequestedFor(urlPathMatching("/admin/directory/v1/users/removetest003"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 // Verify only kept email remains
-                .withRequestBody(containing("{\"address\":\"keep-email@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"keep-email@example.com\",\"type\":\"work\",\"primary\":false}"))
                 .withRequestBody(not(containing("remove-email@example.com")))
                 // Verify only kept phone remains
-                .withRequestBody(containing("{\"value\":\"+1-555-201-0001\",\"type\":\"work\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-201-0001\",\"type\":\"work\",\"primary\":true}"))
                 .withRequestBody(not(containing("+1-555-201-0002")))
                 // Verify only kept address remains
-                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"201 Keep Work St\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"201 Keep Work St\",\"primary\":true}"))
                 .withRequestBody(not(containing("202 Remove Home St")))
                 // Verify only kept organization remains
-                .withRequestBody(containing("{\"name\":\"Keep Company\",\"title\":\"Developer\",\"primary\":\"true\",\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Keep Company\",\"title\":\"Developer\",\"primary\":true,\"type\":\"work\"}"))
                 .withRequestBody(not(containing("Remove Company")))
                 // Verify only kept im remains
-                .withRequestBody(containing("{\"im\":\"keep@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"im\":\"keep@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}"))
                 .withRequestBody(not(containing("remove@example.org")))
                 // Verify only kept externalId remains
                 .withRequestBody(containing("{\"value\":\"KEEP-EMP001\",\"type\":\"organization\"}"))
@@ -758,23 +758,23 @@ public class GoogleAppsUserUpdateMultiValueRemoveTest extends GoogleAppsConnecto
         GoogleApiMockServer.verifyRequest(putRequestedFor(urlPathMatching("/admin/directory/v1/users/removetest007"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 // Verify only kept email remains
-                .withRequestBody(containing("{\"address\":\"keep-email@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"keep-email@example.com\",\"type\":\"work\",\"primary\":false}"))
                 .withRequestBody(not(containing("remove1-email@example.com")))
                 .withRequestBody(not(containing("remove2-email@example.com")))
                 // Verify only kept phone remains
-                .withRequestBody(containing("{\"value\":\"+1-555-401-0001\",\"type\":\"work\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-401-0001\",\"type\":\"work\",\"primary\":true}"))
                 .withRequestBody(not(containing("+1-555-401-0002")))
                 .withRequestBody(not(containing("+1-555-401-0003")))
                 // Verify only kept address remains
-                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"401 Keep Work St\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"401 Keep Work St\",\"primary\":true}"))
                 .withRequestBody(not(containing("402 Remove Home St")))
                 .withRequestBody(not(containing("403 Remove Other St")))
                 // Verify only kept organization remains
-                .withRequestBody(containing("{\"name\":\"Keep Company\",\"title\":\"Developer\",\"primary\":\"true\",\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Keep Company\",\"title\":\"Developer\",\"primary\":true,\"type\":\"work\"}"))
                 .withRequestBody(not(containing("Remove Company A")))
                 .withRequestBody(not(containing("Remove Company B")))
                 // Verify only kept im remains
-                .withRequestBody(containing("{\"im\":\"keep@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"im\":\"keep@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}"))
                 .withRequestBody(not(containing("remove1@example.org")))
                 .withRequestBody(not(containing("remove2@example.org")))
                 // Verify only kept externalId remains
