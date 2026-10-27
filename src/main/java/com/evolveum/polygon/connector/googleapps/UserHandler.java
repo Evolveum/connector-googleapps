@@ -916,7 +916,11 @@ public class UserHandler {
 
         } catch (Exception e) {
             logger.warn(e, "Failed to process special attributes during user creation: {0}", uid.getUidValue());
-            // Note: In a production system, you might want to clean up the partially created user
+            org.identityconnectors.framework.common.exceptions.RetryableException partial =
+                    org.identityconnectors.framework.common.exceptions.RetryableException.wrap(
+                            "User created but requested attributes could not be applied: " + uid.getUidValue(), uid);
+            partial.addSuppressed(e);
+            throw partial;
         }
 
         return uid;
@@ -953,7 +957,7 @@ public class UserHandler {
         try {
             executor.execute(createDeleteUserPhoto(executor.getDirectory().users().photos(),
                             uid.getUidValue()),
-                    new RequestResultHandler.NoOp<Directory.Users.Photos.Delete, Void>());
+                    new RequestResultHandler.IgnoreMissing<Directory.Users.Photos.Delete, Void>());
         } catch (Exception e) {
             logger.warn(e, "Failed to delete photo for user: {0}", uid.getUidValue());
             throw ConnectorException.wrap(e);
@@ -983,7 +987,7 @@ public class UserHandler {
         for (Object groupId : groups) {
             if (groupId instanceof String) {
                 executor.execute(createMemberById(service, (String) groupId, uid.getUidValue(), "MEMBER"),
-                        new RequestResultHandler.NoOp<Directory.Members.Insert, Member>());
+                        new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
             }
         }
     }
@@ -1008,8 +1012,7 @@ public class UserHandler {
 
                         @Override
                         public Uid handleNotFound(IOException e) {
-                            logger.warn("License assignment not found: {0}", e.getMessage());
-                            return null;
+                            throw new org.identityconnectors.framework.common.exceptions.UnknownUidException(e.getMessage(), e);
                         }
 
                         @Override
@@ -1020,7 +1023,7 @@ public class UserHandler {
                     });
         } catch (Exception e) {
             logger.warn(e, "Failed to assign license to user: {0}", uid.getUidValue());
-            // License assignment failure shouldn't prevent user creation
+            throw ConnectorException.wrap(e);
         }
     }
 
@@ -1111,9 +1114,10 @@ public class UserHandler {
                     if (!newGroups.contains(currentGroup)) {
                         try {
                             executor.execute(service.delete(currentGroup, uid.getUidValue()),
-                                    new RequestResultHandler.NoOp<Directory.Members.Delete, Void>());
+                                    new RequestResultHandler.IgnoreMissing<Directory.Members.Delete, Void>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to remove user {0} from group {1}", uid.getUidValue(), currentGroup);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }
@@ -1123,9 +1127,10 @@ public class UserHandler {
                     if (!currentGroups.contains(newGroup)) {
                         try {
                             executor.execute(createMemberById(service, newGroup, uid.getUidValue(), "MEMBER"),
-                                    new RequestResultHandler.NoOp<Directory.Members.Insert, Member>());
+                                    new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to add user {0} to group {1}", uid.getUidValue(), newGroup);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }
@@ -1143,9 +1148,10 @@ public class UserHandler {
                         try {
                             executor.execute(createMemberById(service, (String) groupId, 
                                     uid.getUidValue(), "MEMBER"),
-                                    new RequestResultHandler.NoOp<Directory.Members.Insert, Member>());
+                                    new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to add user {0} to group {1}", uid.getUidValue(), groupId);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }
@@ -1157,9 +1163,10 @@ public class UserHandler {
                     if (groupId instanceof String) {
                         try {
                             executor.execute(service.delete((String) groupId, uid.getUidValue()),
-                                    new RequestResultHandler.NoOp<Directory.Members.Delete, Void>());
+                                    new RequestResultHandler.IgnoreMissing<Directory.Members.Delete, Void>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to remove user {0} from group {1}", uid.getUidValue(), groupId);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }
