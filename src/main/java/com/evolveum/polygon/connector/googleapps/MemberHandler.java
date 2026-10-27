@@ -133,7 +133,7 @@ public class MemberHandler {
         builder.setUid(uid);
         builder.setName(uid.getUidValue());
 
-        builder.addAttribute(AttributeBuilder.build(GROUP_KEY_ATTR, content.getEmail()));
+        builder.addAttribute(AttributeBuilder.build(GROUP_KEY_ATTR, groupKey));
         builder.addAttribute(AttributeBuilder.build(EMAIL_ATTR, content.getEmail()));
         builder.addAttribute(AttributeBuilder.build(ROLE_ATTR, content.getRole()));
         builder.addAttribute(AttributeBuilder.build(TYPE_ATTR, content.getType()));
@@ -142,7 +142,10 @@ public class MemberHandler {
     }
 
     public static Uid generateMemberId(String groupKey, Member content) {
-        String id = groupKey + "/" + content.getId();
+        // Preserve identifiers already stored in midPoint shadows. A change to
+        // immutable member IDs requires an explicit migration, not a code refactor.
+        String memberKey = StringUtil.isNotBlank(content.getEmail()) ? content.getEmail() : content.getId();
+        String id = groupKey + "/" + memberKey;
         if (null != content.getEtag()) {
             return new Uid(id, content.getEtag(), new Name(content.getEmail()));
         } else {
@@ -195,8 +198,6 @@ public class MemberHandler {
                 if (newRole != null) {
                     content = new Member();
                     content.setRole(newRole);
-                    // Also need to include email for the patch request
-                    content.setEmail(memberKey);
                 }
             }
             // Other attributes (groupKey, email, type) are read-only
