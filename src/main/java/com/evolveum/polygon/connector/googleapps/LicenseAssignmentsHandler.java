@@ -26,6 +26,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.LicensingRequest;
+import com.google.api.services.licensing.model.Empty;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentInsert;
 import com.google.api.services.licensing.model.LicenseAssignmentList;
@@ -375,9 +376,9 @@ public class LicenseAssignmentsHandler {
         Licensing.LicenseAssignments.Delete deleteRequest = deleteLicenseAssignment(executor.getLicensing().licenseAssignments(), uid.getUidValue());
 
         executor.execute(deleteRequest,
-                new RequestResultHandler<Licensing.LicenseAssignments.Delete, Void, Void>() {
+                new RequestResultHandler<Licensing.LicenseAssignments.Delete, Empty, Void>() {
                     public Void handleResult(Licensing.LicenseAssignments.Delete request,
-                                             Void value) {
+                                             Empty value) {
                         return null;
                     }
 
