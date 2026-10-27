@@ -185,7 +185,16 @@ public class OrgunitsHandler {
         if (!modifications.isEmpty()) {
             final Directory.Orgunits.Patch patch = buildOrgunitUpdateRequest(executor.getDirectory().orgunits(), uid, modifications);
             if (patch != null) {
-                executor.execute(patch, new RequestResultHandler.NoOp<Directory.Orgunits.Patch, OrgUnit>());
+                executor.execute(patch, new RequestResultHandler<Directory.Orgunits.Patch, OrgUnit, Object>() {
+                    @Override
+                    public Object handleResult(Directory.Orgunits.Patch request, OrgUnit value) {
+                        String newUid = generateOrgUnitId(value).getUidValue();
+                        if (!uid.getUidValue().equals(newUid)) {
+                            sideEffectDeltas.add(AttributeDeltaBuilder.build(Uid.NAME, newUid));
+                        }
+                        return null;
+                    }
+                });
             }
         }
 
