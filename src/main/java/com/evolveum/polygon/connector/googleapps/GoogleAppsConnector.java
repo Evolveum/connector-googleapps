@@ -28,20 +28,40 @@ import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Users;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.OperationOptionInfo;
+import org.identityconnectors.framework.common.objects.OperationOptionInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.Schema;
+import org.identityconnectors.framework.common.objects.SchemaBuilder;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.FilterTranslator;
 import org.identityconnectors.framework.spi.Configuration;
 import org.identityconnectors.framework.spi.Connector;
 import org.identityconnectors.framework.spi.ConnectorClass;
 import org.identityconnectors.framework.spi.PoolableConnector;
-import org.identityconnectors.framework.spi.operations.*;
+import org.identityconnectors.framework.spi.operations.CreateOp;
+import org.identityconnectors.framework.spi.operations.DeleteOp;
+import org.identityconnectors.framework.spi.operations.SchemaOp;
+import org.identityconnectors.framework.spi.operations.SearchOp;
+import org.identityconnectors.framework.spi.operations.TestOp;
+import org.identityconnectors.framework.spi.operations.UpdateDeltaOp;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.GROUP_KEY_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.LICENSE_ASSIGNMENT;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MEMBER;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MY_CUSTOMER_ID;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ORG_UNIT;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.SHOW_DELETED_PARAM;
 import static com.evolveum.polygon.connector.googleapps.GroupHandler.getGroupClassInfo;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.getLicenseAssignmentClassInfo;
 import static com.evolveum.polygon.connector.googleapps.MemberHandler.getMemberClassInfo;
@@ -209,7 +229,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     @Override
     public FilterTranslator<GoogleFilter> createFilterTranslator(ObjectClass objectClass,
                                                                  OperationOptions options) {
-        return new GoogleFilterTranslator();
+        return new GoogleFilterTranslator(objectClass);
     }
 
     @Override

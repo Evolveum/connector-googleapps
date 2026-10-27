@@ -28,6 +28,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.AbstractFilterTranslator;
 import org.identityconnectors.framework.common.objects.filter.ContainsFilter;
@@ -40,6 +41,15 @@ import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
  * @author Hiroyuki Wada
  */
 public class GoogleFilterTranslator extends AbstractFilterTranslator<GoogleFilter> {
+    private final ObjectClass objectClass;
+
+    public GoogleFilterTranslator() {
+        this(ObjectClass.ACCOUNT);
+    }
+
+    public GoogleFilterTranslator(ObjectClass objectClass) {
+        this.objectClass = objectClass;
+    }
 
     @Override
     protected GoogleFilter createEqualsExpression(EqualsFilter filter, boolean not) {
@@ -62,6 +72,11 @@ public class GoogleFilterTranslator extends AbstractFilterTranslator<GoogleFilte
 
     @Override
     protected GoogleFilter createContainsExpression(ContainsFilter filter, boolean not) {
+        if (ObjectClass.GROUP.equals(objectClass) && filter.getAttribute() instanceof Name) {
+            // Google only supports email prefixes. A substring search requires
+            // ConnId's standard client-side filter over the complete result set.
+            return null;
+        }
         if (not) {
             // Google API does not support NOT contains - return EMPTY to indicate no translation possible
             return GoogleFilter.EMPTY;
