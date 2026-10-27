@@ -165,6 +165,9 @@ public class GroupHandler {
             // Handle single-valued attributes
             if (Name.NAME.equals(attributeName)) {
                 String value = RequestResultHandler.getSingleValue(delta, String.class);
+                if (StringUtil.isBlank(value)) {
+                    throw new InvalidAttributeValueException("Group primary email cannot be null or blank.");
+                }
                 group.setEmail(value);
                 hasChanges = true;
             } else if (NAME_ATTR.equals(attributeName)) {

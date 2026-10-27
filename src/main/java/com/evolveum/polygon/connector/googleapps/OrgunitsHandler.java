@@ -213,17 +213,11 @@ public class OrgunitsHandler {
                 hasChanges = true;
             } else if (PARENT_ORG_UNIT_PATH_ATTR.equals(attributeName)) {
                 String value = RequestResultHandler.getSingleValue(delta, String.class);
-                if (value != null) {
-                    // parentOrgUnitPath cannot be null - only update if not null
-                    if (StringUtil.isNotBlank(value)) {
-                        if (value.charAt(0) != '/') {
-                            value = "/" + value;
-                        }
-                        resource.setParentOrgUnitPath(value);
-                        hasChanges = true;
-                    }
+                if (StringUtil.isBlank(value)) {
+                    throw new InvalidAttributeValueException("Parent org unit path cannot be null or blank.");
                 }
-                // Note: parentOrgUnitPath cannot be cleared (set to null)
+                resource.setParentOrgUnitPath(value.charAt(0) == '/' ? value : "/" + value);
+                hasChanges = true;
             } else if (BLOCK_INHERITANCE_ATTR.equals(attributeName)) {
                 Boolean value = RequestResultHandler.getSingleValue(delta, Boolean.class);
                 resource.setBlockInheritance(value != null ? value : Boolean.FALSE);
