@@ -101,9 +101,9 @@ public class GoogleApiMockServer {
     }
 
     /**
-     * Reset requests and stubs, then restore the shared OAuth endpoint
+     * Helper method to reset request history
      */
-    public static void reset() {
+    public static void resetRequests() {
         if (wireMockServer != null) {
             wireMockServer.resetAll();
             setupEssentialEndpoints();

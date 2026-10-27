@@ -38,8 +38,8 @@ public abstract class GoogleAppsConnectorTestBase {
 
     @BeforeMethod(alwaysRun = true)
     public void setUp() {
-        // Reset WireMock requests and stubs before each test to ensure test isolation
-        GoogleApiMockServer.reset();
+        // Reset WireMock request history before each test to ensure test isolation
+        GoogleApiMockServer.resetRequests();
 
         configuration = createTestConfiguration();
         connectorFacade = createConnectorFacade(configuration);
