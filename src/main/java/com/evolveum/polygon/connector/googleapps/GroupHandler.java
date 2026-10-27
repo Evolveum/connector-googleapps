@@ -188,7 +188,8 @@ public class GroupHandler implements FilterVisitor<Void, Directory.Groups.List> 
         builder.setDescription("A Google Group used as an email distribution list and membership container. "
                 + "Group memberships are represented separately by the Member object class.");
         // email
-        builder.addAttributeInfo(Name.INFO);
+        builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setRequired(true)
+                .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE).build());
         builder.addAttributeInfo(AttributeInfoBuilder.build(NAME_ATTR));
         builder.addAttributeInfo(PredefinedAttributeInfos.DESCRIPTION);
 
