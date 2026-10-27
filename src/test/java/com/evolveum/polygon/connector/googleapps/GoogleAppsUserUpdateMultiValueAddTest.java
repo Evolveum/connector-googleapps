@@ -103,15 +103,15 @@ public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTe
         GoogleApiMockServer.verifyRequest(putRequestedFor(urlPathMatching("/admin/directory/v1/users/addtest001"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 // Verify single email added
-                .withRequestBody(containing("{\"address\":\"new-email@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"new-email@example.com\",\"type\":\"work\",\"primary\":false}"))
                 // Verify single phone added
-                .withRequestBody(containing("{\"value\":\"+1-555-111-0001\",\"type\":\"work\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-111-0001\",\"type\":\"work\",\"primary\":true}"))
                 // Verify single address added
-                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"123 New Work St\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"123 New Work St\",\"primary\":true}"))
                 // Verify single organization added
-                .withRequestBody(containing("{\"name\":\"First Company\",\"title\":\"Developer\",\"primary\":\"true\",\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"First Company\",\"title\":\"Developer\",\"primary\":true,\"type\":\"work\"}"))
                 // Verify single im added
-                .withRequestBody(containing("{\"im\":\"first@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"im\":\"first@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}"))
                 // Verify single externalId added
                 .withRequestBody(containing("{\"value\":\"FIRST-EMP001\",\"type\":\"organization\"}"))
                 // Verify single relation added
@@ -222,20 +222,20 @@ public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTe
         GoogleApiMockServer.verifyRequest(putRequestedFor(urlPathMatching("/admin/directory/v1/users/addtest002"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 // Verify emails: existing + new
-                .withRequestBody(containing("{\"address\":\"existing-email@example.com\",\"type\":\"home\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"second-email@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"existing-email@example.com\",\"type\":\"home\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"second-email@example.com\",\"type\":\"work\",\"primary\":false}"))
                 // Verify phones: existing + new
-                .withRequestBody(containing("{\"value\":\"+1-555-222-0001\",\"type\":\"home\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-222-0002\",\"type\":\"work\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-222-0001\",\"type\":\"home\",\"primary\":true}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-222-0002\",\"type\":\"work\",\"primary\":false}"))
                 // Verify addresses: existing + new
-                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"456 Existing Home St\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"789 Second Work St\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"456 Existing Home St\",\"primary\":true}"))
+                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"789 Second Work St\",\"primary\":false}"))
                 // Verify organizations: existing + new
-                .withRequestBody(containing("{\"name\":\"Existing Company\",\"title\":\"Junior Developer\",\"primary\":\"true\",\"type\":\"work\"}"))
-                .withRequestBody(containing("{\"name\":\"Second Company\",\"title\":\"Senior Developer\",\"primary\":\"false\",\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Existing Company\",\"title\":\"Junior Developer\",\"primary\":true,\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Second Company\",\"title\":\"Senior Developer\",\"primary\":false,\"type\":\"work\"}"))
                 // Verify ims: existing + new
-                .withRequestBody(containing("{\"im\":\"existing@example.org\",\"protocol\":\"jabber\",\"type\":\"home\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"im\":\"second@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"im\":\"existing@example.org\",\"protocol\":\"jabber\",\"type\":\"home\",\"primary\":true}"))
+                .withRequestBody(containing("{\"im\":\"second@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":false}"))
                 // Verify externalIds: existing + new
                 .withRequestBody(containing("{\"value\":\"EXISTING-EMP001\",\"type\":\"organization\"}"))
                 .withRequestBody(containing("{\"value\":\"SECOND-EMP002\",\"type\":\"organization\"}"))
@@ -334,20 +334,20 @@ public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTe
         GoogleApiMockServer.verifyRequest(putRequestedFor(urlPathMatching("/admin/directory/v1/users/addtest003"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 // Verify two emails added
-                .withRequestBody(containing("{\"address\":\"first-email@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"second-email@example.com\",\"type\":\"home\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"first-email@example.com\",\"type\":\"work\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"second-email@example.com\",\"type\":\"home\",\"primary\":false}"))
                 // Verify two phones added
-                .withRequestBody(containing("{\"value\":\"+1-555-333-0001\",\"type\":\"work\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-333-0002\",\"type\":\"mobile\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-333-0001\",\"type\":\"work\",\"primary\":true}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-333-0002\",\"type\":\"mobile\",\"primary\":false}"))
                 // Verify two addresses added
-                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"111 First Work St\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"222 First Home St\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"111 First Work St\",\"primary\":true}"))
+                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"222 First Home St\",\"primary\":false}"))
                 // Verify two organizations added
-                .withRequestBody(containing("{\"name\":\"First Company\",\"title\":\"Developer\",\"primary\":\"true\",\"type\":\"work\"}"))
-                .withRequestBody(containing("{\"name\":\"Second Company\",\"title\":\"Consultant\",\"primary\":\"false\",\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"First Company\",\"title\":\"Developer\",\"primary\":true,\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Second Company\",\"title\":\"Consultant\",\"primary\":false,\"type\":\"work\"}"))
                 // Verify two ims added
-                .withRequestBody(containing("{\"im\":\"first@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"im\":\"second@example.org\",\"protocol\":\"jabber\",\"type\":\"home\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"im\":\"first@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}"))
+                .withRequestBody(containing("{\"im\":\"second@example.org\",\"protocol\":\"jabber\",\"type\":\"home\",\"primary\":false}"))
                 // Verify two externalIds added
                 .withRequestBody(containing("{\"value\":\"FIRST-EMP001\",\"type\":\"organization\"}"))
                 .withRequestBody(containing("{\"value\":\"SECOND-EMP002\",\"type\":\"organization\"}"))
@@ -474,30 +474,30 @@ public class GoogleAppsUserUpdateMultiValueAddTest extends GoogleAppsConnectorTe
         GoogleApiMockServer.verifyRequest(putRequestedFor(urlPathMatching("/admin/directory/v1/users/addtest004"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 // Verify emails: 2 existing + 2 new
-                .withRequestBody(containing("{\"address\":\"existing1-email@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"existing2-email@example.com\",\"type\":\"home\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"new1-email@example.com\",\"type\":\"other\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"new2-email@example.com\",\"type\":\"custom\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"existing1-email@example.com\",\"type\":\"work\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"existing2-email@example.com\",\"type\":\"home\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"new1-email@example.com\",\"type\":\"other\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"new2-email@example.com\",\"type\":\"custom\",\"primary\":false}"))
                 // Verify phones: 2 existing + 2 new
-                .withRequestBody(containing("{\"value\":\"+1-555-444-0001\",\"type\":\"work\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-444-0002\",\"type\":\"home\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-444-0003\",\"type\":\"mobile\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-444-0004\",\"type\":\"other\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-444-0001\",\"type\":\"work\",\"primary\":true}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-444-0002\",\"type\":\"home\",\"primary\":false}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-444-0003\",\"type\":\"mobile\",\"primary\":false}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-444-0004\",\"type\":\"other\",\"primary\":false}"))
                 // Verify addresses: 2 existing + 2 new
-                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"333 Existing Work St\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"444 Existing Home St\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"type\":\"other\",\"formatted\":\"555 New Work St\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"type\":\"custom\",\"formatted\":\"666 New Custom St\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"type\":\"work\",\"formatted\":\"333 Existing Work St\",\"primary\":true}"))
+                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"444 Existing Home St\",\"primary\":false}"))
+                .withRequestBody(containing("{\"type\":\"other\",\"formatted\":\"555 New Work St\",\"primary\":false}"))
+                .withRequestBody(containing("{\"type\":\"custom\",\"formatted\":\"666 New Custom St\",\"primary\":false}"))
                 // Verify organizations: 2 existing + 2 new
-                .withRequestBody(containing("{\"name\":\"Existing Company A\",\"title\":\"Developer\",\"primary\":\"true\",\"type\":\"work\"}"))
-                .withRequestBody(containing("{\"name\":\"Existing Company B\",\"title\":\"Consultant\",\"primary\":\"false\",\"type\":\"work\"}"))
-                .withRequestBody(containing("{\"name\":\"New Company C\",\"title\":\"Senior Developer\",\"primary\":\"false\",\"type\":\"work\"}"))
-                .withRequestBody(containing("{\"name\":\"New Company D\",\"title\":\"Architect\",\"primary\":\"false\",\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Existing Company A\",\"title\":\"Developer\",\"primary\":true,\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Existing Company B\",\"title\":\"Consultant\",\"primary\":false,\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"New Company C\",\"title\":\"Senior Developer\",\"primary\":false,\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"New Company D\",\"title\":\"Architect\",\"primary\":false,\"type\":\"work\"}"))
                 // Verify ims: 2 existing + 2 new
-                .withRequestBody(containing("{\"im\":\"existing1@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"im\":\"existing2@example.org\",\"protocol\":\"jabber\",\"type\":\"home\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"im\":\"new1@example.org\",\"protocol\":\"jabber\",\"type\":\"other\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"im\":\"new2@example.org\",\"protocol\":\"jabber\",\"type\":\"custom\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"im\":\"existing1@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}"))
+                .withRequestBody(containing("{\"im\":\"existing2@example.org\",\"protocol\":\"jabber\",\"type\":\"home\",\"primary\":false}"))
+                .withRequestBody(containing("{\"im\":\"new1@example.org\",\"protocol\":\"jabber\",\"type\":\"other\",\"primary\":false}"))
+                .withRequestBody(containing("{\"im\":\"new2@example.org\",\"protocol\":\"jabber\",\"type\":\"custom\",\"primary\":false}"))
                 // Verify externalIds: 2 existing + 2 new
                 .withRequestBody(containing("{\"value\":\"EXISTING1-EMP001\",\"type\":\"organization\"}"))
                 .withRequestBody(containing("{\"value\":\"EXISTING2-EMP002\",\"type\":\"organization\"}"))

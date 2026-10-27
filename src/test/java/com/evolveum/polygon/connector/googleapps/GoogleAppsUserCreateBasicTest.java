@@ -148,11 +148,11 @@ public class GoogleAppsUserCreateBasicTest extends GoogleAppsConnectorTestBase {
                 .withRequestBody(containing("\"orgUnitPath\":\"/TestOU\""))
                 .withRequestBody(containing("\"includeInGlobalAddressList\":true"))
                 .withRequestBody(containing("\"suspended\":false"))
-                .withRequestBody(containing("\"emails\":[{\"address\":\"alt@example.com\",\"type\":\"work\",\"primary\":\"false\"}]"))
-                .withRequestBody(containing("\"phones\":[{\"value\":\"+1-555-123-4567\",\"type\":\"work\",\"primary\":\"true\"}]"))
-                .withRequestBody(containing("\"addresses\":[{\"type\":\"work\",\"formatted\":\"123 Work St, City, State 12345\",\"primary\":\"true\"}]"))
-                .withRequestBody(containing("\"organizations\":[{\"name\":\"Test Company\",\"title\":\"Developer\",\"primary\":\"true\",\"type\":\"work\"}]"))
-                .withRequestBody(containing("\"ims\":[{\"im\":\"user@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}]"))
+                .withRequestBody(containing("\"emails\":[{\"address\":\"alt@example.com\",\"type\":\"work\",\"primary\":false}]"))
+                .withRequestBody(containing("\"phones\":[{\"value\":\"+1-555-123-4567\",\"type\":\"work\",\"primary\":true}]"))
+                .withRequestBody(containing("\"addresses\":[{\"type\":\"work\",\"formatted\":\"123 Work St, City, State 12345\",\"primary\":true}]"))
+                .withRequestBody(containing("\"organizations\":[{\"name\":\"Test Company\",\"title\":\"Developer\",\"primary\":true,\"type\":\"work\"}]"))
+                .withRequestBody(containing("\"ims\":[{\"im\":\"user@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}]"))
                 .withRequestBody(containing("\"externalIds\":[{\"value\":\"EMP123\",\"type\":\"organization\"}]"))
                 .withRequestBody(containing("\"relations\":[{\"value\":\"manager@example.com\",\"type\":\"manager\"}]")));
     }

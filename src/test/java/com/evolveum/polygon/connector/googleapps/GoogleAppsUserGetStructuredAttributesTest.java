@@ -140,11 +140,11 @@ public class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnect
 
         // First email: primary work email with 3 keys
         String email1 = (String) emailValues.get(0);
-        assertThat(email1).isEqualTo("{\"address\":\"struct001@example.com\",\"primary\":\"true\",\"type\":\"work\"}");
+        assertThat(email1).isEqualTo("{\"address\":\"struct001@example.com\",\"primary\":true,\"type\":\"work\"}");
 
         // Second email: home email with 4 keys including customType
         String email2 = (String) emailValues.get(1);
-        assertThat(email2).isEqualTo("{\"address\":\"struct.home@example.org\",\"customType\":\"personal\",\"primary\":\"false\",\"type\":\"home\"}");
+        assertThat(email2).isEqualTo("{\"address\":\"struct.home@example.org\",\"customType\":\"personal\",\"primary\":false,\"type\":\"home\"}");
 
         // Verify phones attribute
         Attribute phones = user.getAttributeByName("phones");
@@ -153,10 +153,10 @@ public class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnect
         assertThat(phoneValues).hasSize(2);
 
         String phone1 = (String) phoneValues.get(0);
-        assertThat(phone1).isEqualTo("{\"primary\":\"true\",\"type\":\"work\",\"value\":\"+1-555-1234\"}");
+        assertThat(phone1).isEqualTo("{\"primary\":true,\"type\":\"work\",\"value\":\"+1-555-1234\"}");
 
         String phone2 = (String) phoneValues.get(1);
-        assertThat(phone2).isEqualTo("{\"customType\":\"iPhone\",\"primary\":\"false\",\"type\":\"mobile\",\"value\":\"+1-555-5678\"}");
+        assertThat(phone2).isEqualTo("{\"customType\":\"iPhone\",\"primary\":false,\"type\":\"mobile\",\"value\":\"+1-555-5678\"}");
 
         // Verify externalIds attribute
         Attribute externalIds = user.getAttributeByName("externalIds");
@@ -190,7 +190,7 @@ public class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnect
 
         String org1 = (String) orgValues.get(0);
         // Keys should be alphabetically sorted: costCenter, department, location, name, primary, title, type
-        assertThat(org1).isEqualTo("{\"costCenter\":\"CC001\",\"department\":\"Engineering\",\"location\":\"Building A\",\"name\":\"Example Corp\",\"primary\":\"true\",\"title\":\"Software Engineer\",\"type\":\"work\"}");
+        assertThat(org1).isEqualTo("{\"costCenter\":\"CC001\",\"department\":\"Engineering\",\"location\":\"Building A\",\"name\":\"Example Corp\",\"primary\":true,\"title\":\"Software Engineer\",\"type\":\"work\"}");
 
         // Verify addresses attribute
         Attribute addresses = user.getAttributeByName("addresses");
@@ -200,7 +200,7 @@ public class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnect
 
         String address1 = (String) addressValues.get(0);
         // Keys should be alphabetically sorted: country, formatted, locality, postalCode, primary, region, streetAddress, type
-        assertThat(address1).isEqualTo("{\"country\":\"USA\",\"formatted\":\"123 Main St, Mountain View, CA 94043\",\"locality\":\"Mountain View\",\"postalCode\":\"94043\",\"primary\":\"true\",\"region\":\"CA\",\"streetAddress\":\"123 Main St\",\"type\":\"work\"}");
+        assertThat(address1).isEqualTo("{\"country\":\"USA\",\"formatted\":\"123 Main St, Mountain View, CA 94043\",\"locality\":\"Mountain View\",\"postalCode\":\"94043\",\"primary\":true,\"region\":\"CA\",\"streetAddress\":\"123 Main St\",\"type\":\"work\"}");
 
         // Verify ims attribute
         Attribute ims = user.getAttributeByName("ims");
@@ -209,7 +209,7 @@ public class GoogleAppsUserGetStructuredAttributesTest extends GoogleAppsConnect
         assertThat(imValues).hasSize(2);
 
         String im1 = (String) imValues.get(0);
-        assertThat(im1).isEqualTo("{\"im\":\"struct001@gmail.com\",\"primary\":\"true\",\"protocol\":\"gtalk\",\"type\":\"work\"}");
+        assertThat(im1).isEqualTo("{\"im\":\"struct001@gmail.com\",\"primary\":true,\"protocol\":\"gtalk\",\"type\":\"work\"}");
 
         String im2 = (String) imValues.get(1);
         assertThat(im2).isEqualTo("{\"customProtocol\":\"skype-personal\",\"im\":\"struct.home\",\"protocol\":\"skype\",\"type\":\"home\"}");

@@ -648,7 +648,10 @@ public class UserHandler {
         if (valuesToAdd != null) {
             for (Object value : valuesToAdd) {
                 if (value instanceof String) {
-                    newValues.add((String) value);
+                    String addedValue = (String) value;
+                    if (newValues.stream().noneMatch(existing -> matchesJsonValue(existing, addedValue))) {
+                        newValues.add(addedValue);
+                    }
                 }
             }
         }
@@ -695,11 +698,9 @@ public class UserHandler {
      */
     private static boolean matchesJsonValue(String currentJsonValue, String valueToRemove) {
         try {
-            Gson gson = new GsonBuilder().create();
-            
             // Parse both JSON strings into generic objects for structural comparison
-            Object currentObj = gson.fromJson(currentJsonValue, Object.class);
-            Object removeObj = gson.fromJson(valueToRemove, Object.class);
+            Object currentObj = GoogleAppsUtil.parseJson(currentJsonValue);
+            Object removeObj = GoogleAppsUtil.parseJson(valueToRemove);
             
             // Compare the parsed objects (handles field ordering and null differences)
             return Objects.equals(currentObj, removeObj);

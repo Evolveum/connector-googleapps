@@ -83,17 +83,17 @@ public class GoogleAppsUserUpdateMultiValueReplaceTest extends GoogleAppsConnect
         GoogleApiMockServer.verifyRequest(putRequestedFor(urlPathMatching("/admin/directory/v1/users/test003"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 // Verify emails array contains both new entries
-                .withRequestBody(containing("{\"address\":\"new-work@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"new-home@example.com\",\"type\":\"home\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"new-work@example.com\",\"type\":\"work\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"new-home@example.com\",\"type\":\"home\",\"primary\":false}"))
                 // Verify phones array contains both new entries
-                .withRequestBody(containing("{\"value\":\"+1-555-111-0000\",\"type\":\"work\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-222-0000\",\"type\":\"mobile\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-111-0000\",\"type\":\"work\",\"primary\":true}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-222-0000\",\"type\":\"mobile\",\"primary\":false}"))
                 // Verify addresses array contains new entry
-                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"456 Home Ave, City, State 67890\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"type\":\"home\",\"formatted\":\"456 Home Ave, City, State 67890\",\"primary\":true}"))
                 // Verify organizations array contains new entry
-                .withRequestBody(containing("{\"name\":\"New Company\",\"title\":\"Senior Engineer\",\"primary\":\"true\",\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"New Company\",\"title\":\"Senior Engineer\",\"primary\":true,\"type\":\"work\"}"))
                 // Verify ims array contains new entry
-                .withRequestBody(containing("{\"im\":\"new-user@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}"))
+                .withRequestBody(containing("{\"im\":\"new-user@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}"))
                 // Verify externalIds array contains new entry
                 .withRequestBody(containing("{\"value\":\"NEW-EMP456\",\"type\":\"organization\"}"))
                 // Verify relations array contains new entry
