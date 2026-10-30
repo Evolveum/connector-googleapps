@@ -85,8 +85,10 @@ public class GroupHandler {
         builder.setType(ObjectClass.GROUP_NAME);
         builder.setDescription("A Google Group used as an email distribution list and membership container. "
                 + "Group memberships are represented separately by the Member object class.");
-        // email
-        builder.addAttributeInfo(Name.INFO);
+        // email (mapped to Name.NAME)
+        builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setRequired(true)
+                .setSubtype(AttributeInfo.Subtypes.STRING_CASE_IGNORE)
+                .build());
         builder.addAttributeInfo(AttributeInfoBuilder.build(NAME_ATTR));
         builder.addAttributeInfo(PredefinedAttributeInfos.DESCRIPTION);
 
@@ -102,7 +104,7 @@ public class GroupHandler {
 
         // Virtual Attribute
         builder.addAttributeInfo(AttributeInfoBuilder.define(MEMBERS_ATTR).setMultiValued(true)
-                .setReturnedByDefault(true).build());
+                .setReturnedByDefault(false).setUpdateable(false).setCreateable(false).build());
 
         return builder.build();
     }
