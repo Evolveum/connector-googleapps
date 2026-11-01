@@ -61,6 +61,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      */
     private static final Log logger = Log.getLog(GoogleAppsConnector.class);
 
+    // Preserve legacy schema references until the exact source cutover.
+    public static final ObjectClass MEMBER = GoogleAppsConstants.MEMBER;
+    public static final ObjectClass ORG_UNIT = GoogleAppsConstants.ORG_UNIT;
+    public static final ObjectClass LICENSE_ASSIGNMENT = GoogleAppsConstants.LICENSE_ASSIGNMENT;
+
     /**
      * Place holder for the {@link Configuration} passed into the init() method
      * {@link GoogleAppsConnector#init(org.identityconnectors.framework.spi.Configuration)}
