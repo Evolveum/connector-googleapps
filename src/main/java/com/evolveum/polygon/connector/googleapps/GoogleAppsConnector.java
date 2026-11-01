@@ -24,87 +24,29 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
-import com.google.api.client.googleapis.json.GoogleJsonError;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.services.directory.Directory;
-import com.google.api.services.directory.model.Alias;
-import com.google.api.services.directory.model.Aliases;
-import com.google.api.services.directory.model.Group;
-import com.google.api.services.directory.model.Groups;
-import com.google.api.services.directory.model.Member;
-import com.google.api.services.directory.model.Members;
-import com.google.api.services.directory.model.OrgUnit;
-import com.google.api.services.directory.model.OrgUnits;
-import com.google.api.services.directory.model.User;
-import com.google.api.services.directory.model.UserPhoto;
-import com.google.api.services.licensing.Licensing;
-import com.google.api.services.licensing.LicensingRequest;
-import com.google.api.services.licensing.model.LicenseAssignment;
-import com.google.api.services.licensing.model.LicenseAssignmentList;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.identityconnectors.common.CollectionUtil;
-import org.identityconnectors.common.StringUtil;
+import com.google.api.services.directory.model.Users;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
-import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
-import org.identityconnectors.framework.common.objects.Attribute;
-import org.identityconnectors.framework.common.objects.AttributeBuilder;
-import org.identityconnectors.framework.common.objects.AttributeDelta;
-import org.identityconnectors.framework.common.objects.AttributeUtil;
-import org.identityconnectors.framework.common.objects.ConnectorObject;
-import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
-import org.identityconnectors.framework.common.objects.Name;
-import org.identityconnectors.framework.common.objects.ObjectClass;
-import org.identityconnectors.framework.common.objects.ObjectClassInfo;
-import org.identityconnectors.framework.common.objects.OperationOptionInfo;
-import org.identityconnectors.framework.common.objects.OperationOptionInfoBuilder;
-import org.identityconnectors.framework.common.objects.OperationOptions;
-import org.identityconnectors.framework.common.objects.PredefinedAttributes;
-import org.identityconnectors.framework.common.objects.ResultsHandler;
-import org.identityconnectors.framework.common.objects.Schema;
-import org.identityconnectors.framework.common.objects.SchemaBuilder;
-import org.identityconnectors.framework.common.objects.SearchResult;
-import org.identityconnectors.framework.common.objects.Uid;
-import org.identityconnectors.framework.common.objects.filter.AttributeFilter;
-import org.identityconnectors.framework.common.objects.filter.EqualsFilter;
-import org.identityconnectors.framework.common.objects.filter.Filter;
+import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.common.objects.filter.FilterTranslator;
-import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
 import org.identityconnectors.framework.spi.Configuration;
 import org.identityconnectors.framework.spi.Connector;
 import org.identityconnectors.framework.spi.ConnectorClass;
-import org.identityconnectors.framework.spi.SearchResultsHandler;
-import org.identityconnectors.framework.spi.operations.CreateOp;
-import org.identityconnectors.framework.spi.operations.DeleteOp;
-import org.identityconnectors.framework.spi.operations.SchemaOp;
-import org.identityconnectors.framework.spi.operations.SearchOp;
-import org.identityconnectors.framework.spi.operations.TestOp;
-import org.identityconnectors.framework.spi.operations.UpdateDeltaOp;
+import org.identityconnectors.framework.spi.PoolableConnector;
+import org.identityconnectors.framework.spi.operations.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
-import java.util.regex.Matcher;
 
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
 import static com.evolveum.polygon.connector.googleapps.GroupHandler.getGroupClassInfo;
-import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.LICENSE_NAME_PATTERN;
-import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.fromLicenseAssignment;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.getLicenseAssignmentClassInfo;
-import static com.evolveum.polygon.connector.googleapps.MemberHandler.fromMember;
 import static com.evolveum.polygon.connector.googleapps.MemberHandler.getMemberClassInfo;
-import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.fromOrgunit;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.getOrgunitClassInfo;
 import static com.evolveum.polygon.connector.googleapps.UserHandler.getUserClassInfo;
-import static org.identityconnectors.framework.common.objects.OperationalAttributes.ENABLE_NAME;
 
 /**
  * Main implementation of the GoogleApps Connector.
@@ -118,68 +60,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * Setup logging for the {@link GoogleAppsConnector}.
      */
     private static final Log logger = Log.getLog(GoogleAppsConnector.class);
-    public static final ObjectClass ORG_UNIT = new ObjectClass("OrgUnit");
-    public static final ObjectClass MEMBER = new ObjectClass("Member");
-    public static final ObjectClass ALIAS = new ObjectClass("Alias");
-    public static final ObjectClass LICENSE_ASSIGNMENT = new ObjectClass("LicenseAssignment");
-    public static final String ID_ETAG = "id,etag";
-    public static final String EMAIL_ETAG = "email,etag";
-    public static final String ID_ATTR = "id";
-    public static final String ETAG_ATTR = "etag";
-    public static final String NAME_ATTR = "name";
-    public static final String ADMIN_CREATED_ATTR = "adminCreated";
-    public static final String NON_EDITABLE_ALIASES_ATTR = "nonEditableAliases";
-    public static final String DIRECT_MEMBERS_COUNT_ATTR = "directMembersCount";
-    public static final String MY_CUSTOMER_ID = "my_customer";
-    public static final String SUSPENDED_ATTR = "suspended";
-    public static final String CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR = "changePasswordAtNextLogin";
-    public static final String IP_WHITELISTED_ATTR = "ipWhitelisted";
-    public static final String ORG_UNIT_PATH_ATTR = "orgUnitPath";
-    public static final String INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR = "includeInGlobalAddressList";
-    public static final String IMS_ATTR = "ims";
-    public static final String EMAILS_ATTR = "emails";
-    public static final String EXTERNAL_IDS_ATTR = "externalIds";
-    public static final String RELATIONS_ATTR = "relations";
-    public static final String ADDRESSES_ATTR = "addresses";
-    public static final String ORGANIZATIONS_ATTR = "organizations";
-    public static final String PHONES_ATTR = "phones";
-    public static final String GIVEN_NAME_ATTR = "givenName";
-    public static final String FAMILY_NAME_ATTR = "familyName";
-    public static final String FULL_NAME_ATTR = "fullName";
-    public static final String IS_ADMIN_ATTR = "isAdmin";
-    public static final String IS_DELEGATED_ADMIN_ATTR = "isDelegatedAdmin";
-    public static final String LAST_LOGIN_TIME_ATTR = "lastLoginTime";
-    public static final String CREATION_TIME_ATTR = "creationTime";
-    public static final String AGREED_TO_TERMS_ATTR = "agreedToTerms";
-    public static final String SUSPENSION_REASON_ATTR = "suspensionReason";
-    public static final String ALIASES_ATTR = "aliases";
-    public static final String CUSTOMER_ID_ATTR = "customerId";
-    public static final String IS_MAILBOX_SETUP_ATTR = "isMailboxSetup";
-    public static final String THUMBNAIL_PHOTO_URL_ATTR = "thumbnailPhotoUrl";
-    public static final String DELETION_TIME_ATTR = "deletionTime";
-    public static final String DESCRIPTION_ATTR = "description";
-    public static final String PRIMARY_EMAIL_ATTR = "primaryEmail";
-    public static final char COMMA = ',';
-    public static final String SHOW_DELETED_PARAM = "showDeleted";
-    public static final String ASCENDING_ORDER = "ASCENDING";
-    public static final String DESCENDING_ORDER = "DESCENDING";
-    public static final String EMAIL_ATTR = "email";
-    public static final String ALIAS_ATTR = "alias";
-    public static final String PARENT_ORG_UNIT_PATH_ATTR = "parentOrgUnitPath";
-    public static final String BLOCK_INHERITANCE_ATTR = "blockInheritance";
-    public static final String EMPTY_STRING = "";
-    public static final String ORG_UNIT_PATH_ETAG = "orgUnitPath,etag";
-    public static final String PRODUCT_ID_ATTR = "productId";
-    public static final String SKU_ID_ATTR = "skuId";
-    public static final String USER_ID_ATTR = "userId";
-    public static final String SELF_LINK_ATTR = "selfLink";
-    public static final String ROLE_ATTR = "role";
-    public static final String MEMBERS_ATTR = "__MEMBERS__";
-    public static final String GROUP_KEY_ATTR = "groupKey";
-    public static final String TYPE_ATTR = "type";
-    public static final String PRODUCT_ID_SKU_ID_USER_ID = "productId,skuId,userId";
-    public static final String PHOTO_ATTR = "__PHOTO__";
-    public static final String LOCATIONS_ATTR = "locations";
 
     /**
      * Place holder for the {@link Configuration} passed into the init() method
@@ -192,49 +72,35 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     private Map<ObjectClass, SchemaDefinition> schemaCache = new HashMap<>();
     private GoogleApiExecutor apiExecutor;
 
-    /**
-     * Gets the Configuration context for this connector.
-     *
-     * @return The current {@link Configuration}
-     */
+    @Override
     public Configuration getConfiguration() {
         return this.configuration;
     }
 
-    /**
-     * Callback method to receive the {@link Configuration}.
-     *
-     * @param configuration the new {@link Configuration}
-     * @see org.identityconnectors.framework.spi.Connector#init(org.identityconnectors.framework.spi.Configuration)
-     */
+    @Override
     public void init(final Configuration configuration) {
         this.configuration = (GoogleAppsConfiguration) configuration;
+        this.objectsCache = ConnectorObjectsCache.getInstance(this.configuration, logger);
         this.apiExecutor = new GoogleApiExecutor(this.configuration);
-        objectsCache = ConnectorObjectsCache.getInstance(this.configuration, logger);
     }
 
-    /**
-     * Disposes of the {@link GoogleAppsConnector}'s resources.
-     *
-     * @see org.identityconnectors.framework.spi.Connector#dispose()
-     */
+    @Override
     public void dispose() {
         configuration = null;
-        apiExecutor = null;
+        objectsCache = null;
         schema = null;
         schemaCache.clear();
+        apiExecutor = null;
     }
 
     /**
      * ****************
      * SPI Operations
-     *
+     * <p>
      * Implement the following operations using the contract and description
      * found in the Javadoc for these methods. ****************
      */
-    /**
-     * {@inheritDoc}
-     */
+    @Override
     public Uid create(final ObjectClass objectClass, final Set<Attribute> createAttributes,
                       final OperationOptions options) {
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
@@ -265,9 +131,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
     public void delete(final ObjectClass objectClass, final Uid uid, final OperationOptions options) {
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
             // Delegate Account deletion to UserHandler
@@ -297,9 +161,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
     public Schema schema() {
         if (null == schema) {
             final SchemaBuilder builder = new SchemaBuilder(GoogleAppsConnector.class);
@@ -344,459 +206,66 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         return schema;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public FilterTranslator<GoogleFilter> createFilterTranslator(ObjectClass objectClass, OperationOptions options) {
-        if ((ObjectClass.ACCOUNT.equals(objectClass) || ObjectClass.GROUP.equals(objectClass))) return new GoogleFilterTranslator();
-        return filter -> Collections.singletonList(new GoogleFilter(filter));
+    @Override
+    public FilterTranslator<GoogleFilter> createFilterTranslator(ObjectClass objectClass,
+                                                                 OperationOptions options) {
+        return new GoogleFilterTranslator();
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void executeQuery(ObjectClass objectClass, GoogleFilter filter, ResultsHandler handler, OperationOptions options) {
+    @Override
+    public void executeQuery(ObjectClass objectClass, GoogleFilter filter, final ResultsHandler handler,
+                             OperationOptions options) {
+        final long startTime = System.currentTimeMillis();
+
+        // Get schema definition for this object class
+        SchemaDefinition schemaDef = getSchemaDefinition(objectClass);
+
+        // Use EMPTY filter if null was passed
+        if (filter == null) {
+            filter = GoogleFilter.EMPTY;
+        }
+
+        logger.info("executeQuery() - objectClass: " + objectClass +
+                ", uid: " + (filter.isReadByUid() ? filter.getUid().getUidValue() : "null") +
+                ", name: " + (filter.isReadByName() ? filter.getName().getNameValue() : "null"));
+
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
-            UserHandler.executeQuery(apiExecutor, objectsCache, filter == null ? GoogleFilter.EMPTY : filter,
-                    handler, options, getSchemaDefinition(objectClass));
+            UserHandler.executeQuery(apiExecutor, objectsCache, filter, handler, options, schemaDef);
+
         } else if (ObjectClass.GROUP.equals(objectClass)) {
-            GroupHandler.executeQuery(apiExecutor, objectsCache, filter == null ? GoogleFilter.EMPTY : filter,
-                    handler, options, getSchemaDefinition(objectClass));
+            GroupHandler.executeQuery(apiExecutor, objectsCache, filter, handler, options, schemaDef);
+
+        } else if (MEMBER.equals(objectClass)) {
+            // Handle Member search with special groupKey extraction
+            if (filter.hasSearchQuery()) {
+                // Extract groupKey from search filter for Member operations
+                String groupKey = extractGroupKeyFromFilter(filter.getFilter());
+                if (groupKey != null) {
+                    MemberHandler.executeQueryWithGroupKey(apiExecutor, groupKey, handler, options, schemaDef);
+                } else {
+                    MemberHandler.executeQuery(apiExecutor, filter, handler, options, schemaDef);
+                }
+            } else {
+                MemberHandler.executeQuery(apiExecutor, filter, handler, options, schemaDef);
+            }
+
+        } else if (ORG_UNIT.equals(objectClass)) {
+            OrgunitsHandler.executeQuery(apiExecutor, filter, handler, options, schemaDef);
+
+        } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
+            LicenseAssignmentsHandler.executeQuery(apiExecutor, filter, handler, options, schemaDef);
+
         } else {
-            executeLegacyQuery(objectClass, filter == null ? null : filter.getFilter(), handler, options);
-        }
-    }
-
-    private void executeLicenseAssignmentReadQuery(Uid uid, final ResultsHandler handler) {
-        try {
-            Matcher name = LICENSE_NAME_PATTERN.matcher(uid.getUidValue());
-            if (!name.matches()) {
-                return;
-            }
-
-            String productId = name.group(1);
-            String skuId = name.group(2);
-            String userId = name.group(3);
-
-            Licensing.LicenseAssignments.Get request
-                    = configuration.getLicensing().licenseAssignments().get(productId, skuId,
-                    userId);
-
-            execute(request,
-                    new RequestResultHandler<Licensing.LicenseAssignments.Get, LicenseAssignment, Boolean>() {
-                        public Boolean handleResult(
-                                Licensing.LicenseAssignments.Get request,
-                                LicenseAssignment value) {
-                            return handler.handle(fromLicenseAssignment(value));
-                        }
-
-                        public Boolean handleNotFound(IOException e) {
-                            // Do nothing if not found
-                            return true;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#Get");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    private void executeLicenseAssignmentSearchQuery(final ResultsHandler handler, OperationOptions options) {
-        try {
-
-            String productId = "";
-            String skuId = "";
-
-            boolean paged = false;
-
-            LicensingRequest<LicenseAssignmentList> request = null;
-
-            if (StringUtil.isBlank(productId)) {
-                // TODO iterate over the three productids
-                throw new ConnectorException("productId is required");
-            } else if (StringUtil.isBlank(skuId)) {
-                Licensing.LicenseAssignments.ListForProduct r
-                        = configuration.getLicensing().licenseAssignments().listForProduct(
-                        productId, MY_CUSTOMER_ID);
-
-                if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                    r.setMaxResults(Long.valueOf(options.getPageSize()));
-                    paged = true;
-                }
-                r.setPageToken(options.getPagedResultsCookie());
-                request = r;
-            } else {
-                Licensing.LicenseAssignments.ListForProductAndSku r
-                        = configuration.getLicensing().licenseAssignments()
-                        .listForProductAndSku(productId, skuId, MY_CUSTOMER_ID);
-
-                if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                    r.setMaxResults(Long.valueOf(options.getPageSize()));
-                    paged = true;
-                }
-                r.setPageToken(options.getPagedResultsCookie());
-                request = r;
-            }
-
-            String nextPageToken = null;
-            do {
-                //TODO license request has no page token property. How to page?
-                /*if(StringUtil.isNotBlank(nextPageToken)){
-                    request.setPageToken(nextPageToken);
-                }*/
-                nextPageToken
-                        = execute(request,
-                        new RequestResultHandler<LicensingRequest<LicenseAssignmentList>, LicenseAssignmentList, String>() {
-                            public String handleResult(LicensingRequest request,
-                                                       final LicenseAssignmentList value) {
-                                if (null != value.getItems()) {
-                                    for (LicenseAssignment resource : value
-                                            .getItems()) {
-                                        handler.handle(fromLicenseAssignment(resource));
-                                    }
-                                }
-                                return value.getNextPageToken();
-                            }
-                        });
-                if (request instanceof Licensing.LicenseAssignments.ListForProduct) {
-                    ((Licensing.LicenseAssignments.ListForProduct) request).setPageToken(nextPageToken);
-                } else {
-                    ((Licensing.LicenseAssignments.ListForProductAndSku) request).setPageToken(nextPageToken);
-                }
-            } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-            if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                logger.info("Paged Search was requested");
-                ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                        nextPageToken, 0));
-            }
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#List");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    private void executeOrgUnitReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            Directory.Orgunits.Get request
-                    = configuration.getDirectory().orgunits().get(MY_CUSTOMER_ID, uid.getUidValue());
-            request.setFields(getFields(ORG_UNIT, options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR));
-
-            execute(request,
-                    new RequestResultHandler<Directory.Orgunits.Get, OrgUnit, Boolean>() {
-                        public Boolean handleResult(Directory.Orgunits.Get request,
-                                                    OrgUnit value) {
-                            return handler.handle(fromOrgunit(value, attributesToGet));
-                        }
-
-                        public Boolean handleNotFound(IOException e) {
-                            // Do nothing if not found
-                            return true;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize OrgUnits#Get");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    private void executeOrgUnitSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            Directory.Orgunits.List request
-                    = configuration.getDirectory().orgunits().list(MY_CUSTOMER_ID);
-            if (null != query) {
-                if (query instanceof StartsWithFilter
-                        && AttributeUtil.namesEqual(ORG_UNIT_PATH_ATTR,
-                        ((StartsWithFilter) query).getName())) {
-                    request.setOrgUnitPath(((StartsWithFilter) query).getValue());
-                } else {
-                    throw new UnsupportedOperationException(
-                            "Only StartsWithFilter('orgUnitPath') is supported");
-                }
-            } else {
-                request.setOrgUnitPath("/");
-            }
-
-            String scope = options.getScope();
-            if (OperationOptions.SCOPE_OBJECT.equalsIgnoreCase(scope)
-                    || OperationOptions.SCOPE_ONE_LEVEL.equalsIgnoreCase(scope)) {
-                request.setType("children");
-            } else {
-                request.setType("all");
-            }
-
-            // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-            String fields = getFields(ORG_UNIT, options, ORG_UNIT_PATH_ATTR, ETAG_ATTR, NAME_ATTR);
-            if (null != fields) {
-                request.setFields("organizationUnits(" + fields + ")");
-            }
-
-            execute(request,
-                    new RequestResultHandler<Directory.Orgunits.List, OrgUnits, Void>() {
-                        public Void handleResult(final Directory.Orgunits.List request,
-                                                 final OrgUnits value) {
-                            if (null != value.getOrganizationUnits()) {
-                                for (OrgUnit group : value.getOrganizationUnits()) {
-                                    handler.handle(fromOrgunit(group, attributesToGet));
-                                }
-                            }
-                            return null;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize OrgUnits#List");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    private void executeMemberReadQuery(Uid uid, final ResultsHandler handler) {
-        try {
-            String[] ids = uid.getUidValue().split("/");
-            if (ids.length != 2) {
-                // TODO fix the exception
-                throw new InvalidAttributeValueException("Unrecognised UID format");
-            }
-
-            Directory.Members.Get request
-                    = configuration.getDirectory().members().get(ids[0], ids[1]);
-
-            execute(request,
-                    new RequestResultHandler<Directory.Members.Get, Member, Boolean>() {
-                        public Boolean handleResult(Directory.Members.Get request,
-                                                    Member value) {
-                            return handler.handle(fromMember(request.getGroupKey(), value));
-                        }
-
-                        public Boolean handleNotFound(IOException e) {
-                            // Do nothing if not found
-                            return true;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#Get");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    private void executeMemberSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options) {
-        // TODO support AND role
-        try {
-
-            String groupKey = null;
-
-            if (query instanceof EqualsFilter
-                    && ((EqualsFilter) query).getAttribute().is(GROUP_KEY_ATTR)) {
-                groupKey
-                        = AttributeUtil.getStringValue(((AttributeFilter) query)
-                        .getAttribute());
-            } else {
-                throw new UnsupportedOperationException(
-                        "Only EqualsFilter('groupKey') is supported");
-            }
-
-            if (StringUtil.isBlank(groupKey)) {
-                throw new InvalidAttributeValueException("The 'groupKey' can not be blank.");
-            }
-            Directory.Members.List request
-                    = configuration.getDirectory().members().list(groupKey);
-
-            boolean paged = false;
-            // Groups
-            if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                request.setMaxResults(options.getPageSize());
-                paged = true;
-            }
-            request.setPageToken(options.getPagedResultsCookie());
-
-            String nextPageToken = null;
-            do {
-                if (StringUtil.isNotBlank(nextPageToken)) {
-                    request.setPageToken(nextPageToken);
-                }
-                nextPageToken
-                        = execute(request,
-                        new RequestResultHandler<Directory.Members.List, Members, String>() {
-                            public String handleResult(
-                                    final Directory.Members.List request,
-                                    final Members value) {
-                                if (null != value.getMembers()) {
-                                    for (Member group : value.getMembers()) {
-                                        handler.handle(fromMember(request
-                                                .getGroupKey(), group));
-                                    }
-                                }
-                                return value.getNextPageToken();
-                            }
-                        });
-                request.setPageToken(nextPageToken);
-            } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-            if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                logger.info("Paged Search was requested");
-                ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                        nextPageToken, 0));
-            }
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#List");
-            throw ConnectorException.wrap(e);
-        }
-    }
-
-    private void executeGroupReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        GroupHandler.executeGroupReadQuery(apiExecutor, objectsCache, uid, handler, options, attributesToGet, getSchemaDefinition(ObjectClass.GROUP));
-    }
-
-    private void executeGroupSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        GroupHandler.executeGroupSearchQuery(apiExecutor, new GoogleFilter(query), handler, options, attributesToGet, getSchemaDefinition(ObjectClass.GROUP));
-    }
-
-    private void executeAccountReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        UserHandler.executeAccountReadQuery(apiExecutor, objectsCache, uid, handler, options, getSchemaDefinition(ObjectClass.ACCOUNT));
-    }
-
-    private void executeAccountSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        UserHandler.executeAccountSearchQuery(apiExecutor, new GoogleFilter(query), handler, options, getSchemaDefinition(ObjectClass.ACCOUNT));
-    }
-
-    protected Set<String> getAttributesToGet(ObjectClass objectClass, OperationOptions options) {
-        Set<String> attributesToGet = null;
-        if (null != options.getAttributesToGet()) {
-            attributesToGet = CollectionUtil.newCaseInsensitiveSet();
-            if (ORG_UNIT.equals(objectClass)) {
-                attributesToGet.add(ORG_UNIT_PATH_ATTR);
-            } else {
-                attributesToGet.add(ID_ATTR);
-            }
-            attributesToGet.add(ETAG_ATTR);
-            for (String attribute : options.getAttributesToGet()) {
-                int i = attribute.indexOf('/');
-                if (i == 0) {
-                    // Strip off the leading '/'
-                    attribute = attribute.substring(1);
-                    i = attribute.indexOf('/');
-                }
-                int j = attribute.indexOf('(');
-                if (i < 0 && j < 0) {
-                    attributesToGet.add(attribute);
-                } else if (i == 0 || j == 0) {
-                    throw new IllegalArgumentException("Invalid attribute name to get:/"
-                            + attribute);
-                } else {
-                    int l = attribute.length();
-                    if (i > 0) {
-                        l = Math.min(l, i);
-                    }
-                    if (j > 0) {
-                        l = Math.min(l, j);
-                    }
-                    attributesToGet.add(attribute.substring(0, l));
-                }
-            }
-        }
-        return attributesToGet;
-    }
-
-    protected String googleName(ObjectClass objectClass, String attributeName) {
-        if (AttributeUtil.namesEqual(Name.NAME, attributeName)) {
-            if (ObjectClass.ACCOUNT.equals(objectClass)) {
-                return PRIMARY_EMAIL_ATTR;
-            } else if (ObjectClass.GROUP.equals(objectClass)) {
-                return EMAIL_ATTR;
-            } else {
-                return NAME_ATTR;
-            }
+            logger.warn("Search of type {0} is not supported", configuration.getConnectorMessages()
+                    .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
+            throw new UnsupportedOperationException("Search of type"
+                    + objectClass.getObjectClassValue() + " is not supported");
         }
 
-        if (AttributeUtil.namesEqual(PredefinedAttributes.DESCRIPTION, attributeName)) {
-            return DESCRIPTION_ATTR;
-        }
-
-        if (AttributeUtil.namesEqual(FAMILY_NAME_ATTR, attributeName)) {
-            return "name/familyName";
-        }
-        if (AttributeUtil.namesEqual(GIVEN_NAME_ATTR, attributeName)) {
-            return "name/givenName";
-        }
-        if (AttributeUtil.namesEqual(FULL_NAME_ATTR, attributeName)) {
-            return "name/fullName";
-        }
-        return attributeName; //__GROUPS__ //__PASSWORD__
+        logger.info("executeQuery() - finished in " + timeFrom(startTime));
     }
 
-    protected Set<String> _getAttributesToGet(OperationOptions options) {
-        Set<String> attributesToGet = null;
-        if (null != options.getAttributesToGet()) {
-            attributesToGet = CollectionUtil.newCaseInsensitiveSet();
-            for (String attribute : options.getAttributesToGet()) {
-                StringBuilder builder = new StringBuilder();
-                loop:
-                for (int i = 0; i < attribute.length(); i++) {
-                    char c = attribute.charAt(i);
-                    switch (c) {
-                        case '/': {
-                            if (i == 0) {
-                                // Strip off the leading '/'
-                                break;
-                            } else if (i == 1) {
-                                throw new IllegalArgumentException("Invalid attribute name to get:"
-                                        + attribute);
-                            }
-                            break loop;
-                        }
-                        case '(': {
-                            if (i == 0) {
-                                throw new IllegalArgumentException("Invalid attribute name to get:"
-                                        + attribute);
-                            }
-                            break loop;
-                        }
-                        default:
-                            builder.append(c);
-                    }
-                }
-                attributesToGet.add(builder.toString());
-            }
-        }
-        return attributesToGet;
-    }
-
-    protected String getFields(ObjectClass objectClass, OperationOptions options, String... nameAttribute) {
-        if (null != options.getAttributesToGet()) {
-            Set<String> attributes = CollectionUtil.newCaseInsensitiveSet();
-            for (String attribute : nameAttribute) {
-                attributes.add(attribute);
-            }
-            for (String attribute : options.getAttributesToGet()) {
-                if (AttributeUtil.namesEqual(PredefinedAttributes.DESCRIPTION, attribute)) {
-                    attributes.add(DESCRIPTION_ATTR);
-                } else if (AttributeUtil.namesEqual(ENABLE_NAME, attribute)) {
-                    if (ObjectClass.ACCOUNT.equals(objectClass)) attributes.add(SUSPENDED_ATTR);
-                } else if (AttributeUtil.isSpecialName(attribute)) {
-                    continue;
-                } else if (AttributeUtil.namesEqual(FAMILY_NAME_ATTR, attribute)) {
-                    attributes.add("name/familyName");
-                } else if (AttributeUtil.namesEqual(GIVEN_NAME_ATTR, attribute)) {
-                    attributes.add("name/givenName");
-                } else if (AttributeUtil.namesEqual(FULL_NAME_ATTR, attribute)) {
-                    attributes.add("name/fullName");
-                } else {
-                    attributes.add(attribute);
-                }
-            }
-            return String.join(String.valueOf(COMMA), attributes);
-        }
-        return null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
+    @Override
     public void test() {
         logger.info("Testing connection... ");
         try {
@@ -808,407 +277,6 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         logger.info("OK.");
     }
 
-    /**
-     * {@inheritDoc}
-     */
-
-
-    protected ConnectorObject fromUser(User user, Set<String> attributesToGet,
-                                       Directory.Groups service) {
-        ConnectorObjectBuilder builder = new ConnectorObjectBuilder();
-        if (null != user.getEtag()) {
-            builder.setUid(new Uid(user.getId(), user.getEtag()));
-        } else {
-            builder.setUid(user.getId());
-        }
-        builder.setName(user.getPrimaryEmail());
-
-        ConnectorObject connectorObject = getUserFromResource(user, builder, attributesToGet, service);
-        return connectorObject;
-    }
-
-    private ConnectorObject getUserFromResource(User user, ConnectorObjectBuilder builder,
-                                                Set<String> attributesToGet, Directory.Groups service) {
-        // Optional
-        // If both givenName and familyName are empty then Google didn't return
-        // with 'name'
-        if (null == attributesToGet || attributesToGet.contains(GIVEN_NAME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(GIVEN_NAME_ATTR,
-                    null != user.getName() ? user.getName().getGivenName() : null));
-        }
-        if (null == attributesToGet || attributesToGet.contains(FAMILY_NAME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(FAMILY_NAME_ATTR,
-                    null != user.getName() ? user.getName().getFamilyName() : null));
-        }
-        if (null == attributesToGet || attributesToGet.contains(FULL_NAME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(FULL_NAME_ATTR,
-                    null != user.getName() ? user.getName().getFullName() : null));
-        }
-
-        if (null == attributesToGet || attributesToGet.contains(IS_ADMIN_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_ADMIN_ATTR, user.getIsAdmin()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(IS_DELEGATED_ADMIN_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_DELEGATED_ADMIN_ATTR, user
-                    .getIsDelegatedAdmin()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(LAST_LOGIN_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(LAST_LOGIN_TIME_ATTR, 
-            null != user.getLastLoginTime() ? user.getLastLoginTime().toString() : null));
-        }
-        if (null == attributesToGet || attributesToGet.contains(CREATION_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(CREATION_TIME_ATTR,
-            null != user.getCreationTime() ? user.getCreationTime().toString() : null));
-        }
-        if (null == attributesToGet || attributesToGet.contains(AGREED_TO_TERMS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(AGREED_TO_TERMS_ATTR, user
-                    .getAgreedToTerms()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(ENABLE_NAME)) {
-            if (Boolean.TRUE.equals(user.getSuspended())) {
-                builder.addAttribute(AttributeBuilder.build(ENABLE_NAME, false));
-            } else {
-                builder.addAttribute(AttributeBuilder.build(ENABLE_NAME, true));
-            }
-        }
-        if (null == attributesToGet || attributesToGet.contains(SUSPENDED_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(SUSPENDED_ATTR, user.getSuspended()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(SUSPENSION_REASON_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(SUSPENSION_REASON_ATTR, user
-                    .getSuspensionReason()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, user
-                    .getChangePasswordAtNextLogin()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(IP_WHITELISTED_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IP_WHITELISTED_ATTR, user
-                    .getIpWhitelisted()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(IMS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IMS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getIms())));
-        }
-        if (null == attributesToGet || attributesToGet.contains(EMAILS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(EMAILS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getEmails())));
-        }
-        if (null == attributesToGet || attributesToGet.contains(EXTERNAL_IDS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(EXTERNAL_IDS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getExternalIds())));
-        }
-        if (null == attributesToGet || attributesToGet.contains(RELATIONS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(RELATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getRelations())));
-        }
-        if (null == attributesToGet || attributesToGet.contains(ADDRESSES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ADDRESSES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getAddresses())));
-        }
-        if (null == attributesToGet || attributesToGet.contains(ORGANIZATIONS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ORGANIZATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getOrganizations())));
-        }
-        if (null == attributesToGet || attributesToGet.contains(PHONES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(PHONES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getPhones())));
-        }
-        if (null == attributesToGet || attributesToGet.contains(ALIASES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ALIASES_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user.getAliases())));
-        }
-
-        if (null == attributesToGet || attributesToGet.contains(LOCATIONS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(LOCATIONS_ATTR, (Collection) GoogleAppsUtil.structAttrToString((Collection) user
-                    .getLocations())));
-        }
-
-        if (null == attributesToGet || attributesToGet.contains(NON_EDITABLE_ALIASES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(NON_EDITABLE_ALIASES_ATTR, user
-                    .getNonEditableAliases()));
-        }
-
-        if (null == attributesToGet || attributesToGet.contains(CUSTOMER_ID_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(CUSTOMER_ID_ATTR, user.getCustomerId()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(ORG_UNIT_PATH_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ORG_UNIT_PATH_ATTR, user.getOrgUnitPath()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(IS_MAILBOX_SETUP_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(IS_MAILBOX_SETUP_ATTR, user
-                    .getIsMailboxSetup()));
-        }
-        if (null == attributesToGet
-                || attributesToGet.contains(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, user
-                    .getIncludeInGlobalAddressList()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(THUMBNAIL_PHOTO_URL_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(THUMBNAIL_PHOTO_URL_ATTR, user
-                    .getThumbnailPhotoUrl()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(PHOTO_ATTR))
-        {
-            byte[] decodedePhoto = null;
-            UserPhoto photo = getUserPhoto(user.getId());
-
-            if (null != photo)
-            {
-                decodedePhoto = photo.decodePhotoData();
-            }
-            builder.addAttribute(AttributeBuilder.build(PHOTO_ATTR, decodedePhoto));
-        }
-        if (null == attributesToGet || attributesToGet.contains(DELETION_TIME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(DELETION_TIME_ATTR, null != user
-                    .getDeletionTime() ? user.getDeletionTime().toString() : null));
-        }
-
-        // Expensive to get
-        //TODO do somehow else "null != attributesToGet &&" breaks associations functions
-        if (null == attributesToGet || attributesToGet.contains(PredefinedAttributes.GROUPS_NAME)) {
-            builder.addAttribute(AttributeBuilder.build(PredefinedAttributes.GROUPS_NAME,
-                    listGroups(service, user.getId())));
-        }
-
-        return builder.build();
-    }
-
-    private UserPhoto getUserPhoto(String userId)
-    {
-        UserPhoto photo = null;
-        try
-        {
-            photo = configuration.getDirectory().users().photos().get(userId).execute();
-        }
-        catch(GoogleJsonResponseException e)
-        {
-            logger.info("No photo is found for user: " + userId);
-        }
-        catch (IOException e)
-        {
-            logger.info("No photo is found for user: " + userId);
-        }
-        return photo;
-    }
-
-    protected ConnectorObject fromGroup(Group group, Set<String> attributesToGet,
-                                        Directory.Members service) {
-        ConnectorObjectBuilder builder = new ConnectorObjectBuilder();
-        builder.setObjectClass(ObjectClass.GROUP);
-
-        if (null != group.getEtag()) {
-            builder.setUid(new Uid(group.getId(), group.getEtag()));
-        } else {
-            builder.setUid(group.getId());
-        }
-        builder.setName(group.getEmail());
-
-        // Optional
-        if (null == attributesToGet || attributesToGet.contains(NAME_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(NAME_ATTR, group.getName()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(PredefinedAttributes.DESCRIPTION)) {
-            builder.addAttribute(AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, group
-                    .getDescription()));
-        }
-
-        if (null == attributesToGet || attributesToGet.contains(ADMIN_CREATED_ATTR)) {
-            builder.addAttribute(AttributeBuilder
-                    .build(ADMIN_CREATED_ATTR, group.getAdminCreated()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(ALIASES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(ALIASES_ATTR, group.getAliases()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(NON_EDITABLE_ALIASES_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(NON_EDITABLE_ALIASES_ATTR, group
-                    .getNonEditableAliases()));
-        }
-        if (null == attributesToGet || attributesToGet.contains(DIRECT_MEMBERS_COUNT_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(DIRECT_MEMBERS_COUNT_ATTR, group
-                    .getDirectMembersCount()));
-        }
-
-        // Expensive to get
-        //TODO do somehow else "null != attributesToGet &&" breaks associations functions
-        if (null == attributesToGet || attributesToGet.contains(MEMBERS_ATTR)) {
-            builder.addAttribute(AttributeBuilder.build(MEMBERS_ATTR, listMembers(service, group
-                    .getId(), null)));
-        }
-
-        return builder.build();
-    }
-
-    protected List<String> listMembers(Directory.Members service, String groupKey, String roles) {
-        List<Map<String, String>> allMembers = listAllMembers(service, groupKey, roles);
-        final List<String> resultMembers = new ArrayList<String>();
-        for (Map<String, String> allMember : allMembers) {
-            //m.put(EMAIL_ATTR, member.getEmail());
-            //m.put(ROLE_ATTR, member.getRole());
-            String memberRole = allMember.get(ROLE_ATTR);
-            String memberEmail = allMember.get(EMAIL_ATTR);
-            if ("MEMBER".equals(memberRole)) {
-                resultMembers.add(memberEmail);
-            }
-        }
-        return resultMembers;
-    }
-
-    //TODO dodelat po te listOwners a listManagers a vystavit obdobny attribut
-    protected List<Map<String, String>> listAllMembers(Directory.Members service, String groupKey, String roles) {
-        final long startTime = System.currentTimeMillis();
-        final List<Map<String, String>> result = new ArrayList<Map<String, String>>();
-        try {
-
-            Directory.Members.List request = service.list(groupKey);
-            request.setRoles(StringUtil.isBlank(roles) ? "OWNER,MANAGER,MEMBER" : roles);
-
-            String nextPageToken = null;
-            do {
-                if (StringUtil.isNotBlank(nextPageToken)) {
-                    request.setPageToken(nextPageToken);
-                }
-                nextPageToken
-                        = execute(request,
-                        new RequestResultHandler<Directory.Members.List, Members, String>() {
-                            public String handleResult(Directory.Members.List request,
-                                                       Members value) {
-                                if (null != value.getMembers()) {
-                                    for (Member member : value.getMembers()) {
-                                        Map<String, String> m
-                                                = new LinkedHashMap<String, String>(2);
-                                        m.put(EMAIL_ATTR, member.getEmail());
-                                        m.put(ROLE_ATTR, member.getRole());
-                                        result.add(m);
-                                    }
-                                }
-                                return value.getNextPageToken();
-                            }
-                        });
-
-            } while (StringUtil.isNotBlank(nextPageToken));
-            // } catch (HttpResponseException e){
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Members#Delete");
-            throw ConnectorException.wrap(e);
-        }
-        logger.info("listAllMembers() - finished in " + timeFrom(startTime));
-        return result;
-    }
-
-    private String timeFrom(long startTime) {
-        return (System.currentTimeMillis() - startTime) + " ms";
-    }
-
-    protected Set<String> listGroups(Directory.Groups service, String userKey) {
-        final Set<String> result = CollectionUtil.newCaseInsensitiveSet();
-        try {
-
-            Directory.Groups.List request = service.list();
-            request.setUserKey(userKey);
-            request.setFields("groups/id,groups/email");
-            //400 Bad Request if the Customer(my_customer or exact value) is set, only domain-userKey combination allowed.
-            //request.setCustomer(MY_CUSTOMER_ID);
-            request.setDomain(configuration.getDomain());
-
-            String nextPageToken = null;
-            do {
-                if (StringUtil.isNotBlank(nextPageToken)) {
-                    request.setPageToken(nextPageToken);
-                }
-                nextPageToken
-                        = execute(request,
-                        new RequestResultHandler<Directory.Groups.List, Groups, String>() {
-                            public String handleResult(Directory.Groups.List request,
-                                                       Groups value) {
-                                if (null != value.getGroups()) {
-                                    for (Group group : value.getGroups()) {
-                                        GoogleAppsConfiguration GAconf = (GoogleAppsConfiguration) getConfiguration();
-                                        String domain = GAconf.getDomain();
-                                        if (group.getEmail().endsWith(domain)) {//TODO fix loading crossdomain groups for users
-                                            result.add(group.getId());
-                                        }
-                                    }
-                                }
-                                return value.getNextPageToken();
-                            }
-                        });
-
-            } while (StringUtil.isNotBlank(nextPageToken));
-            // } catch (HttpResponseException e){
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Members#Delete");
-            throw ConnectorException.wrap(e);
-        }
-        return result;
-    }
-
-    protected Set<String> listAliases(Directory.Users.Aliases service, String userKey) {
-        final Set<String> result = CollectionUtil.newCaseInsensitiveSet();
-        final Gson gson = new GsonBuilder().create();
-        try {
-
-            Directory.Users.Aliases.List request = service.list(userKey);
-
-            String nextPageToken = null;
-            do {
-                //TODO user alias request has no page token, how to page?
-                /*if(StringUtil.isNotBlank(nextPageToken)){
-                    request.setPageToken(nextPageToken);
-                }*/
-                nextPageToken
-                        = execute(request,
-                        new RequestResultHandler<Directory.Users.Aliases.List, Aliases, String>() {
-                            public String handleResult(Directory.Users.Aliases.List request, Aliases value) {
-                                if (null != value.getAliases()) {
-                                    for (Object alias : value.getAliases()) {
-                                        String toJson = gson.toJson(alias);
-                                        Alias fromJson = gson.fromJson(toJson, Alias.class);
-                                        result.add(fromJson.getAlias()); // return only alias parameter of json object
-                                    }
-                                }
-                                return null;
-                            }
-                        });
-
-            } while (StringUtil.isNotBlank(nextPageToken));
-            // } catch (HttpResponseException e){
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Aliases#List");
-            throw ConnectorException.wrap(e);
-        }
-        return result;
-    }
-
-    protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
-                                                                          RequestResultHandler<G, T, R> handler) {
-        return apiExecutor.execute(request, handler);
-    }
-
-    protected <G extends AbstractGoogleJsonClientRequest, T, R> R execute(G request,
-                                                                          RequestResultHandler<G, T, R> handler, int retry) {
-        return apiExecutor.execute(request, handler, retry);
-    }
-
-    protected RuntimeException get(GoogleJsonError.ErrorInfo errorInfo) {
-        return null;
-    }
-
-    private static final Random RANDOM = new Random();
-
-    long nextLong(long n) {
-        long bits, val;
-        do {
-            bits = (RANDOM.nextLong() << 1) >>> 1;
-            val = bits % n;
-        } while (bits - val + (n - 1) < 0L);
-        return val;
-    }
-    private void executeAccountReadQuery(Name name, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        UserHandler.executeAccountReadQuery(apiExecutor, objectsCache, name, handler, options, getSchemaDefinition(ObjectClass.ACCOUNT));
-    }
-    private void executeGroupReadQuery(Name name, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        GroupHandler.executeGroupReadQuery(apiExecutor, objectsCache, name, handler, options, attributesToGet, getSchemaDefinition(ObjectClass.GROUP));
-    }
-    public GoogleApiExecutor getApiExecutor() {
-        return apiExecutor;
-    }
     @Override
     public Set<AttributeDelta> updateDelta(ObjectClass objclass, Uid uid, Set<AttributeDelta> modifications, OperationOptions options) {
         if (ObjectClass.ACCOUNT.equals(objclass)) {
@@ -1248,78 +316,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
     }
 
-    private void executeLegacyQuery(ObjectClass objectClass, Filter query, final ResultsHandler handler,
-                             OperationOptions options) {
-        final long startTime = System.currentTimeMillis();
-        final Set<String> attributesToGet = getAttributesToGet(objectClass, options);
-        Uid uid = null;
-        if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Uid) {
-            // Read request
-            uid = (Uid) ((EqualsFilter) query).getAttribute();
-        }
-        Name name = null;
-        if (query instanceof EqualsFilter && ((EqualsFilter) query).getAttribute() instanceof Name) {
-            // Read request
-            name = (Name) ((EqualsFilter) query).getAttribute();
-        }
-        logger.info("executeQuery() - objectClass: " + objectClass +
-                ", uid: " + (uid == null ? "null" : uid.getUidValue()) +
-                ", name: " + (name == null ? "null" : name.getNameValue()));
-
-        if (ObjectClass.ACCOUNT.equals(objectClass)) {
-            if (null == uid && null == name) {
-                // Search request
-                executeAccountSearchQuery(query, handler, options, attributesToGet);
-            } else if (uid != null) {
-                // Read request
-                executeAccountReadQuery(uid, handler, options, attributesToGet);
-            } else {
-                // Read request
-                executeAccountReadQuery(name, handler, options, attributesToGet);
-            }
-        } else if (ObjectClass.GROUP.equals(objectClass)) {
-            if (null == uid && null == name) {
-                // Search request
-                executeGroupSearchQuery(query, handler, options, attributesToGet);
-            } else if (uid != null) {
-                // Read request
-                executeGroupReadQuery(uid, handler, options, attributesToGet);
-            } else {
-                executeGroupReadQuery(name, handler, options, attributesToGet);
-            }
-        } else if (MEMBER.equals(objectClass)) {
-            if (null == uid) {
-                // Search request
-                executeMemberSearchQuery(query, handler, options);
-            } else {
-                // Read request
-                executeMemberReadQuery(uid, handler);
-            }
-        } else if (ORG_UNIT.equals(objectClass)) {
-            if (null == uid) {
-                // Search request
-                executeOrgUnitSearchQuery(query, handler, options, attributesToGet);
-            } else {
-                // Read request
-                executeOrgUnitReadQuery(uid, handler, options, attributesToGet);
-            }
-        } else if (LICENSE_ASSIGNMENT.equals(objectClass)) {
-            if (null == uid) {
-                // Search request
-                executeLicenseAssignmentSearchQuery(handler, options);
-            } else {
-                // Read request
-                executeLicenseAssignmentReadQuery(uid, handler);
-            }
-        } else {
-            logger.warn("Search of type {0} is not supported", configuration.getConnectorMessages()
-                    .format(objectClass.getDisplayNameKey(), objectClass.getObjectClassValue()));
-            throw new UnsupportedOperationException("Search of type"
-                    + objectClass.getObjectClassValue() + " is not supported");
-        }
-
-        logger.info("executeQuery() - finished in " + timeFrom(startTime));
-    }
+    /**
+     * Initialize schema cache for fast attribute metadata access.
+     */
     private void initializeSchemaCache() {
         for (ObjectClassInfo oci : schema.getObjectClassInfo()) {
             ObjectClass objectClass = new ObjectClass(oci.getType());
@@ -1328,6 +327,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         }
         logger.info("Schema cache initialized for {0} object classes", schemaCache.size());
     }
+
+    /**
+     * Get schema definition for the specified object class.
+     */
     public SchemaDefinition getSchemaDefinition(ObjectClass objectClass) {
         SchemaDefinition schemaDef = schemaCache.get(objectClass);
         if (schemaDef == null) {
@@ -1338,5 +341,34 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
             }
         }
         return schemaDef;
+    }
+
+    /**
+     * Get the cached Google API executor instance.
+     */
+    public GoogleApiExecutor getApiExecutor() {
+        return apiExecutor;
+    }
+
+    /**
+     * Extract groupKey from Member search filter.
+     * Used for Member operations that require groupKey parameter.
+     */
+    private String extractGroupKeyFromFilter(org.identityconnectors.framework.common.objects.filter.Filter filter) {
+        if (filter instanceof org.identityconnectors.framework.common.objects.filter.EqualsFilter) {
+            org.identityconnectors.framework.common.objects.filter.EqualsFilter equalsFilter =
+                    (org.identityconnectors.framework.common.objects.filter.EqualsFilter) filter;
+            if (GROUP_KEY_ATTR.equals(equalsFilter.getAttribute().getName())) {
+                Object value = equalsFilter.getAttribute().getValue().get(0);
+                return value != null ? value.toString() : null;
+            }
+        }
+        return null;
+    }
+
+
+
+    private String timeFrom(long startTime) {
+        return (System.currentTimeMillis() - startTime) + " ms";
     }
 }

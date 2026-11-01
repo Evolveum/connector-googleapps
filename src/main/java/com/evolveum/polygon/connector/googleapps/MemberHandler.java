@@ -35,7 +35,6 @@ import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.*;
-import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -218,17 +217,87 @@ public class MemberHandler {
     /**
      * Execute Member read query by UID.
      */
+    public static void executeMemberReadQuery(GoogleApiExecutor executor, Uid uid, final ResultsHandler handler) {
+        try {
+            String[] ids = uid.getUidValue().split("/", 2);
+            if (ids.length != 2) {
+                return;
+            }
 
+            Directory.Members.Get request = executor.getDirectory().members().get(ids[0], ids[1]);
+
+            executor.execute(request,
+                    new RequestResultHandler<Directory.Members.Get, Member, Boolean>() {
+                        public Boolean handleResult(Directory.Members.Get request,
+                                                    Member value) {
+                            return handler.handle(fromMember(request.getGroupKey(), value));
+                        }
+
+                        public Boolean handleNotFound(IOException e) {
+                            // Do nothing if not found
+                            return true;
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Members#Get");
+            throw ConnectorException.wrap(e);
+        }
+    }
 
     /**
      * Execute Member search query.
      */
+    public static void executeMemberSearchQuery(GoogleApiExecutor executor, GoogleFilter googleFilter, final ResultsHandler handler, OperationOptions options) {
+        String groupKey = null;
 
+        // Extract groupKey from search filter
+        if (googleFilter.hasSearchQuery()) {
+            // This should be an equals filter for groupKey
+            // The filter processing should have been done in GoogleFilterTranslator
+            throw new UnsupportedOperationException("Advanced search filters not supported for Member. Use groupKey equals filter only.");
+        } else if (googleFilter.getFilter() != null) {
+            throw new UnsupportedOperationException("Advanced search filters not supported for Member. Use groupKey equals filter only.");
+        }
+
+        // Check if this is a search with groupKey (should be handled by GoogleFilter processing)
+        // For now, we require explicit groupKey to be provided
+        throw new InvalidAttributeValueException("groupKey is required for Member search operations");
+    }
 
     /**
      * Execute Member search query with specific groupKey.
      */
+    public static void executeMemberSearchQueryByGroupKey(GoogleApiExecutor executor, String groupKey, final ResultsHandler handler, OperationOptions options) {
+        try {
+            Directory.Members.List request = executor.getDirectory().members().list(groupKey);
 
+            // Handle pagination
+            if (options.getPageSize() != null && 0 < options.getPageSize()) {
+                request.setMaxResults(options.getPageSize());
+            }
+            request.setPageToken(options.getPagedResultsCookie());
+
+            executor.execute(request,
+                    new RequestResultHandler<Directory.Members.List, Members, String>() {
+                        public String handleResult(
+                                final Directory.Members.List request,
+                                final Members value) {
+                            if (null != value.getMembers()) {
+                                for (Member member : value.getMembers()) {
+                                    handler.handle(fromMember(request
+                                            .getGroupKey(), member));
+                                }
+                            }
+                            return value.getNextPageToken();
+                        }
+                    });
+
+        } catch (IOException e) {
+            logger.warn(e, "Failed to initialize Members#List");
+            throw ConnectorException.wrap(e);
+        }
+    }
 
     /**
      * Execute Member create operation.
@@ -286,11 +355,30 @@ public class MemberHandler {
     /**
      * Unified query execution method for Members that handles both read and search operations.
      */
-
+    public static void executeQuery(GoogleApiExecutor executor, GoogleFilter googleFilter,
+                                    ResultsHandler handler, OperationOptions options, SchemaDefinition schemaDef) {
+        if (googleFilter.isReadByUid()) {
+            // Read request by UID
+            executeMemberReadQuery(executor, googleFilter.getUid(), handler);
+        } else {
+            // Search query - need to extract groupKey from filter
+            if (googleFilter.hasSearchQuery()) {
+                // For Member search, we expect a groupKey equals filter
+                // This should be processed by the caller to extract groupKey
+                throw new InvalidAttributeValueException("Member search requires groupKey filter");
+            } else {
+                // List all - not supported for Members
+                throw new InvalidAttributeValueException("Member search requires groupKey filter");
+            }
+        }
+    }
 
     /**
      * Execute Member query with extracted groupKey from search filter.
      */
-
+    public static void executeQueryWithGroupKey(GoogleApiExecutor executor, String groupKey,
+                                                ResultsHandler handler, OperationOptions options, SchemaDefinition schemaDef) {
+        executeMemberSearchQueryByGroupKey(executor, groupKey, handler, options);
+    }
 
 }
