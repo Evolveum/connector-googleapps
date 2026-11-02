@@ -6,6 +6,7 @@ import org.identityconnectors.framework.api.ConnectorFacade;
 import org.identityconnectors.framework.api.ConnectorFacadeFactory;
 import org.identityconnectors.test.common.TestHelpers;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.AfterClass;
 
@@ -25,6 +26,11 @@ public abstract class GoogleAppsConnectorTestBase {
     @AfterClass(alwaysRun = true)
     public void stopMockServer() {
         GoogleApiMockServer.stop();
+    }
+
+    @AfterMethod(alwaysRun = true)
+    public void verifyRequests() {
+        GoogleApiMockServer.verifyMatched();
     }
 
     protected ConnectorFacade connectorFacade;

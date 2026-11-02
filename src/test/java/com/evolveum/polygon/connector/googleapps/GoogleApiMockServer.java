@@ -111,6 +111,13 @@ public class GoogleApiMockServer {
     }
 
     /**
+    Fails when a test sends a request without a matching stub.
+    */
+    public static void verifyMatched() {
+        org.assertj.core.api.Assertions.assertThat(wireMockServer.findAllUnmatchedRequests()).as("Unmatched API requests").isEmpty();
+    }
+
+    /**
      * Helper method to get all logged requests
      */
     public static List<com.github.tomakehurst.wiremock.verification.LoggedRequest> getAllRequests() {
