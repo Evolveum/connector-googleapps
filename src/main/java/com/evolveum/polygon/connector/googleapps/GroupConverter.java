@@ -26,7 +26,6 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Group;
 import com.google.api.services.directory.model.Groups;
@@ -122,8 +121,8 @@ public class GroupConverter {
     }
 
     /**
-     * List all group members with details.
-     */
+    Returns all member pages; any read failure throws ConnectorException without returning partial data.
+    */
     public static List<Map<String, String>> listAllMembers(Directory.Members service, String groupKey, String roles) {
         final List<Map<String, String>> result = new ArrayList<Map<String, String>>();
         long startTime = System.currentTimeMillis();
@@ -146,12 +145,6 @@ public class GroupConverter {
                 request.setPageToken(currentPage.getNextPageToken());
             } while (null != request.getPageToken());
 
-        } catch (GoogleJsonResponseException e) {
-            if (404 == e.getDetails().getCode()) {
-                logger.warn("Group {0} is not found", groupKey);
-            } else {
-                throw ConnectorException.wrap(e);
-            }
         } catch (IOException e) {
             throw ConnectorException.wrap(e);
         }
@@ -160,8 +153,8 @@ public class GroupConverter {
     }
 
     /**
-     * List groups for a user.
-     */
+    Returns all group pages; any read failure throws ConnectorException without returning partial data.
+    */
     public static Set<String> listGroups(Directory.Groups service, String userKey) {
         final Set<String> result = new HashSet<String>();
         long startTime = System.currentTimeMillis();
@@ -179,12 +172,6 @@ public class GroupConverter {
                 request.setPageToken(currentPage.getNextPageToken());
             } while (null != request.getPageToken());
 
-        } catch (GoogleJsonResponseException e) {
-            if (404 == e.getDetails().getCode()) {
-                logger.warn("User {0} is not found", userKey);
-            } else {
-                throw ConnectorException.wrap(e);
-            }
         } catch (IOException e) {
             throw ConnectorException.wrap(e);
         }
