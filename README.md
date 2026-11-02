@@ -2,3 +2,13 @@ Status: [![Build Status](https://travis-ci.org/Evolveum/connector-googleapps.svg
 
 ## Google Apps Connector
 * Doc: [Wiki](https://wiki.evolveum.com/display/midPoint/Google+Apps+Connector)
+
+## Run Tests
+
+```shell
+mvn clean test
+```
+## Build
+```shell
+mvn clean verify
+```
