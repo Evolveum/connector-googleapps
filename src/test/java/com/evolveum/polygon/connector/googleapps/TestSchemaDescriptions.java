@@ -37,13 +37,13 @@ public class TestSchemaDescriptions {
         assertDescription(schema, ObjectClass.GROUP_NAME,
                 "A Google Group used as an email distribution list and membership container. "
                         + "Group memberships are represented separately by the Member object class.");
-        assertDescription(schema, GoogleAppsConnector.MEMBER.getObjectClassValue(),
+        assertDescription(schema, GoogleAppsConstants.MEMBER.getObjectClassValue(),
                 "A membership relationship linking a user, another group, or a customer domain "
                         + "to a Google Group. It includes the member type and role, such as MEMBER, MANAGER, or OWNER.");
-        assertDescription(schema, GoogleAppsConnector.ORG_UNIT.getObjectClassValue(),
+        assertDescription(schema, GoogleAppsConstants.ORG_UNIT.getObjectClassValue(),
                 "A node in the Google Workspace organizational hierarchy. Users assigned to it "
                         + "receive the services and settings configured for that organizational unit.");
-        assertDescription(schema, GoogleAppsConnector.LICENSE_ASSIGNMENT.getObjectClassValue(),
+        assertDescription(schema, GoogleAppsConstants.LICENSE_ASSIGNMENT.getObjectClassValue(),
                 "A relationship assigning a Google Workspace product SKU to a user. It connects "
                         + "the user, product, and SKU and can be used to assign, revoke, or change a license.");
     }
