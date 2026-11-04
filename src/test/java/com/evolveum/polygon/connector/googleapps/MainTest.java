@@ -24,7 +24,6 @@ import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
-import org.jspecify.annotations.NonNull;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;
@@ -188,7 +187,8 @@ public class MainTest {
         private boolean closed;
 
         @Override
-        public void write(char @NonNull [] buffer, int offset, int length) throws IOException {
+        @SuppressWarnings("NullableProblems")
+        public void write(char [] buffer, int offset, int length) throws IOException {
             throw new IOException("simulated write failure");
         }
 
