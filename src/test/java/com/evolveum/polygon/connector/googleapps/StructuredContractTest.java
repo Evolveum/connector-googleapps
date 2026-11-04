@@ -3,13 +3,19 @@ package com.evolveum.polygon.connector.googleapps;
 import com.google.api.client.util.ArrayMap;
 import com.google.api.services.directory.model.User;
 import com.google.gson.JsonParser;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.testng.annotations.Test;
-import java.util.*;
-import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.assertj.core.api.Assertions.*;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 public class StructuredContractTest extends GoogleAppsConnectorTestBase {
     @Test public void legacyBooleanStringsMustRemainRemovable() {

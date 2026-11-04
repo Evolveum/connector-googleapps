@@ -33,12 +33,30 @@ import com.google.api.services.directory.model.Member;
 import com.google.api.services.directory.model.Members;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.PredefinedAttributes;
+import org.identityconnectors.framework.common.objects.Uid;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ADMIN_CREATED_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ALIASES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.DIRECT_MEMBERS_COUNT_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EMAIL_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MEMBERS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NAME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NON_EDITABLE_ALIASES_ATTR;
 
 /**
  * GroupConverter handles conversion between Google Group objects and ConnID ConnectorObjects.
