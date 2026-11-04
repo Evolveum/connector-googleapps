@@ -34,14 +34,31 @@ import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
+import org.identityconnectors.framework.common.objects.AttributesAccessor;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.SearchResult;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EMAIL_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.GROUP_KEY_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MEMBER;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ROLE_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.TYPE_ATTR;
 
 /**
  * MemberHandler is a util class to cover all Member related operations.

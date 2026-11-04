@@ -32,7 +32,23 @@ import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
+import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
+import org.identityconnectors.framework.common.objects.AttributeUtil;
+import org.identityconnectors.framework.common.objects.AttributesAccessor;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.PredefinedAttributeInfos;
+import org.identityconnectors.framework.common.objects.PredefinedAttributes;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
 
@@ -40,7 +56,15 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.BLOCK_INHERITANCE_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EMPTY_STRING;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ETAG_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MY_CUSTOMER_ID;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NAME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ORG_UNIT;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ORG_UNIT_PATH_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ORG_UNIT_PATH_ETAG;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR;
 
 /**
  * OrgunitsHandler is a util class to cover all Organizations Unit related

@@ -1,12 +1,8 @@
 package com.evolveum.polygon.connector.googleapps;
 
-import org.identityconnectors.framework.common.objects.*;
 import org.testng.annotations.Test;
-import java.util.*;
-import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class TimeoutContractTest extends GoogleAppsConnectorTestBase {
     @Test public void configuredTimeoutsMustReachGoogleHttpRequest() throws Exception {
