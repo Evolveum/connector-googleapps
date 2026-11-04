@@ -5,7 +5,10 @@ import org.identityconnectors.framework.common.objects.Uid;
 import org.testng.annotations.Test;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.delete;
+import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
 /**
  * Tests for GoogleAppsConnector Group delete operations

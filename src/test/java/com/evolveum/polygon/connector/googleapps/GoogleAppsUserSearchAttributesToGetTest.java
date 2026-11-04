@@ -1,7 +1,12 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeUtil;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
@@ -10,7 +15,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**

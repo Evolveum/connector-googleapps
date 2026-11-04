@@ -9,7 +9,9 @@ import org.testng.annotations.Test;
 import java.util.List;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**

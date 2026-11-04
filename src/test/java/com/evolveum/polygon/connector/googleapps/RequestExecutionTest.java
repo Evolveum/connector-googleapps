@@ -1,11 +1,17 @@
 package com.evolveum.polygon.connector.googleapps;
-import com.google.api.client.testing.http.*;
+
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.directory.Directory;
-import org.identityconnectors.framework.common.exceptions.*;
+import org.identityconnectors.framework.common.exceptions.ConnectorException;
+import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.testng.annotations.Test;
+
 import java.io.IOException;
-import static org.assertj.core.api.Assertions.*;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 public class RequestExecutionTest {
     @Test public void missingObjectIsReportedWithoutErrorDetails() throws Exception {
         Directory d=new Directory.Builder(new MockHttpTransport.Builder().setLowLevelHttpResponse(

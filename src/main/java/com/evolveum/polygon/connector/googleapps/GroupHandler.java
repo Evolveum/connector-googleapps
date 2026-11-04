@@ -35,7 +35,23 @@ import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeInfo;
+import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
+import org.identityconnectors.framework.common.objects.AttributesAccessor;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.PredefinedAttributeInfos;
+import org.identityconnectors.framework.common.objects.PredefinedAttributes;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.SearchResult;
+import org.identityconnectors.framework.common.objects.SortKey;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
@@ -45,7 +61,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ADMIN_CREATED_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ALIASES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.DIRECT_MEMBERS_COUNT_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EMAIL_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ETAG_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ID_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ID_ETAG;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MEMBERS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MY_CUSTOMER_ID;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NAME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ROLE_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NON_EDITABLE_ALIASES_ATTR;
 
 /**
  * A GroupHandler is a util class to cover all Group related operations.

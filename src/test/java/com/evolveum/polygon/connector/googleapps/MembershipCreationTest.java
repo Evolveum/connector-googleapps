@@ -1,15 +1,30 @@
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.api.client.testing.http.*;
-import com.google.api.client.http.*;
+import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpRequest;
+import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.directory.Directory;
-import org.identityconnectors.framework.common.exceptions.*;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.exceptions.AlreadyExistsException;
+import org.identityconnectors.framework.common.exceptions.RetryableException;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.testng.annotations.Test;
+
 import java.io.IOException;
-import java.util.*;
-import static org.assertj.core.api.Assertions.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class MembershipCreationTest {
     private final List<MockLowLevelHttpRequest> requests = new ArrayList<>();

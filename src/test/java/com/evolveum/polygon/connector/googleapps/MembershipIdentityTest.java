@@ -1,12 +1,12 @@
 package com.evolveum.polygon.connector.googleapps;
 
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
-import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Member;
 import org.testng.annotations.Test;
-import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class MembershipIdentityTest {

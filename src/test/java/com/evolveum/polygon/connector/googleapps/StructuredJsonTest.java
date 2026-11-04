@@ -1,9 +1,16 @@
 package com.evolveum.polygon.connector.googleapps;
+
 import com.google.api.client.util.ArrayMap;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
 import org.testng.annotations.Test;
-import java.util.*;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
+
 public class StructuredJsonTest {
     @Test public void escapedValuesAndNativeTypesRoundTrip() {
         Map<String,Object> value=new HashMap<>();value.put("value","quote\"\n\\");value.put("primary",true);value.put("number",42);
