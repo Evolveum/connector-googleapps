@@ -119,7 +119,7 @@ public class GoogleAppsConnectorOperationsTest {
                 new OperationOptionsBuilder().build());
 
         assertEquals(groupUid.getUidValue(), "engineering@example.com");
-        assertEquals(memberUid.getUidValue(), "engineering@example.com/grace@example.com");
+        assertEquals(memberUid.getUidValue(), "engineering@example.com/member-id");
         assertEquals(orgUnitUid.getUidValue(), "Engineering");
         assertEquals(orgUnitUid.getRevision(), "ou-v1");
         assertEquals(licenseUid.getUidValue(), "product/sku/sku/user/ada@example.com");
@@ -154,7 +154,7 @@ public class GoogleAppsConnectorOperationsTest {
 
         assertEquals(user.getRevision(), "user-v2");
         assertEquals(group.getRevision(), "group-v2");
-        assertEquals(member.getUidValue(), "engineering@example.com/ada@example.com");
+        assertEquals(member.getUidValue(), "engineering@example.com/member-id");
         assertEquals(member.getRevision(), "member-v2");
         assertEquals(orgUnit.getRevision(), "ou-v2");
         assertEquals(license.getUidValue(), "Google-Drive-storage/sku/Google-Drive-storage-2TB/user/ada@example.com");
