@@ -24,7 +24,7 @@ import org.testng.annotations.Test;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertNotNull;
 
-public class TestSchemaDescriptions {
+public class SchemaDescriptionsTest {
 
     @Test
     public void testObjectClassDescriptions() {
