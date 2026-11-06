@@ -49,6 +49,7 @@ import java.util.EnumSet;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.ID_ATTR;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConnector.PHOTO_ATTR;
+import static org.identityconnectors.framework.common.objects.OperationalAttributes.ENABLE_NAME;
 
 /**
  *
@@ -456,6 +457,7 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 GuardedString.class).setRequired(true).setReadable(false).setReturnedByDefault(
                         false).build());
 
+        builder.addAttributeInfo(OperationalAttributeInfos.ENABLE);
         builder.addAttributeInfo(AttributeInfoBuilder.build(SUSPENDED_ATTR, Boolean.class));
         builder.addAttributeInfo(AttributeInfoBuilder.define(SUSPENSION_REASON_ATTR).setUpdateable(
                 false).setCreateable(false).build());
@@ -567,7 +569,9 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
         user.setPhones(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(PHONES_ATTR)));
         user.setLocations(GoogleAppsUtil.getStructAttr((Attribute) attributes.find(LOCATIONS_ATTR)));
 
-        user.setSuspended(attributes.findBoolean(SUSPENDED_ATTR));
+        Boolean suspended = attributes.findBoolean(SUSPENDED_ATTR);
+        Boolean enabled = attributes.findBoolean(ENABLE_NAME);
+        user.setSuspended(suspended != null ? suspended : enabled == null ? null : !enabled);
         user.setChangePasswordAtNextLogin(attributes
                 .findBoolean(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR));
         user.setIpWhitelisted(attributes.findBoolean(IP_WHITELISTED_ATTR));
@@ -626,6 +630,14 @@ public class UserHandler implements FilterVisitor<StringBuilder, Directory.Users
                 content = new User();
             }
             content.setPassword(SecurityUtil.decrypt(password));
+        }
+
+        Boolean enable = attributes.findBoolean(ENABLE_NAME);
+        if (null != enable) {
+            if (null == content) {
+                content = new User();
+            }
+            content.setSuspended(!enable);
         }
 
         Attribute suspended = attributes.find(SUSPENDED_ATTR);
