@@ -30,14 +30,19 @@ import com.google.api.client.util.Data;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Group;
 import com.google.api.services.directory.model.Groups;
+import com.google.api.services.directory.model.Member;
 import org.identityconnectors.common.StringUtil;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
+import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.objects.*;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
@@ -478,14 +483,55 @@ public class GroupHandler {
     }
 
     /**
-     * Execute Group create operation.
-     */
+    Creates a group and its requested memberships after validating all member values.
+    Members accept email strings or maps with email and optional role. Membership failures propagate;
+    the group and any earlier memberships remain created because these requests are not transactional.
+    */
     public static Uid executeGroupCreate(GoogleApiExecutor executor, Set<Attribute> createAttributes) {
-        final AttributesAccessor accessor = new AttributesAccessor(createAttributes);
+        AttributesAccessor accessor = new AttributesAccessor(createAttributes);
+        List<Member> members = parseMembers(accessor);
+        String email = GoogleAppsUtil.getName(accessor.getName());
 
-        return executor.execute(createGroup(executor.getDirectory().groups(), accessor),
-                new RequestResultHandler.Create<>(ObjectClass.GROUP,
-                    (Group group) -> new Uid(group.getId(), group.getEtag(), new Name(group.getEmail()))));
+        // The insert response contains only id and etag, so retain the validated input name.
+        Uid uid = executor.execute(createGroup(executor.getDirectory().groups(), accessor),
+                new RequestResultHandler.Create<>(ObjectClass.GROUP, (Group group) -> new Uid(group.getId(), group.getEtag(), new Name(email))));
+        for (Member member : members) {
+            Directory.Members.Insert request = MemberHandler.createMemberByEmail(executor.getDirectory().members(), uid.getUidValue(), member.getEmail(),
+                    StringUtil.isBlank(member.getRole()) ? "MEMBER" : member.getRole()).setFields(EMAIL_ATTR + "," + ETAG_ATTR);
+            executor.execute(request,
+                    new RequestResultHandler<Directory.Members.Insert, Member, Void>() {
+                        @Override
+                        public Void handleResult(Directory.Members.Insert request, Member result) {
+                            return null;
+                        }
+                    });
+        }
+        return uid;
+    }
+
+    private static List<Member> parseMembers(AttributesAccessor accessor) {
+        List<Member> members = new ArrayList<>();
+        List<Object> values = accessor.findList(MEMBERS_ATTR);
+        if (values == null) {
+            return members;
+        }
+        for (Object value : values) {
+            Object email = value;
+            Object role = null;
+            if (value instanceof Map) {
+                Map<?, ?> member = (Map<?, ?>) value;
+                email = member.get(EMAIL_ATTR);
+                role = member.get(ROLE_ATTR);
+            }
+            if (!(email instanceof String) || StringUtil.isBlank((String) email)) {
+                throw new InvalidAttributeValueException("Each '__MEMBERS__' value must be a nonblank email string or a map with a nonblank 'email' string.");
+            }
+            if (role != null && !(role instanceof String)) {
+                throw new InvalidAttributeValueException("The '__MEMBERS__' member 'role' must be a string when provided.");
+            }
+            members.add(new Member().setEmail((String) email).setRole((String) role));
+        }
+        return members;
     }
 
     /**

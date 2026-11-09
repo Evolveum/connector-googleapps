@@ -187,11 +187,9 @@ public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientReq
     // Utility methods for AttributeDelta processing
     
     /**
-     * Extract single value from AttributeDelta.
-     * For single-valued attributes, only replace operations are supported.
-     * Returns null if the attribute should be cleared (empty list), or the actual value to set.
-     * Common utility for all ObjectClass handlers.
-     */
+    Returns a replacement value, or null when the attribute is cleared.
+    Rejects deltas without replacements and values incompatible with the requested type.
+    */
     public static <T> T getSingleValue(AttributeDelta delta, Class<T> type) {
         List<Object> valuesToReplace = delta.getValuesToReplace();
         if (valuesToReplace == null) {
@@ -205,6 +203,9 @@ public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientReq
             return null; // Clear the attribute (empty list means remove all values)
         }
         Object rawValue = valuesToReplace.get(0);
+        if (rawValue != null && !type.isInstance(rawValue)) {
+            throw new InvalidAttributeValueException("Attribute '" + delta.getName() + "' requires a value of type " + type.getSimpleName());
+        }
         return rawValue != null ? type.cast(rawValue) : null;
     }
 }

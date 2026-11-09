@@ -361,10 +361,8 @@ public class GoogleFilter {
         }
 
         /**
-         * Helper method to build query string components.
-         * Surround with single quotes ' if the query contains whitespace. Escape
-         * single quotes in queries with \', for example 'Valentine\'s Day'.
-         */
+        Builds a query term, quoting whitespace and escaping single quotes.
+        */
         protected StringBuilder getStringBuilder(Attribute attribute, char operator, Character postfix, String fieldName) {
             StringBuilder builder = new StringBuilder();
             builder.append(fieldName).append(operator);
@@ -376,7 +374,7 @@ public class GoogleFilter {
                 if (stringValue.contains(" ")) {
                     builder.append('\'').append(STRING_ESCAPER.escape(stringValue)).append('\'');
                 } else {
-                    builder.append(stringValue);
+                    builder.append(STRING_ESCAPER.escape(stringValue));
                 }
             }
             return builder;
