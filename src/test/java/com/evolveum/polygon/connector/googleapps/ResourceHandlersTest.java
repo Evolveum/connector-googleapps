@@ -16,7 +16,6 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
@@ -31,7 +30,6 @@ import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentInsert;
 import org.identityconnectors.common.security.GuardedString;
-import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
@@ -108,7 +106,7 @@ public class ResourceHandlersTest {
     @Test
     public void createAndUpdateOrgUnitNormalizeParentPath() throws Exception {
         // Given: Parent paths without leading slashes
-        RecordingTransport transport = new RecordingTransport();
+        RecordingTransport transport = new RecordingTransport(200, "{\"name\":\"Engineering\",\"orgUnitPath\":\"/Company/Platform/Engineering\"}");
         GoogleApiExecutor executor = executor(transport);
         Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PARENT_ORG_UNIT_PATH_ATTR, "Company/Platform"));
 
@@ -127,7 +125,7 @@ public class ResourceHandlersTest {
         assertEquals(insertContent.getName(), "Engineering");
         assertEquals(insertContent.getDescription(), "Product engineering");
         assertEquals(insertContent.getBlockInheritance(), Boolean.TRUE);
-        assertEquals(result, Set.of());
+        assertEquals(result, Set.of(AttributeDeltaBuilder.build(Uid.NAME, "Company/Platform/Engineering")));
         assertEquals(transport.methods, List.of("PATCH"));
         assertEquals(transport.requests.size(), 1);
         MockLowLevelHttpRequest request = transport.requests.get(0);
@@ -215,13 +213,12 @@ public class ResourceHandlersTest {
     public void updateOrgUnitRejectsBlankParentPath() {
         // Given: A blank parent path replacement
         RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
         Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PARENT_ORG_UNIT_PATH_ATTR, " "));
 
         // When: Apply the invalid parent path
-        Set<AttributeDelta> result = OrgunitsHandler.executeOrgunitUpdateDelta(executor(transport), new Uid("Engineering"), modifications);
-
-        // Then: Ignore the replacement without remote changes
-        assertEquals(result, Set.of());
+        // Then: Reject input without remote changes
+        expectThrows(InvalidAttributeValueException.class, () -> OrgunitsHandler.executeOrgunitUpdateDelta(executor, new Uid("Engineering"), modifications));
         assertTrue(transport.requests.isEmpty());
     }
 
@@ -241,7 +238,7 @@ public class ResourceHandlersTest {
     @Test
     public void updateOrgUnitCanReturnNullOrClearDescription() throws Exception {
         // Given: Empty update and description removal
-        RecordingTransport transport = new RecordingTransport();
+        RecordingTransport transport = new RecordingTransport(200, "{\"name\":\"Engineering\",\"orgUnitPath\":\"/Engineering\"}");
         GoogleApiExecutor executor = executor(transport);
         Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PredefinedAttributes.DESCRIPTION, List.of()));
 
@@ -291,14 +288,15 @@ public class ResourceHandlersTest {
     @Test
     public void licenseUpdateUsesExistingLicenseCoordinatesAndNewSku() throws Exception {
         // Given: Existing assignment and replacement storage SKU
-        RecordingTransport transport = new RecordingTransport();
+        RecordingTransport transport = new RecordingTransport(200,
+                "{\"productId\":\"Google-Drive-storage\",\"skuId\":\"Google-Drive-storage-2TB\",\"userId\":\"ada@example.com\"}");
         Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(SKU_ID_ATTR, "Google-Drive-storage-2TB"));
 
         // When: Apply the replacement SKU delta
         Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor(transport), new Uid(licenseUid()), modifications);
 
         // Then: Target existing keys with replacement content
-        assertEquals(result, Set.of());
+        assertEquals(result, Set.of(AttributeDeltaBuilder.build(Uid.NAME, "Google-Drive-storage/sku/Google-Drive-storage-2TB/user/ada@example.com")));
         assertEquals(transport.methods, List.of("PATCH"));
         assertEquals(transport.requests.size(), 1);
         MockLowLevelHttpRequest request = transport.requests.get(0);
@@ -357,14 +355,15 @@ public class ResourceHandlersTest {
     @Test
     public void updateLicenseAssignmentPassesRequestedSkuToGoogle() throws Exception {
         // Given: A SKU outside legacy identifier alternatives
-        RecordingTransport transport = new RecordingTransport();
+        RecordingTransport transport = new RecordingTransport(200,
+                "{\"productId\":\"Google-Drive-storage\",\"skuId\":\"new-sku\",\"userId\":\"ada@example.com\"}");
         Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(SKU_ID_ATTR, "new-sku"));
 
         // When: Forward the replacement to licensing
         Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor(transport), new Uid(licenseUid()), modifications);
 
         // Then: Preserve the exact supplied SKU
-        assertEquals(result, Set.of());
+        assertEquals(result, Set.of(AttributeDeltaBuilder.build(Uid.NAME, "Google-Drive-storage/sku/new-sku/user/ada@example.com")));
         assertEquals(transport.methods, List.of("PATCH"));
         assertEquals(transport.requests.size(), 1);
         MockLowLevelHttpRequest request = transport.requests.get(0);
@@ -484,24 +483,16 @@ public class ResourceHandlersTest {
 
     @Test
     public void groupUpdateRejectsBlankPrimaryEmail() throws Exception {
-        // Given: Blank email rejected by Directory API
-        RecordingTransport transport = new RecordingTransport(400,
-                "{\"error\":{\"code\":400,\"message\":\"Invalid email\",\"errors\":[{\"reason\":\"invalid\",\"message\":\"Invalid email\"}]}}");
+        // Given: A blank group email replacement
+        RecordingTransport transport = new RecordingTransport();
         GoogleApiExecutor executor = executor(transport);
         Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(Name.NAME, " "));
 
         // When: Update the group's primary email
-        ConnectorException failure = expectThrows(ConnectorException.class,
+        // Then: Reject input before issuing requests
+        expectThrows(InvalidAttributeValueException.class,
                 () -> GroupHandler.executeGroupUpdateDelta(executor, new Uid("engineering@example.com"), modifications));
-
-        // Then: Propagate rejection without retrying the update
-        assertEquals(failure.getCause().getClass(), GoogleJsonResponseException.class);
-        assertEquals(((GoogleJsonResponseException) failure.getCause()).getStatusCode(), 400);
-        assertEquals(transport.methods, List.of("PATCH"));
-        assertEquals(transport.requests.size(), 1);
-        MockLowLevelHttpRequest request = transport.requests.get(0);
-        assertEquals(request.getUrl(), "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com");
-        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("email", " "));
+        assertTrue(transport.requests.isEmpty());
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
@@ -538,10 +529,10 @@ public class ResourceHandlersTest {
         ConnectorObject object = MemberHandler.fromMember("engineering@example.com", member);
 
         // Then: Preserve identity and membership attributes
-        assertEquals(uid.getUidValue(), "engineering@example.com/123");
+        assertEquals(uid.getUidValue(), "engineering@example.com/ada@example.com");
         assertEquals(uid.getRevision(), "member-version");
         assertEquals(object.getUid(), uid);
-        assertEquals(object.getAttributeByName(GROUP_KEY_ATTR).getValue(), List.of("ada@example.com"));
+        assertEquals(object.getAttributeByName(GROUP_KEY_ATTR).getValue(), List.of("engineering@example.com"));
         assertEquals(object.getAttributeByName(ROLE_ATTR).getValue(), List.of("OWNER"));
         assertEquals(object.getAttributeByName(TYPE_ATTR).getValue(), List.of("USER"));
         assertNull(MemberHandler.generateMemberId("engineering@example.com", new Member().setEmail(USER)).getRevision());
@@ -564,7 +555,7 @@ public class ResourceHandlersTest {
         assertEquals(transport.requests.size(), 1);
         MockLowLevelHttpRequest request = transport.requests.get(0);
         assertEquals(request.getUrl(), "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com/members/ada@example.com");
-        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("email", USER, "role", "MEMBER"));
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("role", "MEMBER"));
         assertEquals(deletion.getGroupKey(), "engineering@example.com");
         assertEquals(deletion.getMemberKey(), USER);
         assertEquals(deletion.getRequestMethod(), "DELETE");
