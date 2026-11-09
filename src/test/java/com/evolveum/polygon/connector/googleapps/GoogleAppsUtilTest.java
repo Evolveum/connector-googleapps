@@ -27,6 +27,8 @@ import org.testng.annotations.Test;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -81,18 +83,16 @@ public class GoogleAppsUtilTest {
 
     @Test
     public void structAttributesConvertPlainAndJsonValuesAndOmitNullValue() {
+        // Given: Plain, JSON and null-valued structured entries
         Attribute values = AttributeBuilder.build("phones",
                 Arrays.asList("+421123", "{\"type\":\"work\",\"value\":\"+421456\"}", "{\"value\":\"null\"}"));
 
+        // When: Parse the structured attribute values
         Collection<?> converted = (Collection<?>) GoogleAppsUtil.getStructAttr(values);
 
-        assertEquals(converted.size(), 3);
-        assertTrue(converted.stream().anyMatch(value -> value instanceof ArrayMap
-                && "+421123".equals(((ArrayMap<?, ?>) value).get("value"))));
-        assertTrue(converted.stream().anyMatch(value -> value instanceof ArrayMap
-                && "work".equals(((ArrayMap<?, ?>) value).get("type"))));
-        assertTrue(converted.stream().anyMatch(value -> value instanceof ArrayMap
-                && "null".equals(((ArrayMap<?, ?>) value).get("value"))));
+        // Then: Preserve complete entries and omit nulls
+        assertEquals(converted.size(), 2);
+        assertEquals(Set.copyOf(converted), Set.of(Map.of("value", "+421123"), Map.of("type", "work", "value", "+421456")));
     }
 
     @Test
@@ -137,14 +137,18 @@ public class GoogleAppsUtilTest {
 
     @Test
     public void nestedJsonStructAttributeIsParsedRecursively() {
-        Collection<?> converted = (Collection<?>) GoogleAppsUtil.getStructAttr(
-                AttributeBuilder.build("addresses", "{\"type\":\"work\",\"metadata\":{\"primary\":\"true\"}}"));
+        // Given: Nested metadata with a boolean value
+        Attribute attribute = AttributeBuilder.build("addresses", "{\"type\":\"work\",\"metadata\":{\"primary\":\"true\"}}");
 
+        // When: Parse nested structured values
+        Collection<?> converted = (Collection<?>) GoogleAppsUtil.getStructAttr(attribute);
+
+        // Then: Preserve nesting and the boolean type
         assertEquals(converted.size(), 1);
         ArrayMap<?, ?> address = (ArrayMap<?, ?>) converted.iterator().next();
         assertEquals(address.get("type"), "work");
         assertTrue(address.get("metadata") instanceof ArrayMap);
-        assertEquals(((ArrayMap<?, ?>) address.get("metadata")).get("primary"), "true");
+        assertEquals(((ArrayMap<?, ?>) address.get("metadata")).get("primary"), Boolean.TRUE);
     }
 
     @Test(expectedExceptions = JsonSyntaxException.class)
