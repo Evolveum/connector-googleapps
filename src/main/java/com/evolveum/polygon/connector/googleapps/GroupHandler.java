@@ -109,33 +109,6 @@ public class GroupHandler {
         return builder.build();
     }
 
-    public static ObjectClassInfo getMemberClassInfo() {
-        // @formatter:off
-            /*
-            {
-			}
-            */
-        // @formatter:on
-        ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
-        builder.setType(MEMBER.getObjectClassValue());
-        builder.setDescription("A membership relationship linking a user, another group, or a customer domain "
-                + "to a Google Group. It includes the member type and role, such as MEMBER, MANAGER, or OWNER.");
-        builder.addAttributeInfo(AttributeInfoBuilder.define(Name.NAME).setUpdateable(false)
-                .setCreateable(false)/* .setRequired(true) */.build());
-
-        // optional
-        builder.addAttributeInfo(AttributeInfoBuilder.define(GROUP_KEY_ATTR).setUpdateable(false)
-        /* .setCreateable(false) */.setRequired(true).build());
-        builder.addAttributeInfo(AttributeInfoBuilder.define(EMAIL_ATTR).setUpdateable(false)
-        /* .setCreateable(false) */.setRequired(true).build());
-
-        builder.addAttributeInfo(AttributeInfoBuilder.build(ROLE_ATTR));
-        builder.addAttributeInfo(AttributeInfoBuilder.define(TYPE_ATTR).setUpdateable(false)
-                .setCreateable(false).build());
-
-        return builder.build();
-    }
-
     // https://support.google.com/a/answer/33386
     public static Directory.Groups.Insert createGroup(Directory.Groups groups,
             AttributesAccessor attributes) {

@@ -169,11 +169,11 @@ public class GoogleAppsConnectorOperationsTest {
                     Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.GIVEN_NAME_ATTR, "Ada")), options.build());
             Set<AttributeDelta> group = connector.updateDelta(ObjectClass.GROUP, new Uid("engineering@example.com"),
                     Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.NAME_ATTR, "Engineering")), options.build());
-            Set<AttributeDelta> member = connector.updateDelta(GoogleAppsConnector.MEMBER, new Uid("engineering@example.com/ada@example.com"),
+            Set<AttributeDelta> member = connector.updateDelta(GoogleAppsConstants.MEMBER, new Uid("engineering@example.com/ada@example.com"),
                     Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.ROLE_ATTR, "OWNER")), options.build());
-            Set<AttributeDelta> orgUnit = connector.updateDelta(GoogleAppsConnector.ORG_UNIT, new Uid("Engineering"),
+            Set<AttributeDelta> orgUnit = connector.updateDelta(GoogleAppsConstants.ORG_UNIT, new Uid("Engineering"),
                     Set.of(AttributeDeltaBuilder.build(Name.NAME, "New Engineering")), options.build());
-            Set<AttributeDelta> license = connector.updateDelta(GoogleAppsConnector.LICENSE_ASSIGNMENT,
+            Set<AttributeDelta> license = connector.updateDelta(GoogleAppsConstants.LICENSE_ASSIGNMENT,
                     new Uid("Google-Drive-storage/sku/Google-Drive-storage-1TB/user/ada@example.com"),
                     Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.SKU_ID_ATTR, "Google-Drive-storage-2TB")), options.build());
 
@@ -192,21 +192,24 @@ public class GoogleAppsConnectorOperationsTest {
 
     @Test
     public void deleteOperationsTreatGoogleNotFoundAsUnknownUid() {
+        // Given: Missing resources for every deletion type
         ScriptedTransport transport = new ScriptedTransport(notFound(), notFound(), notFound(), notFound(), notFound());
         GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
         OperationOptionsBuilder options = new OperationOptionsBuilder();
 
+        // When: Delete resources absent from Google
+        // Then: Report unknown identities for each request
         expectThrows(UnknownUidException.class,
                 () -> connector.delete(ObjectClass.ACCOUNT, new Uid("missing@example.com"), options.build()));
         expectThrows(UnknownUidException.class,
                 () -> connector.delete(ObjectClass.GROUP, new Uid("missing-group"), options.build()));
         expectThrows(UnknownUidException.class,
-                () -> connector.delete(GoogleAppsConnector.MEMBER,
+                () -> connector.delete(GoogleAppsConstants.MEMBER,
                         new Uid("group@example.com/missing@example.com"), options.build()));
         expectThrows(UnknownUidException.class,
-                () -> connector.delete(GoogleAppsConnector.ORG_UNIT, new Uid("Missing"), options.build()));
+                () -> connector.delete(GoogleAppsConstants.ORG_UNIT, new Uid("Missing"), options.build()));
         expectThrows(UnknownUidException.class,
-                () -> connector.delete(GoogleAppsConnector.LICENSE_ASSIGNMENT,
+                () -> connector.delete(GoogleAppsConstants.LICENSE_ASSIGNMENT,
                         new Uid("Google-Drive-storage/sku/Google-Drive-storage-1TB/user/missing@example.com"), options.build()));
 
         assertEquals(transport.requestCount, 5);
@@ -238,7 +241,7 @@ public class GoogleAppsConnectorOperationsTest {
 
             // Then: Return nothing and reject member enumeration
             expectThrows(InvalidAttributeValueException.class,
-                    () -> connector.executeQuery(GoogleAppsConnector.MEMBER, null, results::add, options.build()));
+                    () -> connector.executeQuery(GoogleAppsConstants.MEMBER, null, results::add, options.build()));
             assertTrue(results.isEmpty());
             assertEquals(transport.requestCount, 1);
             assertTrue(transport.responses.isEmpty());
@@ -268,10 +271,10 @@ public class GoogleAppsConnectorOperationsTest {
         connector.executeQuery(ObjectClass.GROUP,
                 new GoogleFilter(FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, "ada@example.com"))),
                 groups::add, new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.NAME_ATTR).build());
-        connector.executeQuery(GoogleAppsConnector.MEMBER,
+        connector.executeQuery(GoogleAppsConstants.MEMBER,
                 new GoogleFilter(FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConstants.GROUP_KEY_ATTR, "engineering@example.com"))),
                 members::add, new OperationOptionsBuilder().build());
-        connector.executeQuery(GoogleAppsConnector.ORG_UNIT, null, orgUnits::add,
+        connector.executeQuery(GoogleAppsConstants.ORG_UNIT, null, orgUnits::add,
                 new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).build());
 
         // Then: Verify returned identities and requested attributes
@@ -281,7 +284,7 @@ public class GoogleAppsConnectorOperationsTest {
         assertEquals(groups.size(), 1);
         assertEquals(groups.get(0).getUid().getUidValue(), "engineering@example.com");
         assertEquals(members.size(), 1);
-        assertEquals(members.get(0).getObjectClass(), GoogleAppsConnector.MEMBER);
+        assertEquals(members.get(0).getObjectClass(), GoogleAppsConstants.MEMBER);
         assertEquals(orgUnits.size(), 1);
         assertEquals(orgUnits.get(0).getUid().getUidValue(), "Engineering");
         assertEquals(transport.requestCount, 4);
@@ -291,8 +294,9 @@ public class GoogleAppsConnectorOperationsTest {
 
     @Test
     public void testOperationAndUidReadsCoverEachDirectoryResource() {
-        // Given: Read responses for directory resources
+        // Given: Connection and directory resource responses
         ScriptedTransport transport = new ScriptedTransport(
+                json("{\"users\":[]}"),
                 json("{\"id\":\"ada@example.com\",\"etag\":\"user-read\",\"primaryEmail\":\"ada@example.com\",\"name\":{\"givenName\":\"Ada\"}}"),
                 json("{\"id\":\"engineering@example.com\",\"etag\":\"group-read\",\"email\":\"engineering@example.com\",\"name\":\"Engineering\"}"),
                 json("{\"id\":\"member-read\",\"etag\":\"member-read\",\"email\":\"ada@example.com\",\"role\":\"MEMBER\",\"type\":\"USER\"}"),
@@ -304,17 +308,17 @@ public class GoogleAppsConnectorOperationsTest {
         List<ConnectorObject> members = new ArrayList<>();
         List<ConnectorObject> orgUnits = new ArrayList<>();
 
+        // When: Check connection and read directory resources
         connector.test();
-        // When: Query each resource type
         connector.executeQuery(ObjectClass.ACCOUNT,
                 new GoogleFilter(new Uid("ada@example.com")),
                 users::add, options.setAttributesToGet(GoogleAppsConstants.GIVEN_NAME_ATTR).build());
         connector.executeQuery(ObjectClass.GROUP,
                 new GoogleFilter(new Uid("engineering@example.com")),
                 groups::add, options.setAttributesToGet(GoogleAppsConstants.NAME_ATTR).build());
-        connector.executeQuery(GoogleAppsConnector.MEMBER,
+        connector.executeQuery(GoogleAppsConstants.MEMBER,
                 new GoogleFilter(new Uid("engineering@example.com/ada@example.com")), members::add, options.build());
-        connector.executeQuery(GoogleAppsConnector.ORG_UNIT,
+        connector.executeQuery(GoogleAppsConstants.ORG_UNIT,
                 new GoogleFilter(new Uid("Engineering")),
                 orgUnits::add, options.setAttributesToGet(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).build());
 
@@ -324,7 +328,7 @@ public class GoogleAppsConnectorOperationsTest {
         assertEquals(groups.size(), 1);
         assertEquals(members.size(), 1);
         assertEquals(orgUnits.size(), 1);
-        assertEquals(transport.requestCount, 4);
+        assertEquals(transport.requestCount, 5);
         assertTrue(transport.responses.isEmpty());
         connector.dispose();
     }

@@ -59,12 +59,12 @@ public class ConnectorExceptionPathsTest {
         expectThrows(InvalidAttributeValueException.class,
                 () -> connector.create(ObjectClass.GROUP, attributes(AttributeBuilder.build("description", "group")), options.build()));
         expectThrows(InvalidAttributeValueException.class,
-                () -> connector.create(GoogleAppsConnector.MEMBER, attributes(), options.build()));
+                () -> connector.create(GoogleAppsConstants.MEMBER, attributes(), options.build()));
         expectThrows(InvalidAttributeValueException.class,
-                () -> connector.create(GoogleAppsConnector.ORG_UNIT,
+                () -> connector.create(GoogleAppsConstants.ORG_UNIT,
                         attributes(AttributeBuilder.build(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "/")), options.build()));
         expectThrows(InvalidAttributeValueException.class,
-                () -> connector.create(GoogleAppsConnector.LICENSE_ASSIGNMENT, attributes(), options.build()));
+                () -> connector.create(GoogleAppsConstants.LICENSE_ASSIGNMENT, attributes(), options.build()));
 
         connector.dispose();
     }
@@ -85,16 +85,16 @@ public class ConnectorExceptionPathsTest {
                     () -> connector.updateDelta(ObjectClass.GROUP, new Uid("group@example.com"),
                             Set.of(addition(GoogleAppsConstants.NAME_ATTR, "Engineering")), options.build()));
             expectThrows(InvalidAttributeValueException.class,
-                    () -> connector.updateDelta(GoogleAppsConnector.ORG_UNIT, new Uid("Engineering"),
+                    () -> connector.updateDelta(GoogleAppsConstants.ORG_UNIT, new Uid("Engineering"),
                             Set.of(addition(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "/Engineering")), options.build()));
             expectThrows(UnknownUidException.class,
-                    () -> connector.updateDelta(GoogleAppsConnector.MEMBER, new Uid("bad-member-id"),
+                    () -> connector.updateDelta(GoogleAppsConstants.MEMBER, new Uid("bad-member-id"),
                             Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.ROLE_ATTR, "MANAGER")), options.build()));
             expectThrows(UnknownUidException.class,
-                    () -> connector.updateDelta(GoogleAppsConnector.LICENSE_ASSIGNMENT, new Uid("bad-license-id"),
+                    () -> connector.updateDelta(GoogleAppsConstants.LICENSE_ASSIGNMENT, new Uid("bad-license-id"),
                             Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.SKU_ID_ATTR, "replacement")), options.build()));
             expectThrows(UnknownUidException.class,
-                    () -> connector.delete(GoogleAppsConnector.MEMBER, new Uid("bad-member-id"), options.build()));
+                    () -> connector.delete(GoogleAppsConstants.MEMBER, new Uid("bad-member-id"), options.build()));
         } finally {
             connector.dispose();
         }
@@ -115,16 +115,16 @@ public class ConnectorExceptionPathsTest {
             // When: Execute invalid resource queries
             // Then: Reject invalid searches without returning objects
             expectThrows(InvalidAttributeValueException.class,
-                    () -> connector.executeQuery(GoogleAppsConnector.MEMBER, member, handler, options.build()));
+                    () -> connector.executeQuery(GoogleAppsConstants.MEMBER, member, handler, options.build()));
             expectThrows(InvalidAttributeValueException.class,
-                    () -> connector.executeQuery(GoogleAppsConnector.MEMBER, null, handler, options.build()));
+                    () -> connector.executeQuery(GoogleAppsConstants.MEMBER, null, handler, options.build()));
             ConnectorException missingProduct = expectThrows(ConnectorException.class,
-                    () -> connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT, null, handler, options.build()));
+                    () -> connector.executeQuery(GoogleAppsConstants.LICENSE_ASSIGNMENT, null, handler, options.build()));
             assertTrue(missingProduct.getMessage().contains("productId is required"));
 
             // Unrecognized assignment identifiers represent missing resources.
-            connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT, license, handler, options.build());
-            connector.executeQuery(GoogleAppsConnector.MEMBER, new GoogleFilter(new Uid("bad-member-id")), handler, options.build());
+            connector.executeQuery(GoogleAppsConstants.LICENSE_ASSIGNMENT, license, handler, options.build());
+            connector.executeQuery(GoogleAppsConstants.MEMBER, new GoogleFilter(new Uid("bad-member-id")), handler, options.build());
         } finally {
             connector.dispose();
         }
