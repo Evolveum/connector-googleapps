@@ -21,6 +21,7 @@ import com.google.api.services.directory.model.User;
 import com.google.api.services.directory.model.UserName;
 import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
@@ -36,36 +37,36 @@ public class ConnectorObjectMappingTest {
 
     @Test
     public void userResourceMapsRequestedAttributesWithoutExpensiveAssociations() {
-        GoogleAppsConnector connector = new GoogleAppsConnector();
+        // Given: User attributes without expensive associations
         Set<String> attributes = new HashSet<>(Arrays.asList(
-                GoogleAppsConnector.GIVEN_NAME_ATTR,
-                GoogleAppsConnector.FAMILY_NAME_ATTR,
-                GoogleAppsConnector.FULL_NAME_ATTR,
-                GoogleAppsConnector.IS_ADMIN_ATTR,
-                GoogleAppsConnector.IS_DELEGATED_ADMIN_ATTR,
-                GoogleAppsConnector.LAST_LOGIN_TIME_ATTR,
-                GoogleAppsConnector.CREATION_TIME_ATTR,
-                GoogleAppsConnector.AGREED_TO_TERMS_ATTR,
-                GoogleAppsConnector.SUSPENDED_ATTR,
-                GoogleAppsConnector.SUSPENSION_REASON_ATTR,
-                GoogleAppsConnector.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR,
-                GoogleAppsConnector.IP_WHITELISTED_ATTR,
-                GoogleAppsConnector.IMS_ATTR,
-                GoogleAppsConnector.EMAILS_ATTR,
-                GoogleAppsConnector.EXTERNAL_IDS_ATTR,
-                GoogleAppsConnector.RELATIONS_ATTR,
-                GoogleAppsConnector.ADDRESSES_ATTR,
-                GoogleAppsConnector.ORGANIZATIONS_ATTR,
-                GoogleAppsConnector.PHONES_ATTR,
-                GoogleAppsConnector.ALIASES_ATTR,
-                GoogleAppsConnector.LOCATIONS_ATTR,
-                GoogleAppsConnector.NON_EDITABLE_ALIASES_ATTR,
-                GoogleAppsConnector.CUSTOMER_ID_ATTR,
-                GoogleAppsConnector.ORG_UNIT_PATH_ATTR,
-                GoogleAppsConnector.IS_MAILBOX_SETUP_ATTR,
-                GoogleAppsConnector.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR,
-                GoogleAppsConnector.THUMBNAIL_PHOTO_URL_ATTR,
-                GoogleAppsConnector.DELETION_TIME_ATTR));
+                GoogleAppsConstants.GIVEN_NAME_ATTR,
+                GoogleAppsConstants.FAMILY_NAME_ATTR,
+                GoogleAppsConstants.FULL_NAME_ATTR,
+                GoogleAppsConstants.IS_ADMIN_ATTR,
+                GoogleAppsConstants.IS_DELEGATED_ADMIN_ATTR,
+                GoogleAppsConstants.LAST_LOGIN_TIME_ATTR,
+                GoogleAppsConstants.CREATION_TIME_ATTR,
+                GoogleAppsConstants.AGREED_TO_TERMS_ATTR,
+                GoogleAppsConstants.SUSPENDED_ATTR,
+                GoogleAppsConstants.SUSPENSION_REASON_ATTR,
+                GoogleAppsConstants.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR,
+                GoogleAppsConstants.IP_WHITELISTED_ATTR,
+                GoogleAppsConstants.IMS_ATTR,
+                GoogleAppsConstants.EMAILS_ATTR,
+                GoogleAppsConstants.EXTERNAL_IDS_ATTR,
+                GoogleAppsConstants.RELATIONS_ATTR,
+                GoogleAppsConstants.ADDRESSES_ATTR,
+                GoogleAppsConstants.ORGANIZATIONS_ATTR,
+                GoogleAppsConstants.PHONES_ATTR,
+                GoogleAppsConstants.ALIASES_ATTR,
+                GoogleAppsConstants.LOCATIONS_ATTR,
+                GoogleAppsConstants.NON_EDITABLE_ALIASES_ATTR,
+                GoogleAppsConstants.CUSTOMER_ID_ATTR,
+                GoogleAppsConstants.ORG_UNIT_PATH_ATTR,
+                GoogleAppsConstants.IS_MAILBOX_SETUP_ATTR,
+                GoogleAppsConstants.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR,
+                GoogleAppsConstants.THUMBNAIL_PHOTO_URL_ATTR,
+                GoogleAppsConstants.DELETION_TIME_ATTR));
         User user = new User()
                 .setId("user-id")
                 .setEtag("etag-1")
@@ -88,61 +89,67 @@ public class ConnectorObjectMappingTest {
                 .setThumbnailPhotoUrl("https://example.test/photo")
                 .setDeletionTime(new com.google.api.client.util.DateTime("2026-02-01T00:00:00.000Z"));
 
-        ConnectorObject object = connector.fromUser(user, attributes, null);
+        // When: Convert the requested user attributes
+        ConnectorObject object = UserConverter.fromUser(user, attributes, null, new GoogleAppsConfiguration(), new OperationOptionsBuilder().build());
 
+        // Then: Preserve identity and omit unrequested associations
         assertEquals(object.getObjectClass(), ObjectClass.ACCOUNT);
         assertEquals(object.getUid().getUidValue(), "user-id");
         assertEquals(object.getUid().getRevision(), "etag-1");
         assertEquals(object.getName().getNameValue(), "ada@example.com");
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.GIVEN_NAME_ATTR).getValue(), List.of("Ada"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.FAMILY_NAME_ATTR).getValue(), List.of("Lovelace"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.SUSPENDED_ATTR).getValue(), List.of(false));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).getValue(), List.of("/Engineering"));
-        assertNull(object.getAttributeByName(GoogleAppsConnector.PHOTO_ATTR));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.GIVEN_NAME_ATTR).getValue(), List.of("Ada"));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.FAMILY_NAME_ATTR).getValue(), List.of("Lovelace"));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.SUSPENDED_ATTR).getValue(), List.of(false));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).getValue(), List.of("/Engineering"));
+        assertNull(object.getAttributeByName(GoogleAppsConstants.PHOTO_ATTR));
         assertNull(object.getAttributeByName(org.identityconnectors.framework.common.objects.PredefinedAttributes.GROUPS_NAME));
     }
 
     @Test
     public void userResourceUsesIdWithoutRevisionWhenNoEtagAndNoName() {
-        GoogleAppsConnector connector = new GoogleAppsConnector();
-        Set<String> attributes = new HashSet<>(List.of(GoogleAppsConnector.GIVEN_NAME_ATTR));
+        // Given: User without revision or structured name
+        Set<String> attributes = new HashSet<>(List.of(GoogleAppsConstants.GIVEN_NAME_ATTR));
         User user = new User().setId("user-id").setPrimaryEmail("ada@example.com");
 
-        ConnectorObject object = connector.fromUser(user, attributes, null);
+        // When: Convert the requested name attribute
+        ConnectorObject object = UserConverter.fromUser(user, attributes, null, new GoogleAppsConfiguration(), new OperationOptionsBuilder().build());
 
+        // Then: Preserve identity without inventing a revision
         assertEquals(object.getUid().getUidValue(), "user-id");
         assertNull(object.getUid().getRevision());
-        assertNotNull(object.getAttributeByName(GoogleAppsConnector.GIVEN_NAME_ATTR));
+        assertNotNull(object.getAttributeByName(GoogleAppsConstants.GIVEN_NAME_ATTR));
     }
 
     @Test
     public void groupResourceMapsProjectedAndDefaultAttributes() {
-        GoogleAppsConnector connector = new GoogleAppsConnector();
+        // Given: Group fields without requested memberships
         Set<String> attributes = new HashSet<>(Arrays.asList(
-                GoogleAppsConnector.NAME_ATTR,
+                GoogleAppsConstants.NAME_ATTR,
                 org.identityconnectors.framework.common.objects.PredefinedAttributes.DESCRIPTION,
-                GoogleAppsConnector.ADMIN_CREATED_ATTR,
-                GoogleAppsConnector.ALIASES_ATTR,
-                GoogleAppsConnector.NON_EDITABLE_ALIASES_ATTR,
-                GoogleAppsConnector.DIRECT_MEMBERS_COUNT_ATTR));
+                GoogleAppsConstants.ADMIN_CREATED_ATTR,
+                GoogleAppsConstants.ALIASES_ATTR,
+                GoogleAppsConstants.NON_EDITABLE_ALIASES_ATTR,
+                GoogleAppsConstants.DIRECT_MEMBERS_COUNT_ATTR));
         Group group = new Group().setId("group-id").setEtag("etag-2").setEmail("eng@example.com")
                 .setName("Engineering").setDescription("Team").setAdminCreated(true)
                 .setAliases(List.of("engineering@example.com"))
                 .setNonEditableAliases(List.of("old@example.com"))
                 .setDirectMembersCount(4L);
 
-        ConnectorObject object = connector.fromGroup(group, attributes, null);
+        // When: Convert projected group attributes
+        ConnectorObject object = GroupConverter.fromGroup(group, attributes, null, new OperationOptionsBuilder().build());
+        ConnectorObject groupWithoutEtag = GroupConverter.fromGroup(new Group().setId("g2").setEmail("g2@example.com"),
+                new HashSet<>(), null, new OperationOptionsBuilder().build());
 
+        // Then: Preserve identity and omit unrequested memberships
         assertEquals(object.getObjectClass(), ObjectClass.GROUP);
         assertEquals(object.getUid().getUidValue(), "group-id");
         assertEquals(object.getUid().getRevision(), "etag-2");
         assertEquals(object.getName().getNameValue(), "eng@example.com");
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.NAME_ATTR).getValue(), List.of("Engineering"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.DIRECT_MEMBERS_COUNT_ATTR).getValue(), List.of(4L));
-        assertNull(object.getAttributeByName(GoogleAppsConnector.MEMBERS_ATTR));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.NAME_ATTR).getValue(), List.of("Engineering"));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.DIRECT_MEMBERS_COUNT_ATTR).getValue(), List.of(4L));
+        assertNull(object.getAttributeByName(GoogleAppsConstants.MEMBERS_ATTR));
 
-        ConnectorObject groupWithoutEtag = connector.fromGroup(new Group().setId("g2").setEmail("g2@example.com"),
-                new HashSet<>(), null);
         assertNull(groupWithoutEtag.getUid().getRevision());
     }
 }
