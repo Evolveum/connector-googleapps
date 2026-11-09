@@ -139,8 +139,8 @@ public class GoogleAppsConnectorOperationsTest {
 
         // Then: Preserve resource identities and creation order
         assertEquals(groupUid.getUidValue(), "engineering@example.com");
-        assertEquals(managerUid.getUidValue(), "engineering@example.com/member-id");
-        assertEquals(memberUid.getUidValue(), "engineering@example.com/member-id");
+        assertEquals(managerUid.getUidValue(), "engineering@example.com/ada@example.com");
+        assertEquals(memberUid.getUidValue(), "engineering@example.com/grace@example.com");
         assertEquals(orgUnitUid.getUidValue(), "Engineering");
         assertEquals(orgUnitUid.getRevision(), "ou-v1");
         assertEquals(licenseUid.getUidValue(), "product/sku/sku/user/ada@example.com");
@@ -315,7 +315,7 @@ public class GoogleAppsConnectorOperationsTest {
                     AttributeBuilder.build(GoogleAppsConstants.EMAIL_ATTR, "grace@example.com")), new OperationOptionsBuilder().build());
 
             // Then: Verify member identity and request
-            assertEquals(uid.getUidValue(), "engineering@example.com/grace-id");
+            assertEquals(uid.getUidValue(), "engineering@example.com/grace@example.com");
             assertEquals(uid.getNameHintValue(), "grace@example.com");
             assertEquals(uid.getRevision(), "grace-v1");
             assertEquals(transport.requestCount, 1);
@@ -379,9 +379,9 @@ public class GoogleAppsConnectorOperationsTest {
                 new Exchange("PATCH", "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com",
                         Map.of("name", "Engineering"), json("{\"id\":\"engineering@example.com\",\"etag\":\"group-v2\"}")),
                 new Exchange("PATCH", "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com/members/ada@example.com",
-                        Map.of("email", "ada@example.com", "role", "OWNER"), json("{\"id\":\"member-id\",\"email\":\"ada@example.com\",\"role\":\"OWNER\"}")),
+                        Map.of("role", "OWNER"), json("{\"id\":\"member-id\",\"email\":\"ada@example.com\",\"role\":\"OWNER\"}")),
                 new Exchange("PATCH", "https://admin.googleapis.com/admin/directory/v1/customer/my_customer/orgunits/Engineering?fields=orgUnitPath,etag",
-                        Map.of("name", "New Engineering"), json("{\"name\":\"New Engineering\",\"orgUnitPath\":\"/Engineering\",\"etag\":\"ou-v2\"}")),
+                        Map.of("name", "New Engineering"), json("{\"name\":\"New Engineering\",\"orgUnitPath\":\"/New Engineering\",\"etag\":\"ou-v2\"}")),
                 new Exchange("PATCH", "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-1TB/user/ada@example.com",
                         Map.of("skuId", "Google-Drive-storage-2TB"),
                         json("{\"productId\":\"Google-Drive-storage\",\"skuId\":\"Google-Drive-storage-2TB\",\"userId\":\"ada@example.com\"}")));
@@ -406,8 +406,8 @@ public class GoogleAppsConnectorOperationsTest {
             assertEquals(user, Set.of());
             assertEquals(group, Set.of());
             assertEquals(member, Set.of());
-            assertEquals(orgUnit, Set.of());
-            assertEquals(license, Set.of());
+            assertEquals(orgUnit, Set.of(AttributeDeltaBuilder.build(Uid.NAME, "New Engineering")));
+            assertEquals(license, Set.of(AttributeDeltaBuilder.build(Uid.NAME, "Google-Drive-storage/sku/Google-Drive-storage-2TB/user/ada@example.com")));
             assertEquals(transport.requestCount, 5);
             assertTrue(transport.exchanges.isEmpty());
         } finally {
