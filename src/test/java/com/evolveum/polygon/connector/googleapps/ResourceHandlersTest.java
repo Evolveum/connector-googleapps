@@ -234,7 +234,7 @@ public class ResourceHandlersTest {
 
         // When: Apply the invalid inheritance value
         // Then: Reject input before issuing a request
-        expectThrows(ClassCastException.class, () -> OrgunitsHandler.executeOrgunitUpdateDelta(executor, new Uid("Engineering"), modifications));
+        expectThrows(InvalidAttributeValueException.class, () -> OrgunitsHandler.executeOrgunitUpdateDelta(executor, new Uid("Engineering"), modifications));
         assertTrue(transport.requests.isEmpty());
     }
 
@@ -523,7 +523,7 @@ public class ResourceHandlersTest {
 
         // When: Update the group description
         // Then: Reject the type before any request
-        expectThrows(ClassCastException.class,
+        expectThrows(InvalidAttributeValueException.class,
                 () -> GroupHandler.executeGroupUpdateDelta(executor, new Uid("engineering@example.com"), modifications));
         assertTrue(transport.requests.isEmpty());
     }
@@ -779,7 +779,7 @@ public class ResourceHandlersTest {
         UserHandler.createUser(directory().users(), attributes);
     }
 
-    @Test(expectedExceptions = ClassCastException.class)
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void userUpdateRejectsNonStringGivenName() {
         // Given: A numeric value for givenName
         Set<AttributeDelta> deltas = Set.of(AttributeDeltaBuilder.build(GIVEN_NAME_ATTR, 42));
@@ -789,7 +789,7 @@ public class ResourceHandlersTest {
         UserHandler.buildUserUpdateRequest(directory().users(), new Uid(USER), deltas, Optional.empty());
     }
 
-    @Test(expectedExceptions = ClassCastException.class)
+    @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void userUpdateRejectsUnrecognizedBooleanValue() {
         // Given: A string value for suspended
         Set<AttributeDelta> deltas = Set.of(AttributeDeltaBuilder.build(SUSPENDED_ATTR, "sometimes"));
