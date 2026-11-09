@@ -30,18 +30,25 @@ import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueE
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.AttributesAccessor;
 import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.OperationalAttributes;
 import org.identityconnectors.framework.common.objects.PredefinedAttributes;
 import org.identityconnectors.framework.common.objects.Uid;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -386,68 +393,76 @@ public class ResourceHandlersTest {
 
     @Test
     public void userCreateUpdatePhotoAndAliasesBuildRequests() {
-        Directory.Users.Insert insert = UserHandler.createUser(directory().users(), attributes(
-                new Name(USER), AttributeBuilder.buildPassword(new GuardedString("P@ssw0rd".toCharArray())),
-                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada"),
-                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace"),
-                AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true),
-                AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering")));
-        com.google.api.services.directory.model.User user =
-                (com.google.api.services.directory.model.User) insert.getJsonContent();
+        // Given: User attributes and replacement values
+        Directory.Users users = directory().users();
+        AttributesAccessor attributes = attributes(new Name(USER), AttributeBuilder.buildPassword(new GuardedString("P@ssw0rd".toCharArray())),
+                AttributeBuilder.build(GIVEN_NAME_ATTR, "Ada"), AttributeBuilder.build(FAMILY_NAME_ATTR, "Lovelace"),
+                AttributeBuilder.build(SUSPENDED_ATTR, true), AttributeBuilder.build(ORG_UNIT_PATH_ATTR, "/Engineering"));
+        Set<AttributeDelta> deltas = Set.of(AttributeDeltaBuilder.build(FAMILY_NAME_ATTR, "Byron"),
+                AttributeDeltaBuilder.build(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, false));
+
+        // When: Build user and related resource requests
+        Directory.Users.Insert insert = UserHandler.createUser(users, attributes);
+        Directory.Users.Update update = UserHandler.buildUserUpdateRequest(users, new Uid(USER), deltas, Optional.empty());
+        Directory.Users.Photos.Update photo = UserHandler.createUpdateUserPhoto(users.photos(), USER, new byte[]{1, 2, 3});
+        Directory.Users.Aliases.Insert alias = UserHandler.createUserAlias(users.aliases(), USER, "ada.alias@example.com");
+        Directory.Users.Aliases.Delete deletion = UserHandler.deleteUserAlias(users.aliases(), USER, "ada.alias@example.com");
+
+        // Then: Verify identities and request contents
+        User user = (User) insert.getJsonContent();
         assertEquals(user.getPrimaryEmail(), USER);
+        assertEquals(user.getPassword(), "P@ssw0rd");
         assertEquals(user.getName().getGivenName(), "Ada");
         assertEquals(user.getName().getFamilyName(), "Lovelace");
         assertEquals(user.getSuspended(), Boolean.TRUE);
         assertEquals(user.getOrgUnitPath(), "/Engineering");
-        assertEquals(insert.getFields(), UserHandler.ID_ETAG);
-
-        assertNull(UserHandler.updateUser(directory().users(), new Uid("u"), attributes()));
-        Directory.Users.Patch patch = UserHandler.updateUser(directory().users(), new Uid("u"), attributes(
-                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Byron"),
-                AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, "false")));
-        assertNotNull(patch);
-        com.google.api.services.directory.model.User patchBody =
-                (com.google.api.services.directory.model.User) patch.getJsonContent();
-        assertEquals(patchBody.getName().getFamilyName(), "Byron");
-        assertEquals(patchBody.getIncludeInGlobalAddressList(), Boolean.FALSE);
-        assertEquals(UserHandler.createUpdateUserPhoto(directory().users().photos(), USER,
-                new byte[]{1, 2, 3}).getFields(), GoogleAppsConnector.ID_ATTR);
-        assertEquals(UserHandler.createUserAlias(directory().users().aliases(), USER,
-                "ada.alias@example.com").getFields(), UserHandler.ID_ETAG);
-        assertEquals(UserHandler.deleteUserAlias(directory().users().aliases(), USER,
-                "ada.alias@example.com").getUserKey(), USER);
+        assertEquals(insert.getFields(), ID_ETAG);
+        assertEquals(update.getRequestMethod(), "PUT");
+        assertEquals(update.getUserKey(), USER);
+        assertEquals(update.getFields(), ID_ETAG);
+        User content = (User) update.getJsonContent();
+        assertEquals(content.getName().getFamilyName(), "Byron");
+        assertEquals(content.getIncludeInGlobalAddressList(), Boolean.FALSE);
+        assertEquals(photo.getUserKey(), USER);
+        assertEquals(photo.getFields(), ID_ATTR);
+        assertEquals(alias.getUserKey(), USER);
+        assertEquals(((com.google.api.services.directory.model.Alias) alias.getJsonContent()).getAlias(), "ada.alias@example.com");
+        assertEquals(alias.getFields(), ID_ETAG);
+        assertEquals(deletion.getUserKey(), USER);
+        assertEquals(deletion.getAlias(), "ada.alias@example.com");
     }
 
     @Test
     public void userCreateMapsStructuredAndOptionalScalarAttributes() {
-        Directory.Users.Insert insert = UserHandler.createUser(directory().users(), attributes(
+        // Given: Structured and scalar user attributes
+        AttributesAccessor attributes = attributes(
                 new Name(USER), AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
-                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada"),
-                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace"),
-                AttributeBuilder.build(UserHandler.IMS_ATTR, "{\"type\":\"work\",\"value\":\"ada-chat\"}"),
-                AttributeBuilder.build(UserHandler.EMAILS_ATTR, "{\"type\":\"work\",\"value\":\"ada@example.com\"}"),
-                AttributeBuilder.build(UserHandler.EXTERNAL_IDS_ATTR, "{\"type\":\"account\",\"value\":\"42\"}"),
-                AttributeBuilder.build(UserHandler.RELATIONS_ATTR, "{\"type\":\"manager\",\"value\":\"grace@example.com\"}"),
-                AttributeBuilder.build(UserHandler.ADDRESSES_ATTR, "{\"type\":\"work\",\"streetAddress\":\"London\"}"),
-                AttributeBuilder.build(UserHandler.ORGANIZATIONS_ATTR, "{\"name\":\"Analytical Engine\"}"),
-                AttributeBuilder.build(UserHandler.PHONES_ATTR, "{\"type\":\"work\",\"value\":\"+44123\"}"),
-                AttributeBuilder.build(UserHandler.LOCATIONS_ATTR, "{\"type\":\"desk\",\"area\":\"A1\"}"),
-                AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true),
-                AttributeBuilder.build(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, true),
-                AttributeBuilder.build(UserHandler.IP_WHITELISTED_ATTR, false),
-                AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering"),
-                AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true)));
+                AttributeBuilder.build(GIVEN_NAME_ATTR, "Ada"), AttributeBuilder.build(FAMILY_NAME_ATTR, "Lovelace"),
+                AttributeBuilder.build(IMS_ATTR, "{\"type\":\"work\",\"value\":\"ada-chat\"}"),
+                AttributeBuilder.build(EMAILS_ATTR, "{\"type\":\"work\",\"value\":\"ada@example.com\"}"),
+                AttributeBuilder.build(EXTERNAL_IDS_ATTR, "{\"type\":\"account\",\"value\":\"42\"}"),
+                AttributeBuilder.build(RELATIONS_ATTR, "{\"type\":\"manager\",\"value\":\"grace@example.com\"}"),
+                AttributeBuilder.build(ADDRESSES_ATTR, "{\"type\":\"work\",\"streetAddress\":\"London\"}"),
+                AttributeBuilder.build(ORGANIZATIONS_ATTR, "{\"name\":\"Analytical Engine\"}"),
+                AttributeBuilder.build(PHONES_ATTR, "{\"type\":\"work\",\"value\":\"+44123\"}"),
+                AttributeBuilder.build(LOCATIONS_ATTR, "{\"type\":\"desk\",\"area\":\"A1\"}"),
+                AttributeBuilder.build(SUSPENDED_ATTR, true), AttributeBuilder.build(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, true), AttributeBuilder.build(IP_WHITELISTED_ATTR, false),
+                AttributeBuilder.build(ORG_UNIT_PATH_ATTR, "/Engineering"), AttributeBuilder.build(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true));
 
+        // When: Build the user creation request
+        Directory.Users.Insert insert = UserHandler.createUser(directory().users(), attributes);
+
+        // Then: Preserve every supplied attribute value
         User content = (User) insert.getJsonContent();
 
-        assertEquals(((java.util.List<?>) content.getIms()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getEmails()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getExternalIds()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getRelations()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getAddresses()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getOrganizations()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getPhones()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getLocations()).size(), 1);
+        assertEquals(content.getIms(), List.of(Map.of("type", "work", "value", "ada-chat")));
+        assertEquals(content.getEmails(), List.of(Map.of("type", "work", "value", "ada@example.com")));
+        assertEquals(content.getExternalIds(), List.of(Map.of("type", "account", "value", "42")));
+        assertEquals(content.getRelations(), List.of(Map.of("type", "manager", "value", "grace@example.com")));
+        assertEquals(content.getAddresses(), List.of(Map.of("type", "work", "streetAddress", "London")));
+        assertEquals(content.getOrganizations(), List.of(Map.of("name", "Analytical Engine")));
+        assertEquals(content.getPhones(), List.of(Map.of("type", "work", "value", "+44123")));
+        assertEquals(content.getLocations(), List.of(Map.of("type", "desk", "area", "A1")));
         assertEquals(content.getSuspended(), Boolean.TRUE);
         assertEquals(content.getChangePasswordAtNextLogin(), Boolean.TRUE);
         assertEquals(content.getIpWhitelisted(), Boolean.FALSE);
@@ -457,27 +472,30 @@ public class ResourceHandlersTest {
 
     @Test
     public void userUpdateMapsEveryOptionalFieldAndAcceptsNullValues() {
-        Directory.Users.Patch patch = UserHandler.updateUser(directory().users(), new Uid("u"), attributes(
-                new Name("new@example.com"),
-                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Augusta"),
-                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "King"),
-                AttributeBuilder.buildPassword(new GuardedString("new-secret".toCharArray())),
-                AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true),
-                AttributeBuilder.build(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, false),
-                AttributeBuilder.build(UserHandler.IP_WHITELISTED_ATTR, true),
-                AttributeBuilder.build(UserHandler.IMS_ATTR, "{\"type\":\"work\",\"value\":\"ada-chat\"}"),
-                AttributeBuilder.build(UserHandler.EMAILS_ATTR, "{\"type\":\"work\",\"value\":\"new@example.com\"}"),
-                AttributeBuilder.build(UserHandler.EXTERNAL_IDS_ATTR, "{\"type\":\"account\",\"value\":\"42\"}"),
-                AttributeBuilder.build(UserHandler.RELATIONS_ATTR, "{\"type\":\"manager\",\"value\":\"grace@example.com\"}"),
-                AttributeBuilder.build(UserHandler.ADDRESSES_ATTR, "{\"type\":\"work\",\"streetAddress\":\"London\"}"),
-                AttributeBuilder.build(UserHandler.ORGANIZATIONS_ATTR, "{\"name\":\"Analytical Engine\"}"),
-                AttributeBuilder.build(UserHandler.PHONES_ATTR, "{\"type\":\"work\",\"value\":\"+44123\"}"),
-                AttributeBuilder.build(UserHandler.LOCATIONS_ATTR, "{\"type\":\"desk\",\"area\":\"A1\"}"),
-                AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering"),
-                AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true)));
+        // Given: Replacements for every optional user field
+        Set<AttributeDelta> deltas = Set.of(
+                AttributeDeltaBuilder.build(Name.NAME, "new@example.com"),
+                AttributeDeltaBuilder.build(GIVEN_NAME_ATTR, "Augusta"), AttributeDeltaBuilder.build(FAMILY_NAME_ATTR, "King"),
+                AttributeDeltaBuilder.build(OperationalAttributes.PASSWORD_NAME, new GuardedString("new-secret".toCharArray())),
+                AttributeDeltaBuilder.build(SUSPENDED_ATTR, true), AttributeDeltaBuilder.build(CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, false),
+                AttributeDeltaBuilder.build(IP_WHITELISTED_ATTR, true),
+                AttributeDeltaBuilder.build(IMS_ATTR, "{\"type\":\"work\",\"value\":\"ada-chat\"}"),
+                AttributeDeltaBuilder.build(EMAILS_ATTR, "{\"type\":\"work\",\"value\":\"new@example.com\"}"),
+                AttributeDeltaBuilder.build(EXTERNAL_IDS_ATTR, "{\"type\":\"account\",\"value\":\"42\"}"),
+                AttributeDeltaBuilder.build(RELATIONS_ATTR, "{\"type\":\"manager\",\"value\":\"grace@example.com\"}"),
+                AttributeDeltaBuilder.build(ADDRESSES_ATTR, "{\"type\":\"work\",\"streetAddress\":\"London\"}"),
+                AttributeDeltaBuilder.build(ORGANIZATIONS_ATTR, "{\"name\":\"Analytical Engine\"}"),
+                AttributeDeltaBuilder.build(PHONES_ATTR, "{\"type\":\"work\",\"value\":\"+44123\"}"),
+                AttributeDeltaBuilder.build(LOCATIONS_ATTR, "{\"type\":\"desk\",\"area\":\"A1\"}"),
+                AttributeDeltaBuilder.build(ORG_UNIT_PATH_ATTR, "/Engineering"), AttributeDeltaBuilder.build(INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true));
 
-        assertNotNull(patch);
-        User content = (User) patch.getJsonContent();
+        // When: Build the user update request
+        Directory.Users.Update update = UserHandler.buildUserUpdateRequest(directory().users(), new Uid(USER), deltas, Optional.empty());
+
+        // Then: Preserve every replacement value
+        assertEquals(update.getUserKey(), USER);
+        assertEquals(update.getRequestMethod(), "PUT");
+        User content = (User) update.getJsonContent();
         assertEquals(content.getPrimaryEmail(), "new@example.com");
         assertEquals(content.getName().getGivenName(), "Augusta");
         assertEquals(content.getName().getFamilyName(), "King");
@@ -485,78 +503,121 @@ public class ResourceHandlersTest {
         assertEquals(content.getSuspended(), Boolean.TRUE);
         assertEquals(content.getChangePasswordAtNextLogin(), Boolean.FALSE);
         assertEquals(content.getIpWhitelisted(), Boolean.TRUE);
-        assertEquals(((java.util.List<?>) content.getIms()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getEmails()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getExternalIds()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getRelations()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getAddresses()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getOrganizations()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getPhones()).size(), 1);
-        assertEquals(((java.util.List<?>) content.getLocations()).size(), 1);
+        assertEquals(content.getIms(), List.of(Map.of("type", "work", "value", "ada-chat")));
+        assertEquals(content.getEmails(), List.of(Map.of("type", "work", "value", "new@example.com")));
+        assertEquals(content.getExternalIds(), List.of(Map.of("type", "account", "value", "42")));
+        assertEquals(content.getRelations(), List.of(Map.of("type", "manager", "value", "grace@example.com")));
+        assertEquals(content.getAddresses(), List.of(Map.of("type", "work", "streetAddress", "London")));
+        assertEquals(content.getOrganizations(), List.of(Map.of("name", "Analytical Engine")));
+        assertEquals(content.getPhones(), List.of(Map.of("type", "work", "value", "+44123")));
+        assertEquals(content.getLocations(), List.of(Map.of("type", "desk", "area", "A1")));
         assertEquals(content.getOrgUnitPath(), "/Engineering");
         assertEquals(content.getIncludeInGlobalAddressList(), Boolean.TRUE);
     }
 
-    @Test
-    public void userUpdateCanInitializeThePatchFromEachOptionalFieldAlone() {
-        AttributesAccessor[] individualAttributes = new AttributesAccessor[] {
-            attributes(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")),
-            attributes(AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace")),
-            attributes(AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray()))),
-            attributes(AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, true)),
-            attributes(AttributeBuilder.build(UserHandler.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, true)),
-            attributes(AttributeBuilder.build(UserHandler.IP_WHITELISTED_ATTR, true)),
-            attributes(AttributeBuilder.build(UserHandler.IMS_ATTR, "{\"type\":\"work\"}")),
-            attributes(AttributeBuilder.build(UserHandler.EMAILS_ATTR, "{\"type\":\"work\"}")),
-            attributes(AttributeBuilder.build(UserHandler.EXTERNAL_IDS_ATTR, "{\"type\":\"account\"}")),
-            attributes(AttributeBuilder.build(UserHandler.RELATIONS_ATTR, "{\"type\":\"manager\"}")),
-            attributes(AttributeBuilder.build(UserHandler.ADDRESSES_ATTR, "{\"type\":\"work\"}")),
-            attributes(AttributeBuilder.build(UserHandler.ORGANIZATIONS_ATTR, "{\"name\":\"Org\"}")),
-            attributes(AttributeBuilder.build(UserHandler.PHONES_ATTR, "{\"type\":\"work\"}")),
-            attributes(AttributeBuilder.build(UserHandler.LOCATIONS_ATTR, "{\"type\":\"desk\"}")),
-            attributes(AttributeBuilder.build(UserHandler.ORG_UNIT_PATH_ATTR, "/Engineering")),
-            attributes(AttributeBuilder.build(UserHandler.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true))
-        };
+    @Test(dataProvider = "userFields")
+    public void userUpdateCanInitializeThePatchFromEachOptionalFieldAlone(String attribute, Object value, Map<String, Object> expected) throws Exception {
+        // Given: One replacement attribute and expected payload
+        AttributeDelta delta = AttributeDeltaBuilder.build(attribute, value);
+        GsonFactory factory = new GsonFactory();
 
-        for (AttributesAccessor singleAttribute : individualAttributes) {
-            assertNotNull(UserHandler.updateUser(directory().users(), new Uid("u"),
-                    singleAttribute));
-        }
-        assertNull(UserHandler.updateUser(directory().users(), new Uid("u"),
-                new AttributesAccessor(Set.of())));
+        // When: Build a single-field update
+        Directory.Users.Update update = UserHandler.buildUserUpdateRequest(directory().users(), new Uid(USER), Set.of(delta), Optional.empty());
+
+        // Then: Verify exact payload and target user
+        assertEquals(update.getUserKey(), USER);
+        assertEquals(update.getFields(), ID_ETAG);
+        assertEquals(factory.fromString(factory.toString(update.getJsonContent()), Map.class), expected);
+    }
+
+    @DataProvider
+    public Object[][] userFields() {
+        return new Object[][] {
+            {GIVEN_NAME_ATTR, "Ada", Map.of("name", Map.of("givenName", "Ada"))},
+            {FAMILY_NAME_ATTR, "Lovelace", Map.of("name", Map.of("familyName", "Lovelace"))},
+            {OperationalAttributes.PASSWORD_NAME, new GuardedString("secret".toCharArray()), Map.of("password", "secret")},
+            {SUSPENDED_ATTR, true, Map.of("suspended", true)},
+            {CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR, true, Map.of("changePasswordAtNextLogin", true)},
+            {IP_WHITELISTED_ATTR, true, Map.of("ipWhitelisted", true)},
+            {IMS_ATTR, "{\"type\":\"work\"}", Map.of("ims", List.of(Map.of("type", "work")))},
+            {EMAILS_ATTR, "{\"type\":\"work\"}", Map.of("emails", List.of(Map.of("type", "work")))},
+            {EXTERNAL_IDS_ATTR, "{\"type\":\"account\"}", Map.of("externalIds", List.of(Map.of("type", "account")))},
+            {RELATIONS_ATTR, "{\"type\":\"manager\"}", Map.of("relations", List.of(Map.of("type", "manager")))},
+            {ADDRESSES_ATTR, "{\"type\":\"work\"}", Map.of("addresses", List.of(Map.of("type", "work")))},
+            {ORGANIZATIONS_ATTR, "{\"name\":\"Org\"}", Map.of("organizations", List.of(Map.of("name", "Org")))},
+            {PHONES_ATTR, "{\"type\":\"work\"}", Map.of("phones", List.of(Map.of("type", "work")))},
+            {LOCATIONS_ATTR, "{\"type\":\"desk\"}", Map.of("locations", List.of(Map.of("type", "desk")))},
+            {ORG_UNIT_PATH_ATTR, "/Engineering", Map.of("orgUnitPath", "/Engineering")},
+            {INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR, true, Map.of("includeInGlobalAddressList", true)}
+        };
+    }
+
+    @Test
+    public void userUpdateWithoutModificationsDoesNotBuildRequest() {
+        // Given: No user modifications
+        Set<AttributeDelta> deltas = Set.of();
+
+        // When: Build the user update request
+        Directory.Users.Update update = UserHandler.buildUserUpdateRequest(directory().users(), new Uid(USER), deltas, Optional.empty());
+
+        // Then: Avoid an unnecessary update request
+        assertNull(update);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void userCreateRequiresPassword() {
-        UserHandler.createUser(directory().users(), attributes(new Name(USER),
-                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada"),
-                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace")));
+        // Given: User missing a required creation attribute
+        AttributesAccessor attributes = attributes(new Name(USER),
+                AttributeBuilder.build(GIVEN_NAME_ATTR, "Ada"),
+                AttributeBuilder.build(FAMILY_NAME_ATTR, "Lovelace"));
+
+        // When: Build the user creation request
+        // Then: Reject the missing required attribute
+        UserHandler.createUser(directory().users(), attributes);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void userCreateRequiresGivenName() {
-        UserHandler.createUser(directory().users(), attributes(new Name(USER),
+        // Given: User missing a required creation attribute
+        AttributesAccessor attributes = attributes(new Name(USER),
                 AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
-                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace")));
+                AttributeBuilder.build(FAMILY_NAME_ATTR, "Lovelace"));
+
+        // When: Build the user creation request
+        // Then: Reject the missing required attribute
+        UserHandler.createUser(directory().users(), attributes);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void userCreateRequiresFamilyName() {
-        UserHandler.createUser(directory().users(), attributes(new Name(USER),
+        // Given: User missing a required creation attribute
+        AttributesAccessor attributes = attributes(new Name(USER),
                 AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
-                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")));
+                AttributeBuilder.build(GIVEN_NAME_ATTR, "Ada"));
+
+        // When: Build the user creation request
+        // Then: Reject the missing required attribute
+        UserHandler.createUser(directory().users(), attributes);
     }
 
-    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    @Test(expectedExceptions = ClassCastException.class)
     public void userUpdateRejectsNonStringGivenName() {
-        UserHandler.updateUser(directory().users(), new Uid("u"),
-                attributes(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, 42)));
+        // Given: A numeric value for givenName
+        Set<AttributeDelta> deltas = Set.of(AttributeDeltaBuilder.build(GIVEN_NAME_ATTR, 42));
+
+        // When: Build the user update request
+        // Then: Reject the invalid attribute type
+        UserHandler.buildUserUpdateRequest(directory().users(), new Uid(USER), deltas, Optional.empty());
     }
 
-    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    @Test(expectedExceptions = ClassCastException.class)
     public void userUpdateRejectsUnrecognizedBooleanValue() {
-        UserHandler.updateUser(directory().users(), new Uid("u"),
-                attributes(AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, "sometimes")));
+        // Given: A string value for suspended
+        Set<AttributeDelta> deltas = Set.of(AttributeDeltaBuilder.build(SUSPENDED_ATTR, "sometimes"));
+
+        // When: Build the user update request
+        // Then: Reject the invalid attribute type
+        UserHandler.buildUserUpdateRequest(directory().users(), new Uid(USER), deltas, Optional.empty());
     }
 
     private static Directory directory() {
