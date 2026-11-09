@@ -309,7 +309,7 @@ public class GoogleAppsConnectorOperationsTest {
                 new GoogleFilter(new Uid("ada@example.com")),
                 users::add, options.setAttributesToGet(GoogleAppsConstants.GIVEN_NAME_ATTR).build());
         connector.executeQuery(ObjectClass.GROUP,
-                new GoogleFilter(FilterBuilder.equalTo(new Uid("engineering@example.com"))),
+                new GoogleFilter(new Uid("engineering@example.com")),
                 groups::add, options.setAttributesToGet(GoogleAppsConnector.NAME_ATTR).build());
         connector.executeQuery(GoogleAppsConnector.MEMBER,
                 new GoogleFilter(FilterBuilder.equalTo(new Uid("engineering@example.com/ada@example.com"))), members::add, options.build());

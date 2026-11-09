@@ -95,11 +95,11 @@ import java.util.Random;
 import java.util.Set;
 import java.util.regex.Matcher;
 
-import static com.evolveum.polygon.connector.googleapps.GroupHandler.fromMember;
 import static com.evolveum.polygon.connector.googleapps.GroupHandler.getGroupClassInfo;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.LICENSE_NAME_PATTERN;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.fromLicenseAssignment;
 import static com.evolveum.polygon.connector.googleapps.LicenseAssignmentsHandler.getLicenseAssignmentClassInfo;
+import static com.evolveum.polygon.connector.googleapps.MemberHandler.fromMember;
 import static com.evolveum.polygon.connector.googleapps.MemberHandler.getMemberClassInfo;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.fromOrgunit;
 import static com.evolveum.polygon.connector.googleapps.OrgunitsHandler.getOrgunitClassInfo;
@@ -348,7 +348,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
      * {@inheritDoc}
      */
     public FilterTranslator<GoogleFilter> createFilterTranslator(ObjectClass objectClass, OperationOptions options) {
-        if (ObjectClass.ACCOUNT.equals(objectClass)) return new GoogleFilterTranslator();
+        if ((ObjectClass.ACCOUNT.equals(objectClass) || ObjectClass.GROUP.equals(objectClass))) return new GoogleFilterTranslator();
         return filter -> Collections.singletonList(new GoogleFilter(filter));
     }
 
@@ -358,6 +358,9 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public void executeQuery(ObjectClass objectClass, GoogleFilter filter, ResultsHandler handler, OperationOptions options) {
         if (ObjectClass.ACCOUNT.equals(objectClass)) {
             UserHandler.executeQuery(apiExecutor, objectsCache, filter == null ? GoogleFilter.EMPTY : filter,
+                    handler, options, getSchemaDefinition(objectClass));
+        } else if (ObjectClass.GROUP.equals(objectClass)) {
+            GroupHandler.executeQuery(apiExecutor, objectsCache, filter == null ? GoogleFilter.EMPTY : filter,
                     handler, options, getSchemaDefinition(objectClass));
         } else {
             executeLegacyQuery(objectClass, filter == null ? null : filter.getFilter(), handler, options);
@@ -646,99 +649,11 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     }
 
     private void executeGroupReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            // Try the cache first
-            ConnectorObject cachedGroup = objectsCache.getGroup(uid.getUidValue());
-            if (cachedGroup != null) {
-                handler.handle(cachedGroup);
-                return;
-            }
-
-            Directory.Groups.Get request
-                    = configuration.getDirectory().groups().get(uid.getUidValue());
-            request.setFields(getFields(ObjectClass.GROUP, options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
-
-            execute(request,
-                    new RequestResultHandler<Directory.Groups.Get, Group, Boolean>() {
-                        public Boolean handleResult(final Directory.Groups.Get request,
-                                                    final Group value) {
-                            ConnectorObject group = fromGroup(value, attributesToGet,
-                                    configuration.getDirectory().members());
-                            objectsCache.addGroup(group);
-                            return handler.handle(group);
-                        }
-
-                        public Boolean handleNotFound(IOException e) {
-                            // Do nothing if not found
-                            return true;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#Get");
-            throw ConnectorException.wrap(e);
-        }
+        GroupHandler.executeGroupReadQuery(apiExecutor, objectsCache, uid, handler, options, attributesToGet, getSchemaDefinition(ObjectClass.GROUP));
     }
 
     private void executeGroupSearchQuery(Filter query, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            // userKey excludes the customer and domain!!
-
-            Directory.Groups.List request = configuration.getDirectory().groups().list();
-            if (null != query) {
-                query.accept(new GroupHandler(), request);
-            } else {
-                request.setCustomer(MY_CUSTOMER_ID);
-            }
-
-            boolean paged = false;
-            // Groups
-            if (null != options.getPageSize() && options.getPageSize() >= 1 && options.getPageSize() <= 500) {
-                request.setMaxResults(options.getPageSize());
-                paged = true;
-            }
-            request.setPageToken(options.getPagedResultsCookie());
-
-            // Implementation to support the 'OP_ATTRIBUTES_TO_GET'
-            String fields = getFields(ObjectClass.GROUP, options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR);
-            if (null != fields) {
-                request.setFields("nextPageToken,groups(" + fields + ")");
-            }
-
-            String nextPageToken = null;
-            do {
-                if (StringUtil.isNotBlank(nextPageToken)) {
-                    request.setPageToken(nextPageToken);
-                }
-                nextPageToken
-                        = execute(request,
-                        new RequestResultHandler<Directory.Groups.List, Groups, String>() {
-                            public String handleResult(
-                                    final Directory.Groups.List request,
-                                    final Groups value) {
-                                if (null != value.getGroups()) {
-                                    for (Group group : value.getGroups()) {
-                                        handler.handle(fromGroup(group,
-                                                attributesToGet, configuration
-                                                        .getDirectory().members()));
-                                    }
-                                }
-                                return value.getNextPageToken();
-                            }
-                        });
-                request.setPageToken(nextPageToken);
-            } while (!paged && StringUtil.isNotBlank(nextPageToken));
-
-            if (paged && StringUtil.isNotBlank(nextPageToken)) {
-                logger.info("Paged Search was requested");
-                ((SearchResultsHandler) handler).handleResult(new SearchResult(
-                        nextPageToken, 0));
-            }
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#List");
-            throw ConnectorException.wrap(e);
-        }
+        GroupHandler.executeGroupSearchQuery(apiExecutor, new GoogleFilter(query), handler, options, attributesToGet, getSchemaDefinition(ObjectClass.GROUP));
     }
 
     private void executeAccountReadQuery(Uid uid, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
@@ -1289,31 +1204,7 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         UserHandler.executeAccountReadQuery(apiExecutor, objectsCache, name, handler, options, getSchemaDefinition(ObjectClass.ACCOUNT));
     }
     private void executeGroupReadQuery(Name name, final ResultsHandler handler, OperationOptions options, final Set<String> attributesToGet) {
-        try {
-            Directory.Groups.Get request
-                    = configuration.getDirectory().groups().get(name.getNameValue());
-            request.setFields(getFields(ObjectClass.GROUP, options, ID_ATTR, ETAG_ATTR, EMAIL_ATTR));
-
-            execute(request,
-                    new RequestResultHandler<Directory.Groups.Get, Group, Boolean>() {
-                        public Boolean handleResult(final Directory.Groups.Get request,
-                                                    final Group value) {
-                            ConnectorObject group = fromGroup(value, attributesToGet,
-                                    configuration.getDirectory().members());
-                            objectsCache.addGroup(group);
-                            return handler.handle(group);
-                        }
-
-                        public Boolean handleNotFound(IOException e) {
-                            // Do nothing if not found
-                            return true;
-                        }
-                    });
-
-        } catch (IOException e) {
-            logger.warn(e, "Failed to initialize Groups#Get");
-            throw ConnectorException.wrap(e);
-        }
+        GroupHandler.executeGroupReadQuery(apiExecutor, objectsCache, name, handler, options, attributesToGet, getSchemaDefinition(ObjectClass.GROUP));
     }
     public GoogleApiExecutor getApiExecutor() {
         return apiExecutor;
