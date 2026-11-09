@@ -442,7 +442,7 @@ public class ResourceHandlersTest {
         ConnectorObject object = LicenseAssignmentsHandler.fromLicenseAssignment(assignment);
 
         // Then: Preserve identity and license attributes
-        assertEquals(object.getObjectClass(), GoogleAppsConnector.LICENSE_ASSIGNMENT);
+        assertEquals(object.getObjectClass(), GoogleAppsConstants.LICENSE_ASSIGNMENT);
         assertEquals(object.getUid().getUidValue(), licenseUid());
         assertEquals(object.getUid().getRevision(), "version-2");
         assertEquals(object.getName().getNameValue(), licenseUid());
