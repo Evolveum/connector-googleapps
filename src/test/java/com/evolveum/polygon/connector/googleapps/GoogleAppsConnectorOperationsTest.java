@@ -26,6 +26,7 @@ import com.google.api.services.directory.Directory;
 import com.google.api.services.licensing.Licensing;
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.exceptions.AlreadyExistsException;
+import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
@@ -80,9 +81,9 @@ public class GoogleAppsConnectorOperationsTest {
                 AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
                 AttributeBuilder.build(GoogleAppsConstants.GIVEN_NAME_ATTR, "Ada"),
                 AttributeBuilder.build(GoogleAppsConstants.FAMILY_NAME_ATTR, "Lovelace"),
-                AttributeBuilder.build(GoogleAppsConnector.ALIASES_ATTR, List.of("ada.alias@example.com")),
-                AttributeBuilder.build(GoogleAppsConnector.PHOTO_ATTR, (Object) new byte[]{1, 2, 3}),
-                AttributeBuilder.build(GoogleAppsConnector.IS_ADMIN_ATTR, true));
+                AttributeBuilder.build(GoogleAppsConstants.ALIASES_ATTR, List.of("ada.alias@example.com")),
+                AttributeBuilder.build(GoogleAppsConstants.PHOTO_ATTR, (Object) new byte[]{1, 2, 3}),
+                AttributeBuilder.build(GoogleAppsConstants.IS_ADMIN_ATTR, true));
 
         // When: Create the user and related resources
         Uid uid = connector.create(ObjectClass.ACCOUNT, attributes, new OperationOptionsBuilder().build());
@@ -236,7 +237,7 @@ public class GoogleAppsConnectorOperationsTest {
             connector.executeQuery(ObjectClass.ACCOUNT, new GoogleFilter(new Uid("missing@example.com")), results::add, options.build());
 
             // Then: Return nothing and reject member enumeration
-            expectThrows(UnsupportedOperationException.class,
+            expectThrows(InvalidAttributeValueException.class,
                     () -> connector.executeQuery(GoogleAppsConnector.MEMBER, null, results::add, options.build()));
             assertTrue(results.isEmpty());
             assertEquals(transport.requestCount, 1);
@@ -265,13 +266,13 @@ public class GoogleAppsConnectorOperationsTest {
                 new GoogleFilter(FilterBuilder.startsWith(AttributeBuilder.build(Name.NAME, "ada"))), users::add,
                 new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.GIVEN_NAME_ATTR).build());
         connector.executeQuery(ObjectClass.GROUP,
-                new GoogleFilter(FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, "ada@example.com"))),
-                groups::add, new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConnector.NAME_ATTR).build());
+                new GoogleFilter(FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, "ada@example.com"))),
+                groups::add, new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.NAME_ATTR).build());
         connector.executeQuery(GoogleAppsConnector.MEMBER,
-                new GoogleFilter(FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConnector.GROUP_KEY_ATTR, "engineering@example.com"))),
+                new GoogleFilter(FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConstants.GROUP_KEY_ATTR, "engineering@example.com"))),
                 members::add, new OperationOptionsBuilder().build());
         connector.executeQuery(GoogleAppsConnector.ORG_UNIT, null, orgUnits::add,
-                new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).build());
+                new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).build());
 
         // Then: Verify returned identities and requested attributes
         assertEquals(users.size(), 1);
@@ -310,12 +311,12 @@ public class GoogleAppsConnectorOperationsTest {
                 users::add, options.setAttributesToGet(GoogleAppsConstants.GIVEN_NAME_ATTR).build());
         connector.executeQuery(ObjectClass.GROUP,
                 new GoogleFilter(new Uid("engineering@example.com")),
-                groups::add, options.setAttributesToGet(GoogleAppsConnector.NAME_ATTR).build());
+                groups::add, options.setAttributesToGet(GoogleAppsConstants.NAME_ATTR).build());
         connector.executeQuery(GoogleAppsConnector.MEMBER,
-                new GoogleFilter(FilterBuilder.equalTo(new Uid("engineering@example.com/ada@example.com"))), members::add, options.build());
+                new GoogleFilter(new Uid("engineering@example.com/ada@example.com")), members::add, options.build());
         connector.executeQuery(GoogleAppsConnector.ORG_UNIT,
-                new GoogleFilter(FilterBuilder.equalTo(new Uid("Engineering"))),
-                orgUnits::add, options.setAttributesToGet(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).build());
+                new GoogleFilter(new Uid("Engineering")),
+                orgUnits::add, options.setAttributesToGet(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).build());
 
         // Then: Verify returned identities and requested attributes
         assertEquals(users.size(), 1);
