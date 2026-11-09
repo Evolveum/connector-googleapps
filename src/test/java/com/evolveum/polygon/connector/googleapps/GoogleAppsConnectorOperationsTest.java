@@ -16,6 +16,7 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.gson.GsonFactory;
@@ -26,6 +27,7 @@ import com.google.api.services.directory.Directory;
 import com.google.api.services.licensing.Licensing;
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.exceptions.AlreadyExistsException;
+import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
@@ -39,6 +41,7 @@ import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
 import org.identityconnectors.framework.common.objects.ResultsHandler;
 import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -143,6 +146,228 @@ public class GoogleAppsConnectorOperationsTest {
         assertEquals(licenseUid.getUidValue(), "product/sku/sku/user/ada@example.com");
         assertEquals(transport.requestCount, 5);
         connector.dispose();
+    }
+
+    @Test
+    public void groupMembers() {
+        // Given: Group with mixed membership inputs
+        ScriptedTransport transport = new ScriptedTransport(
+                groupExchange(json("{\"id\":\"group-id\",\"etag\":\"group-v1\"}")),
+                memberExchange("ada@example.com", "MANAGER", json("{\"email\":\"ada@example.com\",\"etag\":\"ada-v1\"}")),
+                memberExchange("grace@example.com", "MEMBER", json("{\"email\":\"grace@example.com\",\"etag\":\"grace-v1\"}")),
+                memberExchange("alan@example.com", "OWNER", json("{\"email\":\"alan@example.com\",\"etag\":\"alan-v1\"}")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        Set<Attribute> attributes = attributes(new Name("engineering@example.com"), AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR,
+                List.of(Map.of("email", "ada@example.com", "role", "MANAGER"), "grace@example.com", Map.of("email", "alan@example.com", "role", "OWNER"))));
+        try {
+            // When: Create group and memberships
+            Uid uid = connector.create(ObjectClass.GROUP, attributes, new OperationOptionsBuilder().build());
+
+            // Then: Verify identity and every request
+            assertEquals(uid.getUidValue(), "group-id");
+            assertEquals(uid.getRevision(), "group-v1");
+            assertEquals(uid.getNameHintValue(), "engineering@example.com");
+            assertEquals(transport.requestCount, 4);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @Test(dataProvider = "defaultRoles")
+    public void defaultRole(Map<String, String> member) {
+        // Given: Member without an explicit role
+        ScriptedTransport transport = new ScriptedTransport(groupExchange(json("{\"id\":\"group-id\",\"etag\":\"group-v1\"}")),
+                memberExchange("ada@example.com", "MEMBER", json("{\"email\":\"ada@example.com\",\"etag\":\"ada-v1\"}")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        try {
+            // When: Create group with default membership
+            Uid uid = connector.create(ObjectClass.GROUP, attributes(new Name("engineering@example.com"),
+                    AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, List.of(member))), new OperationOptionsBuilder().build());
+
+            // Then: Verify default role and identity
+            assertEquals(uid.getUidValue(), "group-id");
+            assertEquals(uid.getRevision(), "group-v1");
+            assertEquals(uid.getNameHintValue(), "engineering@example.com");
+            assertEquals(transport.requestCount, 2);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @DataProvider
+    public Object[][] defaultRoles() {
+        return new Object[][]{{Map.of("email", "ada@example.com")}, {Map.of("email", "ada@example.com", "role", " ")}};
+    }
+
+    @Test(dataProvider = "emptyMembers")
+    public void emptyMembers(List<Object> members) {
+        // Given: Group without requested memberships
+        ScriptedTransport transport = new ScriptedTransport(groupExchange(json("{\"id\":\"group-id\",\"etag\":\"group-v1\"}")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        Set<Attribute> attributes = attributes(new Name("engineering@example.com"));
+        if (members != null) {
+            attributes.add(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, members));
+        }
+        try {
+            // When: Create the group
+            Uid uid = connector.create(ObjectClass.GROUP, attributes, new OperationOptionsBuilder().build());
+
+            // Then: Verify group without membership requests
+            assertEquals(uid.getUidValue(), "group-id");
+            assertEquals(uid.getRevision(), "group-v1");
+            assertEquals(uid.getNameHintValue(), "engineering@example.com");
+            assertEquals(transport.requestCount, 1);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @DataProvider
+    public Object[][] emptyMembers() {
+        return new Object[][]{{null}, {List.of()}};
+    }
+
+    @Test(dataProvider = "invalidMembers")
+    public void invalidMembers(Object member) {
+        // Given: Valid member followed by invalid input
+        ScriptedTransport transport = new ScriptedTransport();
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        Set<Attribute> attributes = attributes(new Name("engineering@example.com"),
+                AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, List.of(Map.of("email", "ada@example.com", "role", "MANAGER"), member)));
+        try {
+            // When: Attempt group creation
+            // Then: Reject input before any write
+            expectThrows(InvalidAttributeValueException.class, () -> connector.create(ObjectClass.GROUP, attributes, new OperationOptionsBuilder().build()));
+            assertEquals(transport.requestCount, 0);
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @DataProvider
+    public Object[][] invalidMembers() {
+        return new Object[][]{{17}, {" "}, {Map.of("role", "MEMBER")}, {Map.of("email", " ")}, {Map.of("email", 17)},
+                {Map.of("email", "grace@example.com", "role", 17)}};
+    }
+
+    @Test(dataProvider = "memberFailures")
+    public void memberFailure(int status, String reason, Class<? extends ConnectorException> failureType) {
+        // Given: Membership failure after one successful addition
+        ScriptedTransport transport = new ScriptedTransport(groupExchange(json("{\"id\":\"group-id\",\"etag\":\"group-v1\"}")),
+                memberExchange("ada@example.com", "MEMBER", json("{\"email\":\"ada@example.com\",\"etag\":\"ada-v1\"}")),
+                memberExchange("grace@example.com", "MEMBER", error(status, reason, "Membership rejected")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        Set<Attribute> attributes = attributes(new Name("engineering@example.com"),
+                AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, List.of("ada@example.com", "grace@example.com", "alan@example.com")));
+        try {
+            // When: Attempt all requested membership writes
+            // Then: Propagate failure and stop further writes
+            ConnectorException failure = expectThrows(failureType, () -> connector.create(ObjectClass.GROUP, attributes, new OperationOptionsBuilder().build()));
+            assertEquals(failure.getClass(), failureType);
+            assertTrue(failure.getCause() instanceof GoogleJsonResponseException);
+            assertEquals(((GoogleJsonResponseException) failure.getCause()).getStatusCode(), status);
+            assertEquals(transport.requestCount, 3);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @DataProvider
+    public Object[][] memberFailures() {
+        return new Object[][]{{403, "forbidden", ConnectorException.class}, {404, "notFound", UnknownUidException.class},
+                {409, "duplicate", AlreadyExistsException.class}};
+    }
+
+    @Test
+    public void groupFailure() {
+        // Given: Existing group and requested membership
+        ScriptedTransport transport = new ScriptedTransport(groupExchange(duplicate()));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        Set<Attribute> attributes = attributes(new Name("engineering@example.com"),
+                AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, List.of("ada@example.com")));
+        try {
+            // When: Attempt duplicate group creation
+            // Then: Preserve error without adding memberships
+            AlreadyExistsException failure = expectThrows(AlreadyExistsException.class,
+                    () -> connector.create(ObjectClass.GROUP, attributes, new OperationOptionsBuilder().build()));
+            assertTrue(failure.getCause() instanceof GoogleJsonResponseException);
+            assertEquals(((GoogleJsonResponseException) failure.getCause()).getStatusCode(), 409);
+            assertEquals(transport.requestCount, 1);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @Test
+    public void createMember() {
+        // Given: Standalone member creation response
+        ScriptedTransport transport = new ScriptedTransport(new Exchange("https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com/members",
+                Map.of("email", "grace@example.com"), json("{\"id\":\"grace-id\",\"email\":\"grace@example.com\",\"role\":\"MEMBER\",\"etag\":\"grace-v1\"}")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        try {
+            // When: Create the standalone member
+            Uid uid = connector.create(GoogleAppsConstants.MEMBER, attributes(AttributeBuilder.build(GoogleAppsConstants.GROUP_KEY_ATTR, "engineering@example.com"),
+                    AttributeBuilder.build(GoogleAppsConstants.EMAIL_ATTR, "grace@example.com")), new OperationOptionsBuilder().build());
+
+            // Then: Verify member identity and request
+            assertEquals(uid.getUidValue(), "engineering@example.com/grace-id");
+            assertEquals(uid.getNameHintValue(), "grace@example.com");
+            assertEquals(uid.getRevision(), "grace-v1");
+            assertEquals(transport.requestCount, 1);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @Test
+    public void createOrgUnit() {
+        // Given: Organizational unit creation response
+        ScriptedTransport transport = new ScriptedTransport(new Exchange("https://admin.googleapis.com/admin/directory/v1/customer/my_customer/orgunits?fields=orgUnitPath,etag",
+                Map.of("name", "Engineering", "parentOrgUnitPath", "/"), json("{\"name\":\"Engineering\",\"orgUnitPath\":\"/Engineering\",\"etag\":\"ou-v1\"}")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        try {
+            // When: Create the organizational unit
+            Uid uid = connector.create(GoogleAppsConstants.ORG_UNIT, attributes(new Name("Engineering"),
+                    AttributeBuilder.build(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "/")), new OperationOptionsBuilder().build());
+
+            // Then: Verify organizational unit and request
+            assertEquals(uid.getUidValue(), "Engineering");
+            assertEquals(uid.getNameHintValue(), "Engineering");
+            assertEquals(uid.getRevision(), "ou-v1");
+            assertEquals(transport.requestCount, 1);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    @Test
+    public void createLicense() {
+        // Given: License assignment creation response
+        ScriptedTransport transport = new ScriptedTransport(new Exchange(
+                "https://licensing.googleapis.com/apps/licensing/v1/product/product/sku/sku/user?fields=productId,skuId,userId",
+                Map.of("userId", "ada@example.com"), json("{\"productId\":\"product\",\"skuId\":\"sku\",\"userId\":\"ada@example.com\"}")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
+        try {
+            // When: Create the license assignment
+            Uid uid = connector.create(GoogleAppsConstants.LICENSE_ASSIGNMENT, attributes(AttributeBuilder.build(GoogleAppsConstants.PRODUCT_ID_ATTR, "product"),
+                    AttributeBuilder.build(GoogleAppsConstants.SKU_ID_ATTR, "sku"), AttributeBuilder.build(GoogleAppsConstants.USER_ID_ATTR, "ada@example.com")),
+                    new OperationOptionsBuilder().build());
+
+            // Then: Verify license identity and request
+            assertEquals(uid.getUidValue(), "product/sku/sku/user/ada@example.com");
+            assertEquals(uid.getRevision(), null);
+            assertEquals(transport.requestCount, 1);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
     }
 
     @Test
@@ -366,6 +591,14 @@ public class GoogleAppsConnectorOperationsTest {
                 .setContent("{\"error\":{\"code\":" + status + ",\"message\":\"" + message
                         + "\",\"errors\":[{\"domain\":\"global\",\"reason\":\"" + reason
                         + "\",\"message\":\"" + message + "\"}]}}");
+    }
+
+    private static Exchange groupExchange(MockLowLevelHttpResponse response) {
+        return new Exchange("https://admin.googleapis.com/admin/directory/v1/groups?fields=id,etag", Map.of("email", "engineering@example.com"), response);
+    }
+
+    private static Exchange memberExchange(String email, String role, MockLowLevelHttpResponse response) {
+        return new Exchange("https://admin.googleapis.com/admin/directory/v1/groups/group-id/members?fields=email,etag", Map.of("email", email, "role", role), response);
     }
 
     private static final class Exchange {
