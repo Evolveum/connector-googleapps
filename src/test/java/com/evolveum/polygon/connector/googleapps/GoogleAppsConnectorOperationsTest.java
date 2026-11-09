@@ -17,6 +17,7 @@
 package com.evolveum.polygon.connector.googleapps;
 
 import com.google.api.client.http.LowLevelHttpRequest;
+import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
@@ -25,9 +26,12 @@ import com.google.api.services.directory.Directory;
 import com.google.api.services.licensing.Licensing;
 import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.framework.common.exceptions.AlreadyExistsException;
+import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.ConnectorObject;
 import org.identityconnectors.framework.common.objects.Name;
 import org.identityconnectors.framework.common.objects.ObjectClass;
@@ -49,13 +53,18 @@ import java.util.Queue;
 import java.util.Set;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
-/** Connector operations are exercised against in-memory Google API responses. */
+/**
+Connector operations are exercised against in-memory Google API responses.
+*/
 public class GoogleAppsConnectorOperationsTest {
 
     @Test
     public void createUserCanCreateAliasesPhotoAdminAndAutomaticLicense() {
+        // Given: User attributes and related resource responses
         ScriptedTransport transport = new ScriptedTransport(
                 json("{\"id\":\"ada@example.com\",\"etag\":\"user-v1\"}"),
                 json("{\"id\":\"alias-id\",\"etag\":\"alias-v1\",\"alias\":\"ada.alias@example.com\"}"),
@@ -70,22 +79,26 @@ public class GoogleAppsConnectorOperationsTest {
         Set<Attribute> attributes = attributes(
                 new Name("ada@example.com"),
                 AttributeBuilder.buildPassword(new GuardedString("secret".toCharArray())),
-                AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada"),
-                AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "Lovelace"),
-                AttributeBuilder.build(GoogleAppsConnector.ALIASES_ATTR, List.of("ada.alias@example.com")),
-                AttributeBuilder.build(GoogleAppsConnector.PHOTO_ATTR, (Object) new byte[]{1, 2, 3}),
-                AttributeBuilder.build(GoogleAppsConnector.IS_ADMIN_ATTR, true));
+                AttributeBuilder.build(GoogleAppsConstants.GIVEN_NAME_ATTR, "Ada"),
+                AttributeBuilder.build(GoogleAppsConstants.FAMILY_NAME_ATTR, "Lovelace"),
+                AttributeBuilder.build(GoogleAppsConstants.ALIASES_ATTR, List.of("ada.alias@example.com")),
+                AttributeBuilder.build(GoogleAppsConstants.PHOTO_ATTR, (Object) new byte[]{1, 2, 3}),
+                AttributeBuilder.build(GoogleAppsConstants.IS_ADMIN_ATTR, true));
 
+        // When: Create the user and related resources
         Uid uid = connector.create(ObjectClass.ACCOUNT, attributes, new OperationOptionsBuilder().build());
 
+        // Then: Verify identity and every expected request
         assertEquals(uid.getUidValue(), "ada@example.com");
         assertEquals(uid.getRevision(), "user-v1");
         assertEquals(transport.requestCount, 5);
+        assertTrue(transport.responses.isEmpty());
         connector.dispose();
     }
 
     @Test
     public void createsGroupWithMembersAndOtherSupportedObjectClasses() {
+        // Given: Group and standalone membership creation responses
         ScriptedTransport transport = new ScriptedTransport(
                 json("{\"id\":\"engineering@example.com\",\"etag\":\"group-v1\",\"email\":\"engineering@example.com\"}"),
                 json("{\"id\":\"member-id\",\"email\":\"ada@example.com\",\"role\":\"MANAGER\",\"etag\":\"member-v1\"}"),
@@ -97,29 +110,34 @@ public class GoogleAppsConnectorOperationsTest {
         configuration.setSkuId("sku");
         GoogleAppsConnector connector = connector(configuration);
         Map<String, String> groupMember = new HashMap<>();
-        groupMember.put(GoogleAppsConnector.EMAIL_ATTR, "ada@example.com");
-        groupMember.put(GoogleAppsConnector.ROLE_ATTR, "MANAGER");
+        groupMember.put(GoogleAppsConstants.EMAIL_ATTR, "ada@example.com");
+        groupMember.put(GoogleAppsConstants.ROLE_ATTR, "MANAGER");
 
-        Uid groupUid = connector.create(ObjectClass.GROUP, attributes(
-                new Name("engineering@example.com"),
-                AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, List.of(groupMember))),
+        // When: Create the group and related resources
+        Uid groupUid = connector.create(ObjectClass.GROUP, attributes(new Name("engineering@example.com")),
                 new OperationOptionsBuilder().build());
-        Uid memberUid = connector.create(GoogleAppsConnector.MEMBER, attributes(
-                AttributeBuilder.build(GoogleAppsConnector.GROUP_KEY_ATTR, "engineering@example.com"),
-                AttributeBuilder.build(GoogleAppsConnector.EMAIL_ATTR, "grace@example.com")),
+        Uid managerUid = connector.create(GoogleAppsConstants.MEMBER, attributes(
+                AttributeBuilder.build(GoogleAppsConstants.GROUP_KEY_ATTR, "engineering@example.com"),
+                AttributeBuilder.build(GoogleAppsConstants.EMAIL_ATTR, groupMember.get(GoogleAppsConstants.EMAIL_ATTR)),
+                AttributeBuilder.build(GoogleAppsConstants.ROLE_ATTR, groupMember.get(GoogleAppsConstants.ROLE_ATTR))), new OperationOptionsBuilder().build());
+        Uid memberUid = connector.create(GoogleAppsConstants.MEMBER, attributes(
+                AttributeBuilder.build(GoogleAppsConstants.GROUP_KEY_ATTR, "engineering@example.com"),
+                AttributeBuilder.build(GoogleAppsConstants.EMAIL_ATTR, "grace@example.com")),
                 new OperationOptionsBuilder().build());
-        Uid orgUnitUid = connector.create(GoogleAppsConnector.ORG_UNIT, attributes(
+        Uid orgUnitUid = connector.create(GoogleAppsConstants.ORG_UNIT, attributes(
                 new Name("Engineering"),
-                AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "/")),
+                AttributeBuilder.build(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "/")),
                 new OperationOptionsBuilder().build());
-        Uid licenseUid = connector.create(GoogleAppsConnector.LICENSE_ASSIGNMENT, attributes(
-                AttributeBuilder.build(GoogleAppsConnector.PRODUCT_ID_ATTR, "product"),
-                AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, "sku"),
-                AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, "ada@example.com")),
+        Uid licenseUid = connector.create(GoogleAppsConstants.LICENSE_ASSIGNMENT, attributes(
+                AttributeBuilder.build(GoogleAppsConstants.PRODUCT_ID_ATTR, "product"),
+                AttributeBuilder.build(GoogleAppsConstants.SKU_ID_ATTR, "sku"),
+                AttributeBuilder.build(GoogleAppsConstants.USER_ID_ATTR, "ada@example.com")),
                 new OperationOptionsBuilder().build());
 
+        // Then: Preserve resource identities and creation order
         assertEquals(groupUid.getUidValue(), "engineering@example.com");
-        assertEquals(memberUid.getUidValue(), "engineering@example.com/grace@example.com");
+        assertEquals(managerUid.getUidValue(), "engineering@example.com/member-id");
+        assertEquals(memberUid.getUidValue(), "engineering@example.com/member-id");
         assertEquals(orgUnitUid.getUidValue(), "Engineering");
         assertEquals(orgUnitUid.getRevision(), "ou-v1");
         assertEquals(licenseUid.getUidValue(), "product/sku/sku/user/ada@example.com");
@@ -129,56 +147,69 @@ public class GoogleAppsConnectorOperationsTest {
 
     @Test
     public void updateOperationBranchesBuildRequestsAndReturnUpdatedUids() {
+        // Given: Expected updates for every resource type
         ScriptedTransport transport = new ScriptedTransport(
-                json("{\"id\":\"ada@example.com\",\"etag\":\"user-v2\"}"),
-                json("{\"id\":\"engineering@example.com\",\"etag\":\"group-v2\"}"),
-                json("{\"id\":\"member-id\",\"email\":\"ada@example.com\",\"role\":\"OWNER\",\"etag\":\"member-v2\"}"),
-                json("{\"name\":\"New Engineering\",\"orgUnitPath\":\"/Engineering\",\"etag\":\"ou-v2\"}"),
-                json("{\"productId\":\"Google-Drive-storage\",\"skuId\":\"Google-Drive-storage-2TB\",\"userId\":\"ada@example.com\",\"etags\":\"license-v2\"}"));
-        LocalConfiguration configuration = new LocalConfiguration(transport);
-        GoogleAppsConnector connector = connector(configuration);
+                new Exchange("PUT", "https://admin.googleapis.com/admin/directory/v1/users/ada@example.com?fields=id,etag",
+                        Map.of("name", Map.of("givenName", "Ada")), json("{\"id\":\"ada@example.com\",\"etag\":\"user-v2\"}")),
+                new Exchange("PATCH", "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com",
+                        Map.of("name", "Engineering"), json("{\"id\":\"engineering@example.com\",\"etag\":\"group-v2\"}")),
+                new Exchange("PATCH", "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com/members/ada@example.com",
+                        Map.of("email", "ada@example.com", "role", "OWNER"), json("{\"id\":\"member-id\",\"email\":\"ada@example.com\",\"role\":\"OWNER\"}")),
+                new Exchange("PATCH", "https://admin.googleapis.com/admin/directory/v1/customer/my_customer/orgunits/Engineering?fields=orgUnitPath,etag",
+                        Map.of("name", "New Engineering"), json("{\"name\":\"New Engineering\",\"orgUnitPath\":\"/Engineering\",\"etag\":\"ou-v2\"}")),
+                new Exchange("PATCH", "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-1TB/user/ada@example.com",
+                        Map.of("skuId", "Google-Drive-storage-2TB"),
+                        json("{\"productId\":\"Google-Drive-storage\",\"skuId\":\"Google-Drive-storage-2TB\",\"userId\":\"ada@example.com\"}")));
+        GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
         OperationOptionsBuilder options = new OperationOptionsBuilder();
 
-        Uid user = connector.update(ObjectClass.ACCOUNT, new Uid("ada@example.com"),
-                attributes(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")), options.build());
-        Uid group = connector.update(ObjectClass.GROUP, new Uid("engineering@example.com"),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.NAME_ATTR, "Engineering")), options.build());
-        Uid member = connector.update(GoogleAppsConnector.MEMBER,
-                new Uid("engineering@example.com/ada@example.com"),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.ROLE_ATTR, "OWNER")), options.build());
-        Uid orgUnit = connector.update(GoogleAppsConnector.ORG_UNIT, new Uid("Engineering"),
-                attributes(new Name("New Engineering")), options.build());
-        Uid license = connector.update(GoogleAppsConnector.LICENSE_ASSIGNMENT,
-                new Uid("Google-Drive-storage/sku/Google-Drive-storage-1TB/user/ada@example.com"),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, "Google-Drive-storage-2TB")), options.build());
+        try {
+            // When: Apply replacement deltas to each resource
+            Set<AttributeDelta> user = connector.updateDelta(ObjectClass.ACCOUNT, new Uid("ada@example.com"),
+                    Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.GIVEN_NAME_ATTR, "Ada")), options.build());
+            Set<AttributeDelta> group = connector.updateDelta(ObjectClass.GROUP, new Uid("engineering@example.com"),
+                    Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.NAME_ATTR, "Engineering")), options.build());
+            Set<AttributeDelta> member = connector.updateDelta(GoogleAppsConstants.MEMBER, new Uid("engineering@example.com/ada@example.com"),
+                    Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.ROLE_ATTR, "OWNER")), options.build());
+            Set<AttributeDelta> orgUnit = connector.updateDelta(GoogleAppsConstants.ORG_UNIT, new Uid("Engineering"),
+                    Set.of(AttributeDeltaBuilder.build(Name.NAME, "New Engineering")), options.build());
+            Set<AttributeDelta> license = connector.updateDelta(GoogleAppsConstants.LICENSE_ASSIGNMENT,
+                    new Uid("Google-Drive-storage/sku/Google-Drive-storage-1TB/user/ada@example.com"),
+                    Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.SKU_ID_ATTR, "Google-Drive-storage-2TB")), options.build());
 
-        assertEquals(user.getRevision(), "user-v2");
-        assertEquals(group.getRevision(), "group-v2");
-        assertEquals(member.getUidValue(), "engineering@example.com/ada@example.com");
-        assertEquals(member.getRevision(), "member-v2");
-        assertEquals(orgUnit.getRevision(), "ou-v2");
-        assertEquals(license.getUidValue(), "Google-Drive-storage/sku/Google-Drive-storage-2TB/user/ada@example.com");
-        assertEquals(transport.requestCount, 5);
-        connector.dispose();
+            // Then: Verify requests and returned side effects
+            assertEquals(user, Set.of());
+            assertEquals(group, Set.of());
+            assertEquals(member, Set.of());
+            assertEquals(orgUnit, Set.of());
+            assertEquals(license, Set.of());
+            assertEquals(transport.requestCount, 5);
+            assertTrue(transport.exchanges.isEmpty());
+        } finally {
+            connector.dispose();
+        }
     }
 
     @Test
     public void deleteOperationsTreatGoogleNotFoundAsUnknownUid() {
+        // Given: Missing resources for every deletion type
         ScriptedTransport transport = new ScriptedTransport(notFound(), notFound(), notFound(), notFound(), notFound());
         GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
         OperationOptionsBuilder options = new OperationOptionsBuilder();
 
+        // When: Delete resources absent from Google
+        // Then: Report unknown identities for each request
         expectThrows(UnknownUidException.class,
                 () -> connector.delete(ObjectClass.ACCOUNT, new Uid("missing@example.com"), options.build()));
         expectThrows(UnknownUidException.class,
                 () -> connector.delete(ObjectClass.GROUP, new Uid("missing-group"), options.build()));
         expectThrows(UnknownUidException.class,
-                () -> connector.delete(GoogleAppsConnector.MEMBER,
+                () -> connector.delete(GoogleAppsConstants.MEMBER,
                         new Uid("group@example.com/missing@example.com"), options.build()));
         expectThrows(UnknownUidException.class,
-                () -> connector.delete(GoogleAppsConnector.ORG_UNIT, new Uid("Missing"), options.build()));
+                () -> connector.delete(GoogleAppsConstants.ORG_UNIT, new Uid("Missing"), options.build()));
         expectThrows(UnknownUidException.class,
-                () -> connector.delete(GoogleAppsConnector.LICENSE_ASSIGNMENT,
+                () -> connector.delete(GoogleAppsConstants.LICENSE_ASSIGNMENT,
                         new Uid("Google-Drive-storage/sku/Google-Drive-storage-1TB/user/missing@example.com"), options.build()));
 
         assertEquals(transport.requestCount, 5);
@@ -198,22 +229,30 @@ public class GoogleAppsConnectorOperationsTest {
 
     @Test
     public void accountReadNotFoundIsHandledAndUnsupportedMemberSearchThrows() {
+        // Given: Missing account and unsupported member search
         ScriptedTransport transport = new ScriptedTransport(notFound());
         GoogleAppsConnector connector = connector(new LocalConfiguration(transport));
-        ResultsHandler handler = object -> true;
+        List<ConnectorObject> results = new ArrayList<>();
         OperationOptionsBuilder options = new OperationOptionsBuilder();
 
-        connector.executeQuery(ObjectClass.ACCOUNT,
-                FilterBuilder.equalTo(AttributeBuilder.build(Uid.NAME, "missing@example.com")),
-                handler, options.build());
-        expectThrows(UnsupportedOperationException.class,
-                () -> connector.executeQuery(GoogleAppsConnector.MEMBER, null, handler, options.build()));
-        assertEquals(transport.requestCount, 1);
-        connector.dispose();
+        try {
+            // When: Read the missing account
+            connector.executeQuery(ObjectClass.ACCOUNT, new GoogleFilter(new Uid("missing@example.com")), results::add, options.build());
+
+            // Then: Return nothing and reject member enumeration
+            expectThrows(InvalidAttributeValueException.class,
+                    () -> connector.executeQuery(GoogleAppsConstants.MEMBER, null, results::add, options.build()));
+            assertTrue(results.isEmpty());
+            assertEquals(transport.requestCount, 1);
+            assertTrue(transport.responses.isEmpty());
+        } finally {
+            connector.dispose();
+        }
     }
 
     @Test
     public void accountGroupMemberAndOrgUnitSearchesMapGoogleResponses() {
+        // Given: Search responses for directory resources
         ScriptedTransport transport = new ScriptedTransport(
                 json("{\"users\":[{\"id\":\"ada@example.com\",\"etag\":\"user-v1\",\"primaryEmail\":\"ada@example.com\",\"name\":{\"givenName\":\"Ada\"}}]}"),
                 json("{\"groups\":[{\"id\":\"engineering@example.com\",\"etag\":\"group-v1\",\"email\":\"engineering@example.com\",\"name\":\"Engineering\"}]}"),
@@ -225,34 +264,39 @@ public class GoogleAppsConnectorOperationsTest {
         List<ConnectorObject> members = new ArrayList<>();
         List<ConnectorObject> orgUnits = new ArrayList<>();
 
+        // When: Query each resource type
         connector.executeQuery(ObjectClass.ACCOUNT,
-                FilterBuilder.startsWith(AttributeBuilder.build(Name.NAME, "ada")), users::add,
-                new OperationOptionsBuilder().setAttributesToGet(UserHandler.GIVEN_NAME_ATTR).build());
+                new GoogleFilter(FilterBuilder.startsWith(AttributeBuilder.build(Name.NAME, "ada"))), users::add,
+                new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.GIVEN_NAME_ATTR).build());
         connector.executeQuery(ObjectClass.GROUP,
-                FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, "ada@example.com")),
-                groups::add, new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConnector.NAME_ATTR).build());
-        connector.executeQuery(GoogleAppsConnector.MEMBER,
-                FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConnector.GROUP_KEY_ATTR,
-                        "engineering@example.com")), members::add, new OperationOptionsBuilder().build());
-        connector.executeQuery(GoogleAppsConnector.ORG_UNIT, null, orgUnits::add,
-                new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).build());
+                new GoogleFilter(FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, "ada@example.com"))),
+                groups::add, new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.NAME_ATTR).build());
+        connector.executeQuery(GoogleAppsConstants.MEMBER,
+                new GoogleFilter(FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConstants.GROUP_KEY_ATTR, "engineering@example.com"))),
+                members::add, new OperationOptionsBuilder().build());
+        connector.executeQuery(GoogleAppsConstants.ORG_UNIT, null, orgUnits::add,
+                new OperationOptionsBuilder().setAttributesToGet(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).build());
 
+        // Then: Verify returned identities and requested attributes
         assertEquals(users.size(), 1);
         assertEquals(users.get(0).getUid().getUidValue(), "ada@example.com");
-        assertEquals(users.get(0).getAttributeByName(UserHandler.GIVEN_NAME_ATTR).getValue().get(0), "Ada");
+        assertEquals(users.get(0).getAttributeByName(GoogleAppsConstants.GIVEN_NAME_ATTR).getValue().get(0), "Ada");
         assertEquals(groups.size(), 1);
         assertEquals(groups.get(0).getUid().getUidValue(), "engineering@example.com");
         assertEquals(members.size(), 1);
-        assertEquals(members.get(0).getObjectClass(), GoogleAppsConnector.MEMBER);
+        assertEquals(members.get(0).getObjectClass(), GoogleAppsConstants.MEMBER);
         assertEquals(orgUnits.size(), 1);
         assertEquals(orgUnits.get(0).getUid().getUidValue(), "Engineering");
         assertEquals(transport.requestCount, 4);
+        assertTrue(transport.responses.isEmpty());
         connector.dispose();
     }
 
     @Test
     public void testOperationAndUidReadsCoverEachDirectoryResource() {
+        // Given: Connection and directory resource responses
         ScriptedTransport transport = new ScriptedTransport(
+                json("{\"users\":[]}"),
                 json("{\"id\":\"ada@example.com\",\"etag\":\"user-read\",\"primaryEmail\":\"ada@example.com\",\"name\":{\"givenName\":\"Ada\"}}"),
                 json("{\"id\":\"engineering@example.com\",\"etag\":\"group-read\",\"email\":\"engineering@example.com\",\"name\":\"Engineering\"}"),
                 json("{\"id\":\"member-read\",\"etag\":\"member-read\",\"email\":\"ada@example.com\",\"role\":\"MEMBER\",\"type\":\"USER\"}"),
@@ -264,26 +308,28 @@ public class GoogleAppsConnectorOperationsTest {
         List<ConnectorObject> members = new ArrayList<>();
         List<ConnectorObject> orgUnits = new ArrayList<>();
 
+        // When: Check connection and read directory resources
         connector.test();
         connector.executeQuery(ObjectClass.ACCOUNT,
-                FilterBuilder.equalTo(AttributeBuilder.build(Uid.NAME, "ada@example.com")),
-                users::add, options.setAttributesToGet(UserHandler.GIVEN_NAME_ATTR).build());
+                new GoogleFilter(new Uid("ada@example.com")),
+                users::add, options.setAttributesToGet(GoogleAppsConstants.GIVEN_NAME_ATTR).build());
         connector.executeQuery(ObjectClass.GROUP,
-                FilterBuilder.equalTo(AttributeBuilder.build(Uid.NAME, "engineering@example.com")),
-                groups::add, options.setAttributesToGet(GoogleAppsConnector.NAME_ATTR).build());
-        connector.executeQuery(GoogleAppsConnector.MEMBER,
-                FilterBuilder.equalTo(AttributeBuilder.build(Uid.NAME,
-                        "engineering@example.com/ada@example.com")), members::add, options.build());
-        connector.executeQuery(GoogleAppsConnector.ORG_UNIT,
-                FilterBuilder.equalTo(AttributeBuilder.build(Uid.NAME, "Engineering")),
-                orgUnits::add, options.setAttributesToGet(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).build());
+                new GoogleFilter(new Uid("engineering@example.com")),
+                groups::add, options.setAttributesToGet(GoogleAppsConstants.NAME_ATTR).build());
+        connector.executeQuery(GoogleAppsConstants.MEMBER,
+                new GoogleFilter(new Uid("engineering@example.com/ada@example.com")), members::add, options.build());
+        connector.executeQuery(GoogleAppsConstants.ORG_UNIT,
+                new GoogleFilter(new Uid("Engineering")),
+                orgUnits::add, options.setAttributesToGet(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).build());
 
+        // Then: Verify returned identities and requested attributes
         assertEquals(users.size(), 1);
         assertEquals(users.get(0).getUid().getUidValue(), "ada@example.com");
         assertEquals(groups.size(), 1);
         assertEquals(members.size(), 1);
         assertEquals(orgUnits.size(), 1);
-        assertEquals(transport.requestCount, 4);
+        assertEquals(transport.requestCount, 5);
+        assertTrue(transport.responses.isEmpty());
         connector.dispose();
     }
 
@@ -322,17 +368,57 @@ public class GoogleAppsConnectorOperationsTest {
                         + "\",\"message\":\"" + message + "\"}]}}");
     }
 
+    private static final class Exchange {
+        private final String method;
+        private final String url;
+        private final Map<String, ?> content;
+        private final MockLowLevelHttpResponse response;
+
+        private Exchange(String url, Map<String, String> content, MockLowLevelHttpResponse response) {
+            this("POST", url, content, response);
+        }
+
+        private Exchange(String method, String url, Map<String, ?> content, MockLowLevelHttpResponse response) {
+            this.method = method;
+            this.url = url;
+            this.content = content;
+            this.response = response;
+        }
+    }
+
     private static final class ScriptedTransport extends MockHttpTransport {
         private final Queue<MockLowLevelHttpResponse> responses = new ArrayDeque<>();
+        private final Queue<Exchange> exchanges = new ArrayDeque<>();
+        private final boolean strict;
         private int requestCount;
 
         private ScriptedTransport(MockLowLevelHttpResponse... responses) {
             this.responses.addAll(Arrays.asList(responses));
+            strict = false;
+        }
+
+        private ScriptedTransport(Exchange exchange, Exchange... exchanges) {
+            this.exchanges.add(exchange);
+            this.exchanges.addAll(Arrays.asList(exchanges));
+            strict = true;
         }
 
         @Override
         public LowLevelHttpRequest buildRequest(String method, String url) throws IOException {
             requestCount++;
+            if (strict) {
+                assertFalse(exchanges.isEmpty(), "Unexpected request: " + method + " " + url);
+                Exchange exchange = exchanges.remove();
+                assertEquals(method, exchange.method);
+                assertEquals(url, exchange.url);
+                return new MockLowLevelHttpRequest(url) {
+                    @Override
+                    public LowLevelHttpResponse execute() throws IOException {
+                        assertEquals(new GsonFactory().fromString(getContentAsString(), Map.class), exchange.content);
+                        return exchange.response;
+                    }
+                };
+            }
             if (responses.isEmpty()) {
                 throw new IOException("No scripted response for " + method + " " + url);
             }
