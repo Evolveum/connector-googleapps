@@ -127,10 +127,11 @@ public class GoogleAppsUtilTest {
         Collection<?> serialized = (Collection<?>) GoogleAppsUtil.structAttrToString(
                 Arrays.asList(value, nullValue, emptyValue, "plain"));
 
-        assertEquals(serialized.size(), 2);
-        assertTrue(serialized.contains("{\"type\"=\"work\",\"value\"=\"+421123\"}"));
+        assertEquals(serialized.size(), 4);
+        assertTrue(serialized.contains("{\"type\":\"work\",\"value\":\"+421123\"}"));
+        assertTrue(serialized.contains("{\"value\":\"null\"}"));
+        assertTrue(serialized.contains("{\"value\":\"\"}"));
         assertTrue(serialized.contains("plain"));
-        assertTrue(((Collection<?>) GoogleAppsUtil.structAttrToString(Arrays.asList(nullValue, emptyValue))).isEmpty());
         assertNull(GoogleAppsUtil.structAttrToString(List.of()));
     }
 
