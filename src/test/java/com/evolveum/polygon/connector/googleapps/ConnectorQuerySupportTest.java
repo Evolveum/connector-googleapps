@@ -69,7 +69,7 @@ public class ConnectorQuerySupportTest {
     @Test
     public void noRequestedFieldsMeansNoFieldsProjection() {
         assertNull(connector.getAttributesToGet(ObjectClass.ACCOUNT, new OperationOptionsBuilder().build()));
-        assertNull(connector.getFields(new OperationOptionsBuilder().build(), GoogleAppsConnector.ID_ATTR));
+        assertNull(connector.getFields(ObjectClass.ACCOUNT, new OperationOptionsBuilder().build(), GoogleAppsConnector.ID_ATTR));
     }
 
     @Test
@@ -82,7 +82,7 @@ public class ConnectorQuerySupportTest {
         assertEquals(connector.googleName(ObjectClass.GROUP, Name.NAME), GoogleAppsConnector.EMAIL_ATTR);
         assertEquals(connector.googleName(ObjectClass.ACCOUNT, PredefinedAttributes.DESCRIPTION), GoogleAppsConnector.DESCRIPTION_ATTR);
 
-        String fields = connector.getFields(options, GoogleAppsConnector.ID_ATTR);
+        String fields = connector.getFields(ObjectClass.ACCOUNT, options, GoogleAppsConnector.ID_ATTR);
         assertTrue(fields.contains(GoogleAppsConnector.ID_ATTR));
         assertTrue(fields.contains(GoogleAppsConnector.DESCRIPTION_ATTR));
         assertTrue(fields.contains("name/familyName"));
@@ -130,7 +130,7 @@ public class ConnectorQuerySupportTest {
                         GoogleAppsConnector.FULL_NAME_ATTR, "customAttribute")
                 .build();
 
-        String fields = connector.getFields(options, GoogleAppsConnector.ID_ATTR);
+        String fields = connector.getFields(ObjectClass.ACCOUNT, options, GoogleAppsConnector.ID_ATTR);
 
         assertTrue(fields.contains(GoogleAppsConnector.ID_ATTR));
         assertTrue(fields.contains("name/givenName"));
