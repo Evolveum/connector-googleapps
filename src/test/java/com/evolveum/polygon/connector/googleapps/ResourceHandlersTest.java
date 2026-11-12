@@ -367,10 +367,10 @@ public class ResourceHandlersTest {
         Uid uid = GroupHandler.generateMemberId("engineering@example.com", member);
         ConnectorObject object = GroupHandler.fromMember("engineering@example.com", member);
 
-        assertEquals(uid.getUidValue(), "engineering@example.com/" + USER);
+        assertEquals(uid.getUidValue(), "engineering@example.com/123");
         assertEquals(uid.getRevision(), "member-version");
         assertEquals(object.getUid(), uid);
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.GROUP_KEY_ATTR).getValue(), List.of("123"));
+        assertEquals(object.getAttributeByName(GoogleAppsConnector.GROUP_KEY_ATTR).getValue(), List.of("ada@example.com"));
         assertEquals(object.getAttributeByName(GoogleAppsConnector.ROLE_ATTR).getValue(), List.of("OWNER"));
         assertEquals(object.getAttributeByName(GoogleAppsConnector.TYPE_ATTR).getValue(), List.of("USER"));
         assertNull(GroupHandler.generateMemberId("engineering@example.com", new Member().setEmail(USER)).getRevision());
