@@ -16,8 +16,9 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.licensing.Licensing;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
@@ -25,11 +26,14 @@ import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueE
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
 import org.identityconnectors.framework.common.objects.Name;
 import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
 import org.identityconnectors.framework.common.objects.ResultsHandler;
 import org.identityconnectors.framework.common.objects.Uid;
+import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
@@ -44,9 +48,12 @@ public class ConnectorExceptionPathsTest {
 
     @Test
     public void createOperationsRejectMissingRequiredAttributes() {
+        // Given: Resource inputs missing mandatory attributes
         GoogleAppsConnector connector = connector();
         OperationOptionsBuilder options = new OperationOptionsBuilder();
 
+        // When: Create resources with incomplete input
+        // Then: Reject inputs before issuing API requests
         expectThrows(InvalidAttributeValueException.class,
                 () -> connector.create(ObjectClass.ACCOUNT, attributes(new Name("user@example.com")), options.build()));
         expectThrows(InvalidAttributeValueException.class,
@@ -55,7 +62,7 @@ public class ConnectorExceptionPathsTest {
                 () -> connector.create(GoogleAppsConnector.MEMBER, attributes(), options.build()));
         expectThrows(InvalidAttributeValueException.class,
                 () -> connector.create(GoogleAppsConnector.ORG_UNIT,
-                        attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "/")), options.build()));
+                        attributes(AttributeBuilder.build(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "/")), options.build()));
         expectThrows(InvalidAttributeValueException.class,
                 () -> connector.create(GoogleAppsConnector.LICENSE_ASSIGNMENT, attributes(), options.build()));
 
@@ -64,51 +71,70 @@ public class ConnectorExceptionPathsTest {
 
     @Test
     public void updateAndDeleteOperationsRejectMalformedInputBeforeApiExecution() {
+        // Given: Single-valued additions and malformed resource identifiers
         GoogleAppsConnector connector = connector();
         OperationOptionsBuilder options = new OperationOptionsBuilder();
 
-        expectThrows(InvalidAttributeValueException.class,
-                () -> connector.update(ObjectClass.ACCOUNT, new Uid("user@example.com"),
-                        attributes(AttributeBuilder.build(UserHandler.SUSPENDED_ATTR, "sometimes")), options.build()));
-        expectThrows(InvalidAttributeValueException.class,
-                () -> connector.update(ObjectClass.GROUP, new Uid("group@example.com"),
-                        attributes(new Name(" ")), options.build()));
-        expectThrows(InvalidAttributeValueException.class,
-                () -> connector.update(GoogleAppsConnector.ORG_UNIT, new Uid("Engineering"),
-                        attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, " ")), options.build()));
-        expectThrows(UnknownUidException.class,
-                () -> connector.update(GoogleAppsConnector.MEMBER, new Uid("bad-member-id"),
-                        attributes(AttributeBuilder.build(GoogleAppsConnector.ROLE_ATTR, "MANAGER")), options.build()));
-        expectThrows(UnknownUidException.class,
-                () -> connector.update(GoogleAppsConnector.LICENSE_ASSIGNMENT, new Uid("bad-license-id"),
-                        attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, "replacement")), options.build()));
-        expectThrows(UnknownUidException.class,
-                () -> connector.delete(GoogleAppsConnector.MEMBER, new Uid("bad-member-id"), options.build()));
-
-        connector.dispose();
+        try {
+            // When: Update or delete invalid resources
+            // Then: Reject input before issuing requests
+            expectThrows(InvalidAttributeValueException.class,
+                    () -> connector.updateDelta(ObjectClass.ACCOUNT, new Uid("user@example.com"),
+                            Set.of(addition(GoogleAppsConstants.SUSPENDED_ATTR, true)), options.build()));
+            expectThrows(InvalidAttributeValueException.class,
+                    () -> connector.updateDelta(ObjectClass.GROUP, new Uid("group@example.com"),
+                            Set.of(addition(GoogleAppsConstants.NAME_ATTR, "Engineering")), options.build()));
+            expectThrows(InvalidAttributeValueException.class,
+                    () -> connector.updateDelta(GoogleAppsConnector.ORG_UNIT, new Uid("Engineering"),
+                            Set.of(addition(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "/Engineering")), options.build()));
+            expectThrows(UnknownUidException.class,
+                    () -> connector.updateDelta(GoogleAppsConnector.MEMBER, new Uid("bad-member-id"),
+                            Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.ROLE_ATTR, "MANAGER")), options.build()));
+            expectThrows(UnknownUidException.class,
+                    () -> connector.updateDelta(GoogleAppsConnector.LICENSE_ASSIGNMENT, new Uid("bad-license-id"),
+                            Set.of(AttributeDeltaBuilder.build(GoogleAppsConstants.SKU_ID_ATTR, "replacement")), options.build()));
+            expectThrows(UnknownUidException.class,
+                    () -> connector.delete(GoogleAppsConnector.MEMBER, new Uid("bad-member-id"), options.build()));
+        } finally {
+            connector.dispose();
+        }
     }
 
     @Test
     public void queryOperationsRejectMalformedMemberUidAndUnsupportedSearchButIgnoreUnknownLicenseUid() {
+        // Given: Invalid identifiers and unsupported resource searches
         GoogleAppsConnector connector = connector();
-        ResultsHandler handler = object -> true;
+        ResultsHandler handler = object -> {
+            throw new AssertionError("Unexpected search result: " + object);
+        };
         OperationOptionsBuilder options = new OperationOptionsBuilder();
+        GoogleFilter member = new GoogleFilter(FilterBuilder.equalTo(new Uid("bad-member-id")));
+        GoogleFilter license = new GoogleFilter(new Uid("bad-license-id"));
 
-        expectThrows(InvalidAttributeValueException.class,
-                () -> connector.executeQuery(GoogleAppsConnector.MEMBER,
-                        org.identityconnectors.framework.common.objects.filter.FilterBuilder.equalTo(
-                                AttributeBuilder.build(Uid.NAME, "bad-member-id")), handler, options.build()));
-        expectThrows(UnsupportedOperationException.class,
-                () -> connector.executeQuery(GoogleAppsConnector.MEMBER, null, handler, options.build()));
-        ConnectorException missingProduct = expectThrows(ConnectorException.class,
-                () -> connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT, null, handler, options.build()));
-        assertTrue(missingProduct.getMessage().contains("productId is required"));
+        try {
+            // When: Execute invalid resource queries
+            // Then: Reject invalid searches without returning objects
+            expectThrows(InvalidAttributeValueException.class,
+                    () -> connector.executeQuery(GoogleAppsConnector.MEMBER, member, handler, options.build()));
+            expectThrows(InvalidAttributeValueException.class,
+                    () -> connector.executeQuery(GoogleAppsConnector.MEMBER, null, handler, options.build()));
+            ConnectorException missingProduct = expectThrows(ConnectorException.class,
+                    () -> connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT, null, handler, options.build()));
+            assertTrue(missingProduct.getMessage().contains("productId is required"));
 
-        // An unrecognized assignment UID is deliberately treated as a not-found read and must not call Google.
-        connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT,
-                org.identityconnectors.framework.common.objects.filter.FilterBuilder.equalTo(
-                        AttributeBuilder.build(Uid.NAME, "bad-license-id")), handler, options.build());
-        connector.dispose();
+            // Unrecognized assignment identifiers represent missing resources.
+            connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT, license, handler, options.build());
+            connector.executeQuery(GoogleAppsConnector.MEMBER, new GoogleFilter(new Uid("bad-member-id")), handler, options.build());
+        } finally {
+            connector.dispose();
+        }
+    }
+
+    private static AttributeDelta addition(String name, Object value) {
+        AttributeDeltaBuilder builder = new AttributeDeltaBuilder();
+        builder.setName(name);
+        builder.addValueToAdd(value);
+        return builder.build();
     }
 
     private static GoogleAppsConnector connector() {
@@ -122,10 +148,16 @@ public class ConnectorExceptionPathsTest {
     }
 
     private static final class LocalConfiguration extends GoogleAppsConfiguration {
-        private final Directory directory = new Directory.Builder(new NetHttpTransport(), new GsonFactory(), request -> { })
+        private final MockHttpTransport transport = new MockHttpTransport() {
+            @Override
+            public LowLevelHttpRequest buildRequest(String method, String url) {
+                throw new AssertionError("Unexpected API request: " + method + " " + url);
+            }
+        };
+        private final Directory directory = new Directory.Builder(transport, new GsonFactory(), request -> { })
                 .setApplicationName("connector-googleapps-test")
                 .build();
-        private final Licensing licensing = new Licensing.Builder(new NetHttpTransport(), new GsonFactory(), request -> { })
+        private final Licensing licensing = new Licensing.Builder(transport, new GsonFactory(), request -> { })
                 .setApplicationName("connector-googleapps-test")
                 .build();
 
