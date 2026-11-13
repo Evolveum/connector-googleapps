@@ -9,7 +9,9 @@ import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 
 /**
  * WireMock-based Google API mock server
@@ -101,13 +103,20 @@ public class GoogleApiMockServer {
     }
 
     /**
-     * Reset requests and stubs, then restore the shared OAuth endpoint
+     * Helper method to reset request history
      */
-    public static void reset() {
+    public static void resetRequests() {
         if (wireMockServer != null) {
             wireMockServer.resetAll();
             setupEssentialEndpoints();
         }
+    }
+
+    /**
+    Fails when a test sends a request without a matching stub.
+    */
+    public static void verifyMatched() {
+        org.assertj.core.api.Assertions.assertThat(wireMockServer.findAllUnmatchedRequests()).as("Unmatched API requests").isEmpty();
     }
 
     /**

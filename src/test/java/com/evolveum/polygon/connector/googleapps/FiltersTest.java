@@ -27,136 +27,163 @@ import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.expectThrows;
 
 public class FiltersTest {
 
     @Test
     public void userFiltersTranslateValuesAndEscapeWhitespaceAndQuotes() throws Exception {
+        // Given: Names containing whitespace and apostrophes
         Directory.Users.List request = directory().users().list();
         Filter startsWith = FilterBuilder.startsWith(AttributeBuilder.build(Name.NAME, "Ada Lovelace"));
-        Filter equals = FilterBuilder.equalTo(AttributeBuilder.build(UserHandler.FAMILY_NAME_ATTR, "O'Connor"));
+        Filter equals = FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConstants.FAMILY_NAME_ATTR, "O'Connor"));
+        Filter quoted = FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConstants.FAMILY_NAME_ATTR, "Anne O'Connor"));
 
-        String startsWithQuery = startsWith.accept(new UserHandler(), request).toString();
-        String equalsQuery = equals.accept(new UserHandler(), request).toString();
+        // When: Build Google search queries
+        String startsWithQuery = new GoogleFilter(startsWith).buildUserQuery(request);
+        String equalsQuery = new GoogleFilter(equals).buildUserQuery(request);
+        String quotedQuery = new GoogleFilter(quoted).buildUserQuery(request);
 
+        // Then: Verify quoting and apostrophe escaping
         assertEquals(startsWithQuery, "email:'Ada Lovelace*'");
         assertEquals(equalsQuery, "familyName=O\\'Connor");
+        assertEquals(quotedQuery, "familyName='Anne O\\'Connor'");
     }
 
     @Test
     public void userFiltersSetCustomerOrDomainButNotBoth() throws Exception {
+        // Given: Mutually exclusive customer and domain filters
         Directory.Users.List request = directory().users().list();
-        Filter customer = FilterBuilder.equalTo(AttributeBuilder.build("customer", "my_customer"));
-        Filter domain = FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"));
+        GoogleFilter customer = new GoogleFilter(FilterBuilder.equalTo(AttributeBuilder.build("customer", "my_customer")));
+        GoogleFilter domain = new GoogleFilter(FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com")));
 
-        customer.accept(new UserHandler(), request);
+        // When: Apply the customer filter
+        String query = customer.buildUserQuery(request);
+
+        // Then: Reject the conflicting domain filter
+        assertNull(query);
         assertEquals(request.getCustomer(), "my_customer");
-        expectThrows(InvalidAttributeValueException.class, () -> domain.accept(new UserHandler(), request));
+        expectThrows(InvalidAttributeValueException.class, () -> domain.buildUserQuery(request));
+        assertNull(request.getDomain());
     }
 
     @Test
     public void groupMemberFilterUsesUserKey() throws Exception {
+        // Given: A group membership search filter
         Directory.Groups.List request = directory().groups().list();
-        Filter members = FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, "ada@example.com"));
+        Filter members = FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, "ada@example.com"));
 
-        members.accept(new GroupHandler(), request);
+        // When: Configure the group search request
+        new GoogleFilter(members).configureGroupRequest(request);
 
+        // Then: Select groups using the member key
         assertEquals(request.getUserKey(), "ada@example.com");
+        assertNull(request.getCustomer());
+        assertNull(request.getDomain());
     }
 
     @Test
     public void groupFiltersRejectMutuallyExclusiveSelectionCriteria() throws Exception {
+        // Given: Mutually exclusive customer and member filters
         Directory.Groups.List request = directory().groups().list();
         Filter customer = FilterBuilder.equalTo(AttributeBuilder.build("customer", "my_customer"));
         Filter userKey = FilterBuilder.equalTo(AttributeBuilder.build("userKey", "ada@example.com"));
 
-        customer.accept(new GroupHandler(), request);
-        expectThrows(InvalidAttributeValueException.class, () -> userKey.accept(new GroupHandler(), request));
+        // When: Select groups by customer
+        new GoogleFilter(customer).configureGroupRequest(request);
+
+        // Then: Reject the conflicting member selection
+        expectThrows(InvalidAttributeValueException.class, () -> new GoogleFilter(userKey).configureGroupRequest(request));
+        assertEquals(request.getCustomer(), "my_customer");
+        assertNull(request.getUserKey());
     }
 
     @Test
     public void userFilterVisitorsRejectUnsupportedAttributes() throws Exception {
+        // Given: Unsupported fields for user searches
         Directory.Users.List request = directory().users().list();
-        UserHandler handler = new UserHandler();
+        Filter[] filters = {
+            FilterBuilder.contains(AttributeBuilder.build("unsupported", "x")),
+            FilterBuilder.startsWith(AttributeBuilder.build("unsupported", "x")),
+            FilterBuilder.equalTo(AttributeBuilder.build("unsupported", "x")),
+            FilterBuilder.contains(AttributeBuilder.build("description", "x"))
+        };
 
-        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.contains(
-                AttributeBuilder.build("unsupported", "x")).accept(handler, request));
-        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.startsWith(
-                AttributeBuilder.build("unsupported", "x")).accept(handler, request));
-        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.equalTo(
-                AttributeBuilder.build("unsupported", "x")).accept(handler, request));
-        expectThrows(InvalidAttributeValueException.class, () -> FilterBuilder.contains(
-                AttributeBuilder.build("description", "x")).accept(handler, request));
+        for (Filter filter : filters) {
+            // When: Build a query with unsupported fields
+            // Then: Reject the invalid attribute
+            expectThrows(InvalidAttributeValueException.class, () -> new GoogleFilter(filter).buildUserQuery(request));
+        }
     }
 
     @Test
     public void groupFilterVisitorsRejectUnsupportedOperatorsAndAttributes() throws Exception {
+        // Given: Unsupported group operators and fields
         Directory.Groups.List request = directory().groups().list();
-        GroupHandler handler = new GroupHandler();
+        Filter[] filters = {
+            FilterBuilder.startsWith(AttributeBuilder.build("domain", "example.com")),
+            FilterBuilder.contains(AttributeBuilder.build("email", "ada@example.com")),
+            FilterBuilder.equalTo(AttributeBuilder.build("email", "ada@example.com"))
+        };
 
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.startsWith(
-                AttributeBuilder.build("domain", "example.com")).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.contains(
-                AttributeBuilder.build("email", "ada@example.com")).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.equalTo(
-                AttributeBuilder.build("email", "ada@example.com")).accept(handler, request));
+        for (Filter filter : filters) {
+            // When: Configure an unsupported group query
+            // Then: Report an invalid filter value
+            expectThrows(InvalidAttributeValueException.class, () -> new GoogleFilter(filter).configureGroupRequest(request));
+        }
     }
 
     @Test
     public void userFilterVisitorsCombineSupportedFiltersAndIgnoreUnsupportedOperators() throws Exception {
+        // Given: Supported conjunction and unsupported operators
         Directory.Users.List request = directory().users().list();
-        UserHandler handler = new UserHandler();
-        Filter conjunction = FilterBuilder.and(
-                FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com")),
-                FilterBuilder.startsWith(AttributeBuilder.build(UserHandler.GIVEN_NAME_ATTR, "Ada")));
+        Filter conjunction = FilterBuilder.and(FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com")),
+                FilterBuilder.startsWith(AttributeBuilder.build(GoogleAppsConstants.GIVEN_NAME_ATTR, "Ada")));
+        Filter base = FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com"));
+        Filter[] unsupported = {
+            FilterBuilder.containsAllValues(AttributeBuilder.build("email", java.util.Arrays.asList("a", "b"))),
+            FilterBuilder.greaterThan(AttributeBuilder.build("customer", "x")),
+            FilterBuilder.greaterThanOrEqualTo(AttributeBuilder.build("customer", "x")),
+            FilterBuilder.lessThan(AttributeBuilder.build("customer", "x")),
+            FilterBuilder.lessThanOrEqualTo(AttributeBuilder.build("customer", "x")), FilterBuilder.not(base),
+            FilterBuilder.or(base, FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "grace@example.com"))),
+            FilterBuilder.endsWith(AttributeBuilder.build(Name.NAME, "example.com")),
+            FilterBuilder.equalsIgnoreCase(AttributeBuilder.build(Name.NAME, "ADA@example.com"))
+        };
 
-        assertEquals(conjunction.accept(handler, request).toString(),
-                "email=ada@example.com givenName:Ada*");
-        assertEquals(FilterBuilder.containsAllValues(AttributeBuilder.build("email",
-                java.util.Arrays.asList("a", "b"))).accept(handler, request), null);
-        assertEquals(FilterBuilder.greaterThan(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
-        assertEquals(FilterBuilder.greaterThanOrEqualTo(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
-        assertEquals(FilterBuilder.lessThan(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
-        assertEquals(FilterBuilder.lessThanOrEqualTo(AttributeBuilder.build("customer", "x")).accept(handler, request), null);
-        assertEquals(FilterBuilder.not(FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com")))
-                .accept(handler, request), null);
-        assertEquals(FilterBuilder.or(
-                FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com")),
-                FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "grace@example.com")))
-                .accept(handler, request), null);
-        assertEquals(FilterBuilder.endsWith(AttributeBuilder.build(Name.NAME, "example.com"))
-                .accept(handler, request), null);
-        assertEquals(FilterBuilder.equalsIgnoreCase(AttributeBuilder.build(Name.NAME, "ADA@example.com"))
-                .accept(handler, request), null);
+        // When: Build the supported search query
+        String query = new GoogleFilter(conjunction).buildUserQuery(request);
+
+        // Then: Combine supported terms without unsupported expressions
+        assertEquals(query, "email=ada@example.com givenName:Ada*");
+        for (Filter filter : unsupported) {
+            assertNull(new GoogleFilter(filter).buildUserQuery(request), filter.toString());
+        }
     }
 
     @Test
     public void groupFilterVisitorsRejectEveryUnsupportedFilterShape() throws Exception {
+        // Given: Unsupported group filter shapes
         Directory.Groups.List request = directory().groups().list();
-        GroupHandler handler = new GroupHandler();
         Filter base = FilterBuilder.equalTo(AttributeBuilder.build("customer", "my_customer"));
+        Filter[] filters = {
+            FilterBuilder.and(base, FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))),
+            FilterBuilder.containsAllValues(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, java.util.Arrays.asList("a", "b"))),
+            FilterBuilder.greaterThan(AttributeBuilder.build("customer", "x")),
+            FilterBuilder.greaterThanOrEqualTo(AttributeBuilder.build("customer", "x")),
+            FilterBuilder.lessThan(AttributeBuilder.build("customer", "x")),
+            FilterBuilder.lessThanOrEqualTo(AttributeBuilder.build("customer", "x")), FilterBuilder.not(base),
+            FilterBuilder.or(base, FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))),
+            FilterBuilder.endsWith(AttributeBuilder.build("domain", "example.com")),
+            FilterBuilder.equalsIgnoreCase(AttributeBuilder.build("domain", "example.com"))
+        };
 
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.and(base,
-                FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.containsAllValues(
-                AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, java.util.Arrays.asList("a", "b")))
-                .accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.greaterThan(
-                AttributeBuilder.build("customer", "x")).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.greaterThanOrEqualTo(
-                AttributeBuilder.build("customer", "x")).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.lessThan(
-                AttributeBuilder.build("customer", "x")).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.lessThanOrEqualTo(
-                AttributeBuilder.build("customer", "x")).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.not(base).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.or(base,
-                FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.endsWith(
-                AttributeBuilder.build("domain", "example.com")).accept(handler, request));
-        expectThrows(UnsupportedOperationException.class, () -> FilterBuilder.equalsIgnoreCase(
-                AttributeBuilder.build("domain", "example.com")).accept(handler, request));
+        for (Filter filter : filters) {
+            // When: Configure an unsupported group query
+            // Then: Reject the entire filter expression
+            expectThrows(InvalidAttributeValueException.class, () -> new GoogleFilter(filter).configureGroupRequest(request));
+        }
     }
 
     private static Directory directory() {

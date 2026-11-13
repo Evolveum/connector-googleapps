@@ -30,7 +30,15 @@ import org.identityconnectors.framework.common.exceptions.AlreadyExistsException
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeValueCompleteness;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.Uid;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -70,11 +78,18 @@ public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientReq
             return null;
         }
         
+    }
+
+    /** A repeated delete is successful when the relationship or photo is already absent. */
+    public static class IgnoreMissing<G extends AbstractGoogleJsonClientRequest, T> extends NoOp<G, T> {
         @Override
         public Object handleNotFound(IOException e) {
             return null;
         }
-        
+    }
+
+    /** Adding an existing membership does not need to change its role. */
+    public static class IgnoreDuplicate<G extends AbstractGoogleJsonClientRequest, T> extends NoOp<G, T> {
         @Override
         public Object handleDuplicate(IOException e) {
             return null;
@@ -187,11 +202,9 @@ public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientReq
     // Utility methods for AttributeDelta processing
     
     /**
-     * Extract single value from AttributeDelta.
-     * For single-valued attributes, only replace operations are supported.
-     * Returns null if the attribute should be cleared (empty list), or the actual value to set.
-     * Common utility for all ObjectClass handlers.
-     */
+    Returns a replacement value, or null when the attribute is cleared.
+    Rejects deltas without replacements and values incompatible with the requested type.
+    */
     public static <T> T getSingleValue(AttributeDelta delta, Class<T> type) {
         List<Object> valuesToReplace = delta.getValuesToReplace();
         if (valuesToReplace == null) {
@@ -204,7 +217,15 @@ public abstract class RequestResultHandler<G extends AbstractGoogleJsonClientReq
         if (valuesToReplace.isEmpty()) {
             return null; // Clear the attribute (empty list means remove all values)
         }
+        if (valuesToReplace.size() != 1) {
+            throw new InvalidAttributeValueException("Single-valued attribute '" + delta.getName()
+                    + "' requires exactly one replacement value or an empty list to clear it.");
+        }
         Object rawValue = valuesToReplace.get(0);
+        if (rawValue != null && !type.isInstance(rawValue)) {
+            throw new InvalidAttributeValueException("Attribute '" + delta.getName()
+                    + "' requires a value of type " + type.getSimpleName() + ".");
+        }
         return rawValue != null ? type.cast(rawValue) : null;
     }
 }
