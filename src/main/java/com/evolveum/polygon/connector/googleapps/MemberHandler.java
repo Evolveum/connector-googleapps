@@ -65,6 +65,8 @@ public class MemberHandler {
     public static ObjectClassInfo getMemberClassInfo() {
         ObjectClassInfoBuilder builder = new ObjectClassInfoBuilder();
         builder.setType(MEMBER.getObjectClassValue());
+        builder.setDescription("A membership relationship linking a user, another group, or a customer domain "
+                + "to a Google Group. It includes the member type and role, such as MEMBER, MANAGER, or OWNER.");
         // groupKey
         builder.addAttributeInfo(AttributeInfoBuilder.define(GROUP_KEY_ATTR).setRequired(true)
                 .build());
