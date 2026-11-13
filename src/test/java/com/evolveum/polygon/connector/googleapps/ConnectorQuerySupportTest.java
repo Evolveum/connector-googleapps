@@ -22,15 +22,18 @@ import org.identityconnectors.framework.common.objects.ObjectClass;
 import org.identityconnectors.framework.common.objects.OperationOptions;
 import org.identityconnectors.framework.common.objects.OperationOptionsBuilder;
 import org.identityconnectors.framework.common.objects.PredefinedAttributes;
+import org.identityconnectors.framework.common.objects.Schema;
 import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.common.objects.filter.Filter;
 import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
 import org.testng.annotations.Test;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -141,17 +144,30 @@ public class ConnectorQuerySupportTest {
 
     @Test
     public void lifecycleSchemaAndFilterTranslationAreUsableWithoutApiCalls() {
+        // Given: Configuration and an account name filter
         GoogleAppsConfiguration configuration = GoogleAppsConfigurationTest.validConfiguration();
-        connector.init(configuration);
-        assertSame(connector.getConfiguration(), configuration);
-        assertTrue(connector.schema().findObjectClassInfo(ObjectClass.ACCOUNT.getObjectClassValue()) != null);
-        assertSame(connector.schema(), connector.schema());
-
         Filter filter = FilterBuilder.equalTo(AttributeBuilder.build(Name.NAME, "ada@example.com"));
-        assertEquals(connector.createFilterTranslator(ObjectClass.ACCOUNT, new OperationOptionsBuilder().build())
-                .translate(filter).get(0), filter);
 
-        connector.dispose();
+        // When: Initialize and translate the query
+        connector.init(configuration);
+        try {
+            Schema schema = connector.schema();
+            List<GoogleFilter> queries = connector.createFilterTranslator(ObjectClass.ACCOUNT, new OperationOptionsBuilder().build()).translate(filter);
+
+            // Then: Verify schema and direct name lookup
+            assertSame(connector.getConfiguration(), configuration);
+            assertNotNull(schema.findObjectClassInfo(ObjectClass.ACCOUNT.getObjectClassValue()));
+            assertSame(connector.schema(), schema);
+            assertEquals(queries.size(), 1);
+            GoogleFilter query = queries.get(0);
+            assertTrue(query.isReadByName());
+            assertEquals(query.getName(), new Name("ada@example.com"));
+            assertNull(query.getUid());
+            assertNull(query.getFilter());
+            assertFalse(query.hasSearchQuery());
+        } finally {
+            connector.dispose();
+        }
         assertNull(connector.getConfiguration());
     }
 }
