@@ -16,8 +16,13 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpRequest;
+import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Member;
 import com.google.api.services.directory.model.OrgUnit;
@@ -26,6 +31,7 @@ import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentInsert;
 import org.identityconnectors.common.security.GuardedString;
+import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
@@ -41,6 +47,7 @@ import org.identityconnectors.framework.common.objects.Uid;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -54,6 +61,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 public class ResourceHandlersTest {
 
@@ -63,27 +71,38 @@ public class ResourceHandlersTest {
 
     @Test
     public void createMemberAppliesDefaultRoleAndRequiredKeys() {
-        Directory.Members.Insert request = GroupHandler.createMember(directory().members(),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.GROUP_KEY_ATTR, "engineering@example.com"),
-                        AttributeBuilder.build(GoogleAppsConnector.EMAIL_ATTR, USER)));
+        // Given: Membership attributes without an explicit role
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(GROUP_KEY_ATTR, "engineering@example.com"), AttributeBuilder.build(EMAIL_ATTR, USER));
 
+        // When: Build the membership creation request
+        Directory.Members.Insert request = MemberHandler.createMember(directory().members(), attributes);
+
+        // Then: Preserve required keys and omit defaults
         Member content = (Member) request.getJsonContent();
         assertEquals(request.getGroupKey(), "engineering@example.com");
         assertEquals(content.getEmail(), USER);
-        assertEquals(content.getRole(), "MEMBER");
-        assertEquals(request.getFields(), GoogleAppsConnector.EMAIL_ETAG);
+        assertNull(content.getRole());
+        assertNull(request.getFields());
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createMemberRequiresGroupKey() {
-        GroupHandler.createMember(directory().members(),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.EMAIL_ATTR, USER)));
+        // Given: Membership attributes without a group key
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(EMAIL_ATTR, USER));
+
+        // When: Build the membership creation request
+        // Then: Reject the missing group key
+        MemberHandler.createMember(directory().members(), attributes);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createMemberRequiresMemberKey() {
-        GroupHandler.createMember(directory().members(),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.GROUP_KEY_ATTR, "engineering@example.com")));
+        // Given: Membership attributes without a member email
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(GROUP_KEY_ATTR, "engineering@example.com"));
+
+        // When: Build the membership creation request
+        // Then: Reject the missing member email
+        MemberHandler.createMember(directory().members(), attributes);
     }
 
     @Test
@@ -329,29 +348,54 @@ public class ResourceHandlersTest {
     }
 
     @Test
-    public void groupRequestMappingsBuildAndSkipEmptyPatch() {
-        Directory.Groups.Insert insert = GroupHandler.createGroup(directory().groups(),
-                attributes(new Name("engineering@example.com"),
-                        AttributeBuilder.build(GoogleAppsConnector.NAME_ATTR, "Engineering"),
-                        AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, "Team")));
-        com.google.api.services.directory.model.Group insertBody =
-                (com.google.api.services.directory.model.Group) insert.getJsonContent();
-        assertEquals(insertBody.getEmail(), "engineering@example.com");
-        assertEquals(insertBody.getName(), "Engineering");
-        assertEquals(insertBody.getDescription(), "Team");
-        assertEquals(insert.getFields(), GoogleAppsConnector.ID_ETAG);
+    public void groupRequestMappingsBuildAndSkipEmptyPatch() throws Exception {
+        // Given: Group attributes and a description replacement
+        AttributesAccessor attributes = attributes(new Name("engineering@example.com"), AttributeBuilder.build(NAME_ATTR, "Engineering"),
+                AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, "Team"));
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PredefinedAttributes.DESCRIPTION, "New description"));
 
-        assertNull(GroupHandler.updateGroup(directory().groups(), "engineering@example.com", attributes()));
-        Directory.Groups.Patch patch = GroupHandler.updateGroup(directory().groups(), "engineering@example.com",
-                attributes(AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, "New description")));
-        assertNotNull(patch);
-        assertEquals(((com.google.api.services.directory.model.Group) patch.getJsonContent()).getDescription(),
-                "New description");
+        // When: Create and update the group
+        Directory.Groups.Insert insert = GroupHandler.createGroup(directory().groups(), attributes);
+        Set<AttributeDelta> unchanged = GroupHandler.executeGroupUpdateDelta(executor, new Uid("engineering@example.com"), Set.of());
+        Set<AttributeDelta> updated = GroupHandler.executeGroupUpdateDelta(executor, new Uid("engineering@example.com"), modifications);
+
+        // Then: Verify contents and skip empty updates
+        com.google.api.services.directory.model.Group content = (com.google.api.services.directory.model.Group) insert.getJsonContent();
+        assertEquals(content.getEmail(), "engineering@example.com");
+        assertEquals(content.getName(), "Engineering");
+        assertEquals(content.getDescription(), "Team");
+        assertEquals(insert.getFields(), ID_ETAG);
+        assertEquals(unchanged, Set.of());
+        assertEquals(updated, Set.of());
+        assertEquals(transport.methods, List.of("PATCH"));
+        assertEquals(transport.requests.size(), 1);
+        MockLowLevelHttpRequest request = transport.requests.get(0);
+        assertEquals(request.getUrl(), "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com");
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("description", "New description"));
     }
 
-    @Test(expectedExceptions = InvalidAttributeValueException.class)
-    public void groupUpdateRejectsBlankPrimaryEmail() {
-        GroupHandler.updateGroup(directory().groups(), "engineering@example.com", attributes(new Name(" ")));
+    @Test
+    public void groupUpdateRejectsBlankPrimaryEmail() throws Exception {
+        // Given: Blank email rejected by Directory API
+        RecordingTransport transport = new RecordingTransport(400,
+                "{\"error\":{\"code\":400,\"message\":\"Invalid email\",\"errors\":[{\"reason\":\"invalid\",\"message\":\"Invalid email\"}]}}");
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(Name.NAME, " "));
+
+        // When: Update the group's primary email
+        ConnectorException failure = expectThrows(ConnectorException.class,
+                () -> GroupHandler.executeGroupUpdateDelta(executor, new Uid("engineering@example.com"), modifications));
+
+        // Then: Propagate rejection without retrying the update
+        assertEquals(failure.getCause().getClass(), GoogleJsonResponseException.class);
+        assertEquals(((GoogleJsonResponseException) failure.getCause()).getStatusCode(), 400);
+        assertEquals(transport.methods, List.of("PATCH"));
+        assertEquals(transport.requests.size(), 1);
+        MockLowLevelHttpRequest request = transport.requests.get(0);
+        assertEquals(request.getUrl(), "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com");
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("email", " "));
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
@@ -360,35 +404,60 @@ public class ResourceHandlersTest {
                 AttributeBuilder.build(GoogleAppsConnector.NAME_ATTR, "Engineering")));
     }
 
-    @Test(expectedExceptions = InvalidAttributeValueException.class)
+    @Test
     public void groupUpdateRejectsNonStringDescription() {
-        GroupHandler.updateGroup(directory().groups(), "engineering@example.com",
-                attributes(AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, 42)));
+        // Given: A non-string group description replacement
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PredefinedAttributes.DESCRIPTION, 42));
+
+        // When: Update the group description
+        // Then: Reject the type before any request
+        expectThrows(ClassCastException.class,
+                () -> GroupHandler.executeGroupUpdateDelta(executor, new Uid("engineering@example.com"), modifications));
+        assertTrue(transport.requests.isEmpty());
     }
 
     @Test
     public void memberMappingsPreserveEtagAndMapAttributes() {
-        Member member = new Member().setId("123").setEmail(USER).setRole("OWNER").setType("USER")
-                .setEtag("member-version");
+        // Given: A membership with identity and revision
+        Member member = new Member().setId("123").setEmail(USER).setRole("OWNER").setType("USER").setEtag("member-version");
 
-        Uid uid = GroupHandler.generateMemberId("engineering@example.com", member);
-        ConnectorObject object = GroupHandler.fromMember("engineering@example.com", member);
+        // When: Convert the membership and its identifier
+        Uid uid = MemberHandler.generateMemberId("engineering@example.com", member);
+        ConnectorObject object = MemberHandler.fromMember("engineering@example.com", member);
 
+        // Then: Preserve identity and membership attributes
         assertEquals(uid.getUidValue(), "engineering@example.com/123");
         assertEquals(uid.getRevision(), "member-version");
         assertEquals(object.getUid(), uid);
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.GROUP_KEY_ATTR).getValue(), List.of("ada@example.com"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.ROLE_ATTR).getValue(), List.of("OWNER"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.TYPE_ATTR).getValue(), List.of("USER"));
-        assertNull(GroupHandler.generateMemberId("engineering@example.com", new Member().setEmail(USER)).getRevision());
+        assertEquals(object.getAttributeByName(GROUP_KEY_ATTR).getValue(), List.of("ada@example.com"));
+        assertEquals(object.getAttributeByName(ROLE_ATTR).getValue(), List.of("OWNER"));
+        assertEquals(object.getAttributeByName(TYPE_ATTR).getValue(), List.of("USER"));
+        assertNull(MemberHandler.generateMemberId("engineering@example.com", new Member().setEmail(USER)).getRevision());
     }
 
     @Test
-    public void memberUpdateDefaultsRoleAndDeleteBuildRequests() {
-        Directory.Members.Patch patch = GroupHandler.updateMembers(directory().members(), "g", USER, " ");
-        assertEquals(((Member) patch.getJsonContent()).getRole(), "MEMBER");
-        assertEquals(patch.getFields(), GoogleAppsConnector.EMAIL_ETAG);
-        assertEquals(GroupHandler.deleteMembers(directory().members(), "g", USER).getMemberKey(), USER);
+    public void memberUpdateDefaultsRoleAndDeleteBuildRequests() throws Exception {
+        // Given: Explicit default role and member identity
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(ROLE_ATTR, "MEMBER"));
+
+        // When: Update membership and build deletion
+        Set<AttributeDelta> result = MemberHandler.executeMemberUpdateDelta(executor, new Uid("engineering@example.com/" + USER), modifications);
+        Directory.Members.Delete deletion = MemberHandler.deleteMembers(directory().members(), "engineering@example.com", USER);
+
+        // Then: Verify role and target membership
+        assertEquals(result, Set.of());
+        assertEquals(transport.methods, List.of("PATCH"));
+        assertEquals(transport.requests.size(), 1);
+        MockLowLevelHttpRequest request = transport.requests.get(0);
+        assertEquals(request.getUrl(), "https://admin.googleapis.com/admin/directory/v1/groups/engineering@example.com/members/ada@example.com");
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("email", USER, "role", "MEMBER"));
+        assertEquals(deletion.getGroupKey(), "engineering@example.com");
+        assertEquals(deletion.getMemberKey(), USER);
+        assertEquals(deletion.getRequestMethod(), "DELETE");
     }
 
     @Test
@@ -618,6 +687,41 @@ public class ResourceHandlersTest {
         // When: Build the user update request
         // Then: Reject the invalid attribute type
         UserHandler.buildUserUpdateRequest(directory().users(), new Uid(USER), deltas, Optional.empty());
+    }
+
+    private static GoogleApiExecutor executor(MockHttpTransport transport) {
+        Directory directory = new Directory.Builder(transport, new GsonFactory(), request -> { }).setApplicationName("connector-googleapps-test").build();
+        return new GoogleApiExecutor(new GoogleAppsConfiguration() {
+            @Override
+            public Directory getDirectory() {
+                return directory;
+            }
+        });
+    }
+
+    private static final class RecordingTransport extends MockHttpTransport {
+        private final List<String> methods = new ArrayList<>();
+        private final List<MockLowLevelHttpRequest> requests = new ArrayList<>();
+        private final int status;
+        private final String content;
+
+        private RecordingTransport() {
+            this(200, "{}");
+        }
+
+        private RecordingTransport(int status, String content) {
+            this.status = status;
+            this.content = content;
+        }
+
+        @Override
+        public LowLevelHttpRequest buildRequest(String method, String url) {
+            MockLowLevelHttpRequest request = new MockLowLevelHttpRequest(url).setResponse(
+                    new MockLowLevelHttpResponse().setStatusCode(status).setContentType("application/json").setContent(content));
+            methods.add(method);
+            requests.add(request);
+            return request;
+        }
     }
 
     private static Directory directory() {
