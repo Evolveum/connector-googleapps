@@ -16,14 +16,14 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.google.api.client.auth.oauth2.BearerToken;
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
+import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;

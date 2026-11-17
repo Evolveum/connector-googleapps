@@ -71,8 +71,8 @@ import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ID_E
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MEMBERS_ATTR;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MY_CUSTOMER_ID;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NAME_ATTR;
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ROLE_ATTR;
 import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NON_EDITABLE_ALIASES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ROLE_ATTR;
 
 /**
  * A GroupHandler is a util class to cover all Group related operations.
