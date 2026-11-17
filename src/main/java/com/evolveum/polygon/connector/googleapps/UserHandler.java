@@ -46,6 +46,8 @@ import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.common.security.SecurityUtil;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
+import org.identityconnectors.framework.common.exceptions.RetryableException;
+import org.identityconnectors.framework.common.exceptions.UnknownUidException;
 import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeBuilder;
 import org.identityconnectors.framework.common.objects.AttributeDelta;
@@ -984,9 +986,7 @@ public class UserHandler {
 
         } catch (Exception e) {
             logger.warn(e, "Failed to process special attributes during user creation: {0}", uid.getUidValue());
-            org.identityconnectors.framework.common.exceptions.RetryableException partial =
-                    org.identityconnectors.framework.common.exceptions.RetryableException.wrap(
-                            "User created but requested attributes could not be applied: " + uid.getUidValue(), uid);
+            RetryableException partial = RetryableException.wrap("User created but requested attributes could not be applied: " + uid.getUidValue(), uid);
             partial.addSuppressed(e);
             throw partial;
         }
@@ -1080,7 +1080,7 @@ public class UserHandler {
 
                         @Override
                         public Uid handleNotFound(IOException e) {
-                            throw new org.identityconnectors.framework.common.exceptions.UnknownUidException(e.getMessage(), e);
+                            throw new UnknownUidException(e.getMessage(), e);
                         }
 
                         @Override
