@@ -48,9 +48,12 @@ public class ConnectorExceptionPathsTest {
 
     @Test
     public void createOperationsRejectMissingRequiredAttributes() {
+        // Given: Resource inputs missing mandatory attributes
         GoogleAppsConnector connector = connector();
         OperationOptionsBuilder options = new OperationOptionsBuilder();
 
+        // When: Create resources with incomplete input
+        // Then: Reject inputs before issuing API requests
         expectThrows(InvalidAttributeValueException.class,
                 () -> connector.create(ObjectClass.ACCOUNT, attributes(new Name("user@example.com")), options.build()));
         expectThrows(InvalidAttributeValueException.class,
@@ -59,7 +62,7 @@ public class ConnectorExceptionPathsTest {
                 () -> connector.create(GoogleAppsConnector.MEMBER, attributes(), options.build()));
         expectThrows(InvalidAttributeValueException.class,
                 () -> connector.create(GoogleAppsConnector.ORG_UNIT,
-                        attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "/")), options.build()));
+                        attributes(AttributeBuilder.build(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "/")), options.build()));
         expectThrows(InvalidAttributeValueException.class,
                 () -> connector.create(GoogleAppsConnector.LICENSE_ASSIGNMENT, attributes(), options.build()));
 
@@ -106,14 +109,14 @@ public class ConnectorExceptionPathsTest {
         };
         OperationOptionsBuilder options = new OperationOptionsBuilder();
         GoogleFilter member = new GoogleFilter(FilterBuilder.equalTo(new Uid("bad-member-id")));
-        GoogleFilter license = new GoogleFilter(FilterBuilder.equalTo(new Uid("bad-license-id")));
+        GoogleFilter license = new GoogleFilter(new Uid("bad-license-id"));
 
         try {
             // When: Execute invalid resource queries
             // Then: Reject invalid searches without returning objects
             expectThrows(InvalidAttributeValueException.class,
                     () -> connector.executeQuery(GoogleAppsConnector.MEMBER, member, handler, options.build()));
-            expectThrows(UnsupportedOperationException.class,
+            expectThrows(InvalidAttributeValueException.class,
                     () -> connector.executeQuery(GoogleAppsConnector.MEMBER, null, handler, options.build()));
             ConnectorException missingProduct = expectThrows(ConnectorException.class,
                     () -> connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT, null, handler, options.build()));
@@ -121,6 +124,7 @@ public class ConnectorExceptionPathsTest {
 
             // Unrecognized assignment identifiers represent missing resources.
             connector.executeQuery(GoogleAppsConnector.LICENSE_ASSIGNMENT, license, handler, options.build());
+            connector.executeQuery(GoogleAppsConnector.MEMBER, new GoogleFilter(new Uid("bad-member-id")), handler, options.build());
         } finally {
             connector.dispose();
         }

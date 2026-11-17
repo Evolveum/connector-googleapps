@@ -69,7 +69,7 @@ public class FiltersTest {
     public void groupMemberFilterUsesUserKey() throws Exception {
         // Given: A group membership search filter
         Directory.Groups.List request = directory().groups().list();
-        Filter members = FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, "ada@example.com"));
+        Filter members = FilterBuilder.contains(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, "ada@example.com"));
 
         // When: Configure the group search request
         new GoogleFilter(members).configureGroupRequest(request);
@@ -166,7 +166,7 @@ public class FiltersTest {
         Filter base = FilterBuilder.equalTo(AttributeBuilder.build("customer", "my_customer"));
         Filter[] filters = {
             FilterBuilder.and(base, FilterBuilder.equalTo(AttributeBuilder.build("domain", "example.com"))),
-            FilterBuilder.containsAllValues(AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, java.util.Arrays.asList("a", "b"))),
+            FilterBuilder.containsAllValues(AttributeBuilder.build(GoogleAppsConstants.MEMBERS_ATTR, java.util.Arrays.asList("a", "b"))),
             FilterBuilder.greaterThan(AttributeBuilder.build("customer", "x")),
             FilterBuilder.greaterThanOrEqualTo(AttributeBuilder.build("customer", "x")),
             FilterBuilder.lessThan(AttributeBuilder.build("customer", "x")),

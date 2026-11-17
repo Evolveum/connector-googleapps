@@ -106,38 +106,52 @@ public class ResourceHandlersTest {
     }
 
     @Test
-    public void createAndUpdateOrgUnitNormalizeParentPath() {
+    public void createAndUpdateOrgUnitNormalizeParentPath() throws Exception {
+        // Given: Parent paths without leading slashes
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PARENT_ORG_UNIT_PATH_ATTR, "Company/Platform"));
+
+        // When: Create and update an organization unit
         Directory.Orgunits.Insert insert = OrgunitsHandler.createOrgunit(directory().orgunits(),
                 attributes(new Name("Engineering"),
-                        AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "Company"),
-                        AttributeBuilder.build(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR, true),
+                        AttributeBuilder.build(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR, "Company"),
+                        AttributeBuilder.build(GoogleAppsConstants.BLOCK_INHERITANCE_ATTR, true),
                         AttributeBuilder.build(PredefinedAttributes.DESCRIPTION, "Product engineering")));
+        Set<AttributeDelta> result = OrgunitsHandler.executeOrgunitUpdateDelta(executor, new Uid("Engineering"), modifications);
 
+        // Then: Normalize parent paths in both requests
         OrgUnit insertContent = (OrgUnit) insert.getJsonContent();
-        assertEquals(insert.getCustomerId(), GoogleAppsConnector.MY_CUSTOMER_ID);
+        assertEquals(insert.getCustomerId(), GoogleAppsConstants.MY_CUSTOMER_ID);
         assertEquals(insertContent.getParentOrgUnitPath(), "/Company");
         assertEquals(insertContent.getName(), "Engineering");
-
-        Directory.Orgunits.Patch patch = OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
-                attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "Company/Platform")));
-        assertNotNull(patch);
-        OrgUnit patchContent = (OrgUnit) patch.getJsonContent();
-        assertEquals(patch.getOrgUnitPath(), "Engineering");
-        assertEquals(patchContent.getParentOrgUnitPath(), "/Company/Platform");
+        assertEquals(insertContent.getDescription(), "Product engineering");
+        assertEquals(insertContent.getBlockInheritance(), Boolean.TRUE);
+        assertEquals(result, Set.of());
+        assertEquals(transport.methods, List.of("PATCH"));
+        assertEquals(transport.requests.size(), 1);
+        MockLowLevelHttpRequest request = transport.requests.get(0);
+        assertEquals(request.getUrl(), "https://admin.googleapis.com/admin/directory/v1/customer/my_customer/orgunits/Engineering?fields=orgUnitPath,etag");
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("parentOrgUnitPath", "/Company/Platform"));
     }
 
     @Test
     public void orgUnitIdStripsOnlyLeadingSlashAndRetainsVersion() {
-        OrgUnit orgUnit = new OrgUnit().setOrgUnitPath("/Company/Engineering").setEtag("version-1");
+        // Given: Named organization unit with nested path
+        OrgUnit orgUnit = new OrgUnit().setName("Engineering").setOrgUnitPath("/Company/Engineering").setEtag("version-1");
 
+        // When: Derive the organization unit identity
         Uid uid = OrgunitsHandler.generateOrgUnitId(orgUnit);
 
+        // Then: Preserve nested path and identity metadata
         assertEquals(uid.getUidValue(), "Company/Engineering");
         assertEquals(uid.getRevision(), "version-1");
+        assertEquals(uid.getNameHintValue(), "Engineering");
     }
 
     @Test
     public void orgUnitProjectionReturnsOnlyRequestedAttributes() {
+        // Given: Organization unit and path-only projection
         OrgUnit orgUnit = new OrgUnit()
                 .setName("Engineering")
                 .setOrgUnitPath("/Engineering")
@@ -145,32 +159,41 @@ public class ResourceHandlersTest {
                 .setDescription("Product engineering")
                 .setBlockInheritance(true);
 
+        // When: Convert the requested organization unit fields
         ConnectorObject object = OrgunitsHandler.fromOrgunit(orgUnit,
-                new HashSet<>(List.of(GoogleAppsConnector.ORG_UNIT_PATH_ATTR)));
+                new HashSet<>(List.of(GoogleAppsConstants.ORG_UNIT_PATH_ATTR)));
 
+        // Then: Omit unrequested organization unit attributes
         assertEquals(object.getUid().getUidValue(), "Engineering");
-        assertNotNull(object.getAttributeByName(GoogleAppsConnector.ORG_UNIT_PATH_ATTR));
+        assertNotNull(object.getAttributeByName(GoogleAppsConstants.ORG_UNIT_PATH_ATTR));
         assertNull(object.getAttributeByName(PredefinedAttributes.DESCRIPTION));
-        assertNull(object.getAttributeByName(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR));
+        assertNull(object.getAttributeByName(GoogleAppsConstants.BLOCK_INHERITANCE_ATTR));
     }
 
     @Test
     public void orgUnitProjectionMapsAllOptionalFieldsWhenNoProjectionIsProvided() {
+        // Given: Organization unit with every optional field
         OrgUnit orgUnit = new OrgUnit().setName("Engineering").setOrgUnitPath("/Engineering")
                 .setParentOrgUnitPath("/").setDescription("Team").setBlockInheritance(true);
 
+        // When: Convert without an explicit projection
         ConnectorObject object = OrgunitsHandler.fromOrgunit(orgUnit, null);
 
+        // Then: Preserve all optional field values
         assertEquals(object.getAttributeByName(PredefinedAttributes.DESCRIPTION).getValue(), List.of("Team"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.ORG_UNIT_PATH_ATTR).getValue(), List.of("/Engineering"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR).getValue(), List.of("/"));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR).getValue(), List.of(true));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.ORG_UNIT_PATH_ATTR).getValue(), List.of("/Engineering"));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.PARENT_ORG_UNIT_PATH_ATTR).getValue(), List.of("/"));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.BLOCK_INHERITANCE_ATTR).getValue(), List.of(true));
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createOrgUnitRequiresName() {
-        OrgunitsHandler.createOrgunit(directory().orgunits(),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, "/")));
+        // Given: Organization unit without a name
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(PARENT_ORG_UNIT_PATH_ATTR, "/"));
+
+        // When: Build organization unit creation
+        // Then: Reject the missing unit name
+        OrgunitsHandler.createOrgunit(directory().orgunits(), attributes);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
@@ -180,31 +203,60 @@ public class ResourceHandlersTest {
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createOrgUnitRejectsBlankParentPath() {
-        OrgunitsHandler.createOrgunit(directory().orgunits(), attributes(new Name("Engineering"),
-                AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, " ")));
-    }
+        // Given: Organization unit with blank parent path
+        AttributesAccessor attributes = attributes(new Name("Engineering"), AttributeBuilder.build(PARENT_ORG_UNIT_PATH_ATTR, " "));
 
-    @Test(expectedExceptions = InvalidAttributeValueException.class)
-    public void updateOrgUnitRejectsBlankParentPath() {
-        OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
-                attributes(AttributeBuilder.build(GoogleAppsConnector.PARENT_ORG_UNIT_PATH_ATTR, " ")));
-    }
-
-    @Test(expectedExceptions = ClassCastException.class)
-    public void updateOrgUnitRejectsNonBooleanInheritanceValue() {
-        OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
-                attributes(AttributeBuilder.build(GoogleAppsConnector.BLOCK_INHERITANCE_ATTR, "sometimes")));
+        // When: Build organization unit creation
+        // Then: Reject the blank parent path
+        OrgunitsHandler.createOrgunit(directory().orgunits(), attributes);
     }
 
     @Test
-    public void updateOrgUnitCanReturnNullOrClearDescription() {
-        assertNull(OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering", attributes()));
+    public void updateOrgUnitRejectsBlankParentPath() {
+        // Given: A blank parent path replacement
+        RecordingTransport transport = new RecordingTransport();
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PARENT_ORG_UNIT_PATH_ATTR, " "));
 
-        Directory.Orgunits.Patch patch = OrgunitsHandler.updateOrgunit(directory().orgunits(), "Engineering",
-                attributes(AttributeBuilder.build(PredefinedAttributes.DESCRIPTION)));
+        // When: Apply the invalid parent path
+        Set<AttributeDelta> result = OrgunitsHandler.executeOrgunitUpdateDelta(executor(transport), new Uid("Engineering"), modifications);
 
-        assertNotNull(patch);
-        assertEquals(((OrgUnit) patch.getJsonContent()).getDescription(), "");
+        // Then: Ignore the replacement without remote changes
+        assertEquals(result, Set.of());
+        assertTrue(transport.requests.isEmpty());
+    }
+
+    @Test
+    public void updateOrgUnitRejectsNonBooleanInheritanceValue() {
+        // Given: A string instead of boolean inheritance
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(BLOCK_INHERITANCE_ATTR, "sometimes"));
+
+        // When: Apply the invalid inheritance value
+        // Then: Reject input before issuing a request
+        expectThrows(ClassCastException.class, () -> OrgunitsHandler.executeOrgunitUpdateDelta(executor, new Uid("Engineering"), modifications));
+        assertTrue(transport.requests.isEmpty());
+    }
+
+    @Test
+    public void updateOrgUnitCanReturnNullOrClearDescription() throws Exception {
+        // Given: Empty update and description removal
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(PredefinedAttributes.DESCRIPTION, List.of()));
+
+        // When: Apply both updates to the unit
+        Set<AttributeDelta> unchanged = OrgunitsHandler.executeOrgunitUpdateDelta(executor, new Uid("Engineering"), Set.of());
+        Set<AttributeDelta> cleared = OrgunitsHandler.executeOrgunitUpdateDelta(executor, new Uid("Engineering"), modifications);
+
+        // Then: Send only the description clearing request
+        assertEquals(unchanged, Set.of());
+        assertEquals(cleared, Set.of());
+        assertEquals(transport.methods, List.of("PATCH"));
+        assertEquals(transport.requests.size(), 1);
+        MockLowLevelHttpRequest request = transport.requests.get(0);
+        assertEquals(request.getUrl(), "https://admin.googleapis.com/admin/directory/v1/customer/my_customer/orgunits/Engineering?fields=orgUnitPath,etag");
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("description", ""));
     }
 
     @Test
@@ -222,83 +274,134 @@ public class ResourceHandlersTest {
         LicenseAssignmentsHandler.deleteLicenseAssignment(licensing().licenseAssignments(), "not-a-license-id");
     }
 
-    @Test(expectedExceptions = UnknownUidException.class)
+    @Test
     public void licenseUpdateRejectsMalformedUid() {
-        LicenseAssignmentsHandler.updateLicenseAssignment(licensing().licenseAssignments(), "not-a-license-id",
-                attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, "replacement")));
+        // Given: Malformed license identity and replacement SKU
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(SKU_ID_ATTR, "replacement"));
+
+        // When: Update an invalid license identity
+        // Then: Reject identity without issuing a request
+        expectThrows(UnknownUidException.class,
+                () -> LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor, new Uid("not-a-license-id"), modifications));
+        assertTrue(transport.requests.isEmpty());
     }
 
     @Test
-    public void licenseUpdateUsesExistingLicenseCoordinatesAndNewSku() {
-        String replacementSku = "Google-Drive-storage-2TB";
-        Licensing.LicenseAssignments.Patch request = LicenseAssignmentsHandler.updateLicenseAssignment(
-                licensing().licenseAssignments(), licenseUid(),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, replacementSku)));
+    public void licenseUpdateUsesExistingLicenseCoordinatesAndNewSku() throws Exception {
+        // Given: Existing assignment and replacement storage SKU
+        RecordingTransport transport = new RecordingTransport();
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(SKU_ID_ATTR, "Google-Drive-storage-2TB"));
 
-        assertNotNull(request);
-        LicenseAssignment content = (LicenseAssignment) request.getJsonContent();
-        assertEquals(request.getProductId(), PRODUCT);
-        assertEquals(request.getSkuId(), SKU);
-        assertEquals(request.getUserId(), USER);
-        assertEquals(content.getSkuId(), replacementSku);
+        // When: Apply the replacement SKU delta
+        Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor(transport), new Uid(licenseUid()), modifications);
+
+        // Then: Target existing keys with replacement content
+        assertEquals(result, Set.of());
+        assertEquals(transport.methods, List.of("PATCH"));
+        assertEquals(transport.requests.size(), 1);
+        MockLowLevelHttpRequest request = transport.requests.get(0);
+        assertEquals(request.getUrl(),
+                "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-1TB/user/ada@example.com");
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("skuId", "Google-Drive-storage-2TB"));
     }
 
     @Test
     public void createLicenseAssignmentMapsRequiredFieldsToRequest() {
-        Licensing.LicenseAssignments.Insert request = LicenseAssignmentsHandler.createLicenseAssignment(
-                licensing().licenseAssignments(), attributes(
-                        AttributeBuilder.build(GoogleAppsConnector.PRODUCT_ID_ATTR, PRODUCT),
-                        AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU),
-                        AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, USER)));
+        // Given: Required license assignment attributes
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(PRODUCT_ID_ATTR, PRODUCT), AttributeBuilder.build(SKU_ID_ATTR, SKU),
+                AttributeBuilder.build(USER_ID_ATTR, USER));
 
+        // When: Build the license assignment request
+        Licensing.LicenseAssignments.Insert request = LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes);
+
+        // Then: Preserve identifiers and requested response fields
         LicenseAssignmentInsert content = (LicenseAssignmentInsert) request.getJsonContent();
         assertEquals(request.getProductId(), PRODUCT);
         assertEquals(request.getSkuId(), SKU);
-        assertEquals(request.getFields(), GoogleAppsConnector.PRODUCT_ID_SKU_ID_USER_ID);
+        assertEquals(request.getFields(), GoogleAppsConstants.PRODUCT_ID_SKU_ID_USER_ID);
         assertEquals(content.getUserId(), USER);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createLicenseAssignmentRequiresProduct() {
-        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes(
-                AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU),
-                AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, USER)));
+        // Given: License attributes without a product
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(SKU_ID_ATTR, SKU), AttributeBuilder.build(USER_ID_ATTR, USER));
+
+        // When: Build the license assignment request
+        // Then: Reject the missing product identifier
+        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createLicenseAssignmentRequiresSku() {
-        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes(
-                AttributeBuilder.build(GoogleAppsConnector.PRODUCT_ID_ATTR, PRODUCT),
-                AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, USER)));
+        // Given: License attributes without a SKU
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(PRODUCT_ID_ATTR, PRODUCT), AttributeBuilder.build(USER_ID_ATTR, USER));
+
+        // When: Build the license assignment request
+        // Then: Reject the missing SKU identifier
+        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes);
     }
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createLicenseAssignmentRequiresUser() {
-        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes(
-                AttributeBuilder.build(GoogleAppsConnector.PRODUCT_ID_ATTR, PRODUCT),
-                AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU)));
+        // Given: License attributes without a user
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(PRODUCT_ID_ATTR, PRODUCT), AttributeBuilder.build(SKU_ID_ATTR, SKU));
+
+        // When: Build the license assignment request
+        // Then: Reject the missing user identifier
+        LicenseAssignmentsHandler.createLicenseAssignment(licensing().licenseAssignments(), attributes);
     }
 
     @Test
-    public void updateLicenseAssignmentPassesRequestedSkuToGoogle() {
-        Licensing.LicenseAssignments.Patch patch = LicenseAssignmentsHandler.updateLicenseAssignment(
-                licensing().licenseAssignments(), licenseUid(),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, "new-sku")));
+    public void updateLicenseAssignmentPassesRequestedSkuToGoogle() throws Exception {
+        // Given: A SKU outside legacy identifier alternatives
+        RecordingTransport transport = new RecordingTransport();
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(SKU_ID_ATTR, "new-sku"));
 
-        assertNotNull(patch);
-        assertEquals(((LicenseAssignment) patch.getJsonContent()).getSkuId(), "new-sku");
+        // When: Forward the replacement to licensing
+        Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor(transport), new Uid(licenseUid()), modifications);
+
+        // Then: Preserve the exact supplied SKU
+        assertEquals(result, Set.of());
+        assertEquals(transport.methods, List.of("PATCH"));
+        assertEquals(transport.requests.size(), 1);
+        MockLowLevelHttpRequest request = transport.requests.get(0);
+        assertEquals(request.getUrl(),
+                "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Drive-storage/sku/Google-Drive-storage-1TB/user/ada@example.com");
+        assertEquals(new GsonFactory().fromString(request.getContentAsString(), Map.class), Map.of("skuId", "new-sku"));
     }
 
     @Test
     public void unchangedLicenseSkuDoesNotCreatePatch() {
-        assertNull(LicenseAssignmentsHandler.updateLicenseAssignment(licensing().licenseAssignments(), licenseUid(),
-                attributes(AttributeBuilder.build(GoogleAppsConnector.SKU_ID_ATTR, SKU))));
+        // Given: Assignment with an unchanged replacement SKU
+        RecordingTransport transport = new RecordingTransport();
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(SKU_ID_ATTR, SKU));
+
+        // When: Apply the unchanged SKU delta
+        Set<AttributeDelta> result = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor(transport), new Uid(licenseUid()), modifications);
+
+        // Then: Skip redundant remote updates
+        assertEquals(result, Set.of());
+        assertTrue(transport.requests.isEmpty());
     }
 
     @Test
     public void licenseUpdateWithoutSkuDoesNotCreatePatch() {
-        assertNull(LicenseAssignmentsHandler.updateLicenseAssignment(licensing().licenseAssignments(), licenseUid(),
-                attributes()));
+        // Given: No deltas or unrelated license attributes
+        RecordingTransport transport = new RecordingTransport();
+        GoogleApiExecutor executor = executor(transport);
+        Set<AttributeDelta> modifications = Set.of(AttributeDeltaBuilder.build(USER_ID_ATTR, "another@example.com"));
+
+        // When: Apply updates without a SKU replacement
+        Set<AttributeDelta> empty = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor, new Uid(licenseUid()), Set.of());
+        Set<AttributeDelta> unrelated = LicenseAssignmentsHandler.executeLicenseAssignmentUpdateDelta(executor, new Uid(licenseUid()), modifications);
+
+        // Then: Leave the remote assignment unchanged
+        assertEquals(empty, Set.of());
+        assertEquals(unrelated, Set.of());
+        assertTrue(transport.requests.isEmpty());
     }
 
     @Test
@@ -327,6 +430,7 @@ public class ResourceHandlersTest {
 
     @Test
     public void licenseAssignmentMapsToConnectorObject() {
+        // Given: License assignment with identifiers and revision
         LicenseAssignment assignment = new LicenseAssignment()
                 .setProductId(PRODUCT)
                 .setSkuId(SKU)
@@ -334,16 +438,18 @@ public class ResourceHandlersTest {
                 .setSelfLink("https://example.test/license")
                 .setEtags("version-2");
 
+        // When: Convert the license assignment
         ConnectorObject object = LicenseAssignmentsHandler.fromLicenseAssignment(assignment);
 
+        // Then: Preserve identity and license attributes
         assertEquals(object.getObjectClass(), GoogleAppsConnector.LICENSE_ASSIGNMENT);
         assertEquals(object.getUid().getUidValue(), licenseUid());
         assertEquals(object.getUid().getRevision(), "version-2");
         assertEquals(object.getName().getNameValue(), licenseUid());
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.PRODUCT_ID_ATTR).getValue(), List.of(PRODUCT));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.SKU_ID_ATTR).getValue(), List.of(SKU));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.USER_ID_ATTR).getValue(), List.of(USER));
-        assertEquals(object.getAttributeByName(GoogleAppsConnector.SELF_LINK_ATTR).getValue(),
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.PRODUCT_ID_ATTR).getValue(), List.of(PRODUCT));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.SKU_ID_ATTR).getValue(), List.of(SKU));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.USER_ID_ATTR).getValue(), List.of(USER));
+        assertEquals(object.getAttributeByName(GoogleAppsConstants.SELF_LINK_ATTR).getValue(),
                 List.of("https://example.test/license"));
     }
 
@@ -400,8 +506,12 @@ public class ResourceHandlersTest {
 
     @Test(expectedExceptions = InvalidAttributeValueException.class)
     public void createGroupRequiresPrimaryEmail() {
-        GroupHandler.createGroup(directory().groups(), attributes(
-                AttributeBuilder.build(GoogleAppsConnector.NAME_ATTR, "Engineering")));
+        // Given: Group attributes without primary email
+        AttributesAccessor attributes = attributes(AttributeBuilder.build(NAME_ATTR, "Engineering"));
+
+        // When: Build the group creation request
+        // Then: Reject the missing primary email
+        GroupHandler.createGroup(directory().groups(), attributes);
     }
 
     @Test
@@ -691,10 +801,16 @@ public class ResourceHandlersTest {
 
     private static GoogleApiExecutor executor(MockHttpTransport transport) {
         Directory directory = new Directory.Builder(transport, new GsonFactory(), request -> { }).setApplicationName("connector-googleapps-test").build();
+        Licensing licensing = new Licensing.Builder(transport, new GsonFactory(), request -> { }).setApplicationName("connector-googleapps-test").build();
         return new GoogleApiExecutor(new GoogleAppsConfiguration() {
             @Override
             public Directory getDirectory() {
                 return directory;
+            }
+
+            @Override
+            public Licensing getLicensing() {
+                return licensing;
             }
         });
     }
