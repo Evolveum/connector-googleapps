@@ -26,7 +26,6 @@
 
 package com.evolveum.polygon.connector.googleapps;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.directory.model.Group;
 import com.google.api.services.directory.model.Groups;
@@ -34,12 +33,30 @@ import com.google.api.services.directory.model.Member;
 import com.google.api.services.directory.model.Members;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.PredefinedAttributes;
+import org.identityconnectors.framework.common.objects.Uid;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ADMIN_CREATED_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ALIASES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.DIRECT_MEMBERS_COUNT_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EMAIL_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MEMBERS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NAME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NON_EDITABLE_ALIASES_ATTR;
 
 /**
  * GroupConverter handles conversion between Google Group objects and ConnID ConnectorObjects.
@@ -122,8 +139,8 @@ public class GroupConverter {
     }
 
     /**
-     * List all group members with details.
-     */
+    Returns all member pages; any read failure throws ConnectorException without returning partial data.
+    */
     public static List<Map<String, String>> listAllMembers(Directory.Members service, String groupKey, String roles) {
         final List<Map<String, String>> result = new ArrayList<Map<String, String>>();
         long startTime = System.currentTimeMillis();
@@ -146,12 +163,6 @@ public class GroupConverter {
                 request.setPageToken(currentPage.getNextPageToken());
             } while (null != request.getPageToken());
 
-        } catch (GoogleJsonResponseException e) {
-            if (404 == e.getDetails().getCode()) {
-                logger.warn("Group {0} is not found", groupKey);
-            } else {
-                throw ConnectorException.wrap(e);
-            }
         } catch (IOException e) {
             throw ConnectorException.wrap(e);
         }
@@ -160,8 +171,8 @@ public class GroupConverter {
     }
 
     /**
-     * List groups for a user.
-     */
+    Returns all group pages; any read failure throws ConnectorException without returning partial data.
+    */
     public static Set<String> listGroups(Directory.Groups service, String userKey) {
         final Set<String> result = new HashSet<String>();
         long startTime = System.currentTimeMillis();
@@ -179,12 +190,6 @@ public class GroupConverter {
                 request.setPageToken(currentPage.getNextPageToken());
             } while (null != request.getPageToken());
 
-        } catch (GoogleJsonResponseException e) {
-            if (404 == e.getDetails().getCode()) {
-                logger.warn("User {0} is not found", userKey);
-            } else {
-                throw ConnectorException.wrap(e);
-            }
         } catch (IOException e) {
             throw ConnectorException.wrap(e);
         }

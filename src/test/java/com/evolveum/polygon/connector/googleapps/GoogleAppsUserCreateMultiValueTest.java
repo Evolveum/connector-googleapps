@@ -1,6 +1,10 @@
 package com.evolveum.polygon.connector.googleapps;
 
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
@@ -9,7 +13,11 @@ import java.util.List;
 import java.util.Set;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -87,11 +95,11 @@ public class GoogleAppsUserCreateMultiValueTest extends GoogleAppsConnectorTestB
                 .withRequestBody(containing("\"givenName\":\"Full\""))
                 .withRequestBody(containing("\"familyName\":\"User\""))
                 .withRequestBody(containing("\"password\":\"ComplexPassword123\""))
-                .withRequestBody(containing("\"emails\":[{\"address\":\"alt@example.com\",\"type\":\"work\",\"primary\":\"false\"}]"))
-                .withRequestBody(containing("\"phones\":[{\"value\":\"+1-555-123-4567\",\"type\":\"work\",\"primary\":\"true\"}]"))
-                .withRequestBody(containing("\"addresses\":[{\"type\":\"work\",\"formatted\":\"123 Work St, City, State 12345\",\"primary\":\"true\"}]"))
-                .withRequestBody(containing("\"organizations\":[{\"name\":\"Test Company\",\"title\":\"Developer\",\"primary\":\"true\",\"type\":\"work\"}]"))
-                .withRequestBody(containing("\"ims\":[{\"im\":\"user@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":\"true\"}]"))
+                .withRequestBody(containing("\"emails\":[{\"address\":\"alt@example.com\",\"type\":\"work\",\"primary\":false}]"))
+                .withRequestBody(containing("\"phones\":[{\"value\":\"+1-555-123-4567\",\"type\":\"work\",\"primary\":true}]"))
+                .withRequestBody(containing("\"addresses\":[{\"type\":\"work\",\"formatted\":\"123 Work St, City, State 12345\",\"primary\":true}]"))
+                .withRequestBody(containing("\"organizations\":[{\"name\":\"Test Company\",\"title\":\"Developer\",\"primary\":true,\"type\":\"work\"}]"))
+                .withRequestBody(containing("\"ims\":[{\"im\":\"user@example.org\",\"protocol\":\"jabber\",\"type\":\"work\",\"primary\":true}]"))
                 .withRequestBody(containing("\"externalIds\":[{\"value\":\"EMP123\",\"type\":\"organization\"}]"))
                 .withRequestBody(containing("\"relations\":[{\"value\":\"manager@example.com\",\"type\":\"manager\"}]")));
     }
@@ -148,15 +156,15 @@ public class GoogleAppsUserCreateMultiValueTest extends GoogleAppsConnectorTestB
         // Verify request contains all multiple values (individual elements since array order may vary)
         GoogleApiMockServer.verifyRequest(postRequestedFor(urlPathEqualTo("/admin/directory/v1/users"))
                 // Verify individual email entries exist
-                .withRequestBody(containing("{\"address\":\"work@example.com\",\"type\":\"work\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"home@example.com\",\"type\":\"home\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"address\":\"other@example.com\",\"type\":\"other\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"address\":\"work@example.com\",\"type\":\"work\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"home@example.com\",\"type\":\"home\",\"primary\":false}"))
+                .withRequestBody(containing("{\"address\":\"other@example.com\",\"type\":\"other\",\"primary\":false}"))
                 // Verify individual phone entries exist
-                .withRequestBody(containing("{\"value\":\"+1-555-111-1111\",\"type\":\"work\",\"primary\":\"true\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-222-2222\",\"type\":\"home\",\"primary\":\"false\"}"))
-                .withRequestBody(containing("{\"value\":\"+1-555-333-3333\",\"type\":\"mobile\",\"primary\":\"false\"}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-111-1111\",\"type\":\"work\",\"primary\":true}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-222-2222\",\"type\":\"home\",\"primary\":false}"))
+                .withRequestBody(containing("{\"value\":\"+1-555-333-3333\",\"type\":\"mobile\",\"primary\":false}"))
                 // Verify individual organization entries exist
-                .withRequestBody(containing("{\"name\":\"Current Company\",\"title\":\"Senior Developer\",\"primary\":\"true\",\"type\":\"work\"}"))
-                .withRequestBody(containing("{\"name\":\"Previous Company\",\"title\":\"Developer\",\"primary\":\"false\",\"type\":\"work\"}")));
+                .withRequestBody(containing("{\"name\":\"Current Company\",\"title\":\"Senior Developer\",\"primary\":true,\"type\":\"work\"}"))
+                .withRequestBody(containing("{\"name\":\"Previous Company\",\"title\":\"Developer\",\"primary\":false,\"type\":\"work\"}")));
     }
 }

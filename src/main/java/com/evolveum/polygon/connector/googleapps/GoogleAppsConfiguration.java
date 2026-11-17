@@ -38,16 +38,6 @@ import com.google.auth.Credentials;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.auth.oauth2.UserCredentials;
-import org.identityconnectors.common.StringUtil;
-import org.identityconnectors.common.logging.Log;
-import org.identityconnectors.common.security.GuardedString;
-import org.identityconnectors.common.security.SecurityUtil;
-import org.identityconnectors.framework.common.exceptions.ConfigurationException;
-import org.identityconnectors.framework.common.exceptions.ConnectorException;
-import org.identityconnectors.framework.spi.AbstractConfiguration;
-import org.identityconnectors.framework.spi.ConfigurationProperty;
-import org.identityconnectors.framework.spi.StatefulConfiguration;
-
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -58,6 +48,15 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.ProxyAuthenticationStrategy;
 import org.apache.http.impl.conn.DefaultProxyRoutePlanner;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.identityconnectors.common.StringUtil;
+import org.identityconnectors.common.logging.Log;
+import org.identityconnectors.common.security.GuardedString;
+import org.identityconnectors.common.security.SecurityUtil;
+import org.identityconnectors.framework.common.exceptions.ConfigurationException;
+import org.identityconnectors.framework.common.exceptions.ConnectorException;
+import org.identityconnectors.framework.spi.AbstractConfiguration;
+import org.identityconnectors.framework.spi.ConfigurationProperty;
+import org.identityconnectors.framework.spi.StatefulConfiguration;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -599,6 +598,8 @@ public class GoogleAppsConfiguration extends AbstractConfiguration implements St
         return new HttpRequestInitializer() {
             @Override
             public void initialize(HttpRequest httpRequest) throws IOException {
+                httpRequest.setConnectTimeout(httpConnectTimeout != null ? httpConnectTimeout : 10000);
+                httpRequest.setReadTimeout(httpSocketTimeout != null ? httpSocketTimeout : 10000);
                 credentialsAdapter.initialize(httpRequest);
             }
         };

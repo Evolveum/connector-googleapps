@@ -5,9 +5,10 @@ import org.identityconnectors.framework.api.APIConfiguration;
 import org.identityconnectors.framework.api.ConnectorFacade;
 import org.identityconnectors.framework.api.ConnectorFacadeFactory;
 import org.identityconnectors.test.common.TestHelpers;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 
 /**
  * Base class for GoogleAppsConnector tests
@@ -27,13 +28,18 @@ public abstract class GoogleAppsConnectorTestBase {
         GoogleApiMockServer.stop();
     }
 
+    @AfterMethod(alwaysRun = true)
+    public void verifyRequests() {
+        GoogleApiMockServer.verifyMatched();
+    }
+
     protected ConnectorFacade connectorFacade;
     protected GoogleAppsConfiguration configuration;
 
     @BeforeMethod(alwaysRun = true)
     public void setUp() {
-        // Reset WireMock requests and stubs before each test to ensure test isolation
-        GoogleApiMockServer.reset();
+        // Reset WireMock request history before each test to ensure test isolation
+        GoogleApiMockServer.resetRequests();
 
         configuration = createTestConfiguration();
         connectorFacade = createConnectorFacade(configuration);

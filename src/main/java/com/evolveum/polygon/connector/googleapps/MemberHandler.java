@@ -34,13 +34,31 @@ import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
+import org.identityconnectors.framework.common.objects.AttributesAccessor;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.SearchResult;
+import org.identityconnectors.framework.common.objects.Uid;
+import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EMAIL_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.GROUP_KEY_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MEMBER;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ROLE_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.TYPE_ATTR;
 
 /**
  * MemberHandler is a util class to cover all Member related operations.
@@ -133,7 +151,7 @@ public class MemberHandler {
         builder.setUid(uid);
         builder.setName(uid.getUidValue());
 
-        builder.addAttribute(AttributeBuilder.build(GROUP_KEY_ATTR, content.getEmail()));
+        builder.addAttribute(AttributeBuilder.build(GROUP_KEY_ATTR, groupKey));
         builder.addAttribute(AttributeBuilder.build(EMAIL_ATTR, content.getEmail()));
         builder.addAttribute(AttributeBuilder.build(ROLE_ATTR, content.getRole()));
         builder.addAttribute(AttributeBuilder.build(TYPE_ATTR, content.getType()));
@@ -142,7 +160,10 @@ public class MemberHandler {
     }
 
     public static Uid generateMemberId(String groupKey, Member content) {
-        String id = groupKey + "/" + content.getId();
+        // Preserve identifiers already stored in midPoint shadows. A change to
+        // immutable member IDs requires an explicit migration, not a code refactor.
+        String memberKey = StringUtil.isNotBlank(content.getEmail()) ? content.getEmail() : content.getId();
+        String id = groupKey + "/" + memberKey;
         if (null != content.getEtag()) {
             return new Uid(id, content.getEtag(), new Name(content.getEmail()));
         } else {
@@ -195,8 +216,6 @@ public class MemberHandler {
                 if (newRole != null) {
                     content = new Member();
                     content.setRole(newRole);
-                    // Also need to include email for the patch request
-                    content.setEmail(memberKey);
                 }
             }
             // Other attributes (groupKey, email, type) are read-only
@@ -273,25 +292,34 @@ public class MemberHandler {
             Directory.Members.List request = executor.getDirectory().members().list(groupKey);
 
             // Handle pagination
-            if (options.getPageSize() != null && 0 < options.getPageSize()) {
-                request.setMaxResults(options.getPageSize());
+            boolean paged = options.getPageSize() != null && options.getPageSize() > 0;
+            if (paged) {
+                request.setMaxResults(Math.min(options.getPageSize(), 200));
             }
             request.setPageToken(options.getPagedResultsCookie());
 
-            executor.execute(request,
+            String nextPageToken;
+            do {
+                nextPageToken = executor.execute(request,
                     new RequestResultHandler<Directory.Members.List, Members, String>() {
                         public String handleResult(
                                 final Directory.Members.List request,
                                 final Members value) {
                             if (null != value.getMembers()) {
                                 for (Member member : value.getMembers()) {
-                                    handler.handle(fromMember(request
-                                            .getGroupKey(), member));
+                                    if (!handler.handle(fromMember(request.getGroupKey(), member))) {
+                                        return null;
+                                    }
                                 }
                             }
                             return value.getNextPageToken();
                         }
                     });
+                request.setPageToken(nextPageToken);
+            } while (!paged && StringUtil.isNotBlank(nextPageToken));
+            if (handler instanceof SearchResultsHandler) {
+                ((SearchResultsHandler) handler).handleResult(new SearchResult(nextPageToken, -1));
+            }
 
         } catch (IOException e) {
             logger.warn(e, "Failed to initialize Members#List");

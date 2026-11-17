@@ -10,7 +10,12 @@ import org.identityconnectors.framework.common.objects.filter.FilterBuilder;
 import org.testng.annotations.Test;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -623,9 +628,9 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
 
     @Test(description = "Test filter with single quotes (should be escaped)")
     public void testFilterWithSingleQuotes() {
-        // Setup minimal mock response (URL encoding changes John's to John%27s, handle both)
+        // Match the decoded query value so URL encoding cannot hide missing query escaping.
         stubFor(get(urlPathMatching("/admin/directory/v1/users"))
-                .withQueryParam("query", matching("givenName.*John.*s"))
+                .withQueryParam("query", equalTo("givenName=John\\'s"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
@@ -637,9 +642,9 @@ public class GoogleAppsUserSearchFilterTest extends GoogleAppsConnectorTestBase 
         // Execute search with filter
         connectorFacade.search(ObjectClass.ACCOUNT, filter, obj -> true, null);
 
-        // Verify query parameter contains the search term (may be URL encoded)
+        // Verify query escaping separately from HTTP URL encoding.
         GoogleApiMockServer.verifyRequest(getRequestedFor(urlPathEqualTo("/admin/directory/v1/users"))
-                .withQueryParam("query", matching(".*givenName.*John.*s.*")));
+                .withQueryParam("query", equalTo("givenName=John\\'s")));
     }
 
     // ========== URL ENCODING TESTS ==========

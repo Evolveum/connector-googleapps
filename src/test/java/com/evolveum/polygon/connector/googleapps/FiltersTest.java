@@ -37,14 +37,17 @@ public class FiltersTest {
         // Given: Names containing whitespace and apostrophes
         Directory.Users.List request = directory().users().list();
         Filter startsWith = FilterBuilder.startsWith(AttributeBuilder.build(Name.NAME, "Ada Lovelace"));
+        Filter equals = FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConstants.FAMILY_NAME_ATTR, "O'Connor"));
         Filter quoted = FilterBuilder.equalTo(AttributeBuilder.build(GoogleAppsConstants.FAMILY_NAME_ATTR, "Anne O'Connor"));
 
         // When: Build Google search queries
         String startsWithQuery = new GoogleFilter(startsWith).buildUserQuery(request);
+        String equalsQuery = new GoogleFilter(equals).buildUserQuery(request);
         String quotedQuery = new GoogleFilter(quoted).buildUserQuery(request);
 
         // Then: Verify quoting and apostrophe escaping
         assertEquals(startsWithQuery, "email:'Ada Lovelace*'");
+        assertEquals(equalsQuery, "familyName=O\\'Connor");
         assertEquals(quotedQuery, "familyName='Anne O\\'Connor'");
     }
 

@@ -26,6 +26,7 @@ package com.evolveum.polygon.connector.googleapps;
 
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.LicensingRequest;
+import com.google.api.services.licensing.model.Empty;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.api.services.licensing.model.LicenseAssignmentInsert;
 import com.google.api.services.licensing.model.LicenseAssignmentList;
@@ -34,7 +35,21 @@ import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
 import org.identityconnectors.framework.common.exceptions.UnknownUidException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeDeltaBuilder;
+import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
+import org.identityconnectors.framework.common.objects.AttributesAccessor;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.ConnectorObjectBuilder;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.SearchResult;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
@@ -43,7 +58,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.LICENSE_ASSIGNMENT;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MY_CUSTOMER_ID;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.PRODUCT_ID_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.PRODUCT_ID_SKU_ID_USER_ID;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.SELF_LINK_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.SKU_ID_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.USER_ID_ATTR;
 
 /**
  * A NAME does ...
@@ -197,7 +218,16 @@ public class LicenseAssignmentsHandler {
         if (!modifications.isEmpty()) {
             final Licensing.LicenseAssignments.Patch patch = buildLicenseAssignmentUpdateRequest(executor.getLicensing().licenseAssignments(), uid, modifications);
             if (patch != null) {
-                executor.execute(patch, new RequestResultHandler.NoOp<Licensing.LicenseAssignments.Patch, LicenseAssignment>());
+                executor.execute(patch, new RequestResultHandler<Licensing.LicenseAssignments.Patch, LicenseAssignment, Object>() {
+                    @Override
+                    public Object handleResult(Licensing.LicenseAssignments.Patch request, LicenseAssignment value) {
+                        String newUid = generateLicenseAssignmentId(value).getUidValue();
+                        if (!uid.getUidValue().equals(newUid)) {
+                            sideEffectDeltas.add(AttributeDeltaBuilder.build(Uid.NAME, newUid));
+                        }
+                        return null;
+                    }
+                });
             }
         }
         
@@ -375,9 +405,9 @@ public class LicenseAssignmentsHandler {
         Licensing.LicenseAssignments.Delete deleteRequest = deleteLicenseAssignment(executor.getLicensing().licenseAssignments(), uid.getUidValue());
 
         executor.execute(deleteRequest,
-                new RequestResultHandler<Licensing.LicenseAssignments.Delete, Void, Void>() {
+                new RequestResultHandler<Licensing.LicenseAssignments.Delete, Empty, Void>() {
                     public Void handleResult(Licensing.LicenseAssignments.Delete request,
-                                             Void value) {
+                                             Empty value) {
                         return null;
                     }
 

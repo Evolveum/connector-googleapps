@@ -27,7 +27,14 @@ import com.evolveum.polygon.connector.googleapps.cache.ConnectorObjectsCache;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
 import com.google.api.client.util.Data;
 import com.google.api.services.directory.Directory;
-import com.google.api.services.directory.model.*;
+import com.google.api.services.directory.model.Alias;
+import com.google.api.services.directory.model.Aliases;
+import com.google.api.services.directory.model.Member;
+import com.google.api.services.directory.model.User;
+import com.google.api.services.directory.model.UserMakeAdmin;
+import com.google.api.services.directory.model.UserName;
+import com.google.api.services.directory.model.UserPhoto;
+import com.google.api.services.directory.model.Users;
 import com.google.api.services.licensing.Licensing;
 import com.google.api.services.licensing.model.LicenseAssignment;
 import com.google.gson.Gson;
@@ -39,13 +46,76 @@ import org.identityconnectors.common.security.GuardedString;
 import org.identityconnectors.common.security.SecurityUtil;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.InvalidAttributeValueException;
-import org.identityconnectors.framework.common.objects.*;
+import org.identityconnectors.framework.common.exceptions.RetryableException;
+import org.identityconnectors.framework.common.exceptions.UnknownUidException;
+import org.identityconnectors.framework.common.objects.Attribute;
+import org.identityconnectors.framework.common.objects.AttributeBuilder;
+import org.identityconnectors.framework.common.objects.AttributeDelta;
+import org.identityconnectors.framework.common.objects.AttributeInfo;
+import org.identityconnectors.framework.common.objects.AttributeInfoBuilder;
+import org.identityconnectors.framework.common.objects.AttributeUtil;
+import org.identityconnectors.framework.common.objects.AttributesAccessor;
+import org.identityconnectors.framework.common.objects.ConnectorObject;
+import org.identityconnectors.framework.common.objects.Name;
+import org.identityconnectors.framework.common.objects.ObjectClass;
+import org.identityconnectors.framework.common.objects.ObjectClassInfo;
+import org.identityconnectors.framework.common.objects.ObjectClassInfoBuilder;
+import org.identityconnectors.framework.common.objects.OperationOptions;
+import org.identityconnectors.framework.common.objects.OperationalAttributeInfos;
+import org.identityconnectors.framework.common.objects.OperationalAttributes;
+import org.identityconnectors.framework.common.objects.PredefinedAttributes;
+import org.identityconnectors.framework.common.objects.ResultsHandler;
+import org.identityconnectors.framework.common.objects.SearchResult;
+import org.identityconnectors.framework.common.objects.SortKey;
+import org.identityconnectors.framework.common.objects.Uid;
 import org.identityconnectors.framework.spi.SearchResultsHandler;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
-import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.*;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ADDRESSES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.AGREED_TO_TERMS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ALIASES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ASCENDING_ORDER;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.CHANGE_PASSWORD_AT_NEXT_LOGIN_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.CREATION_TIME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.CUSTOMER_ID_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.DELETION_TIME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.DESCENDING_ORDER;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EMAILS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ETAG_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.EXTERNAL_IDS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.FAMILY_NAME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.FULL_NAME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.GIVEN_NAME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ID_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ID_ETAG;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.IMS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.INCLUDE_IN_GLOBAL_ADDRESS_LIST_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.IP_WHITELISTED_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.IS_ADMIN_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.IS_DELEGATED_ADMIN_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.IS_MAILBOX_SETUP_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.LAST_LOGIN_TIME_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.LOCATIONS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.MY_CUSTOMER_ID;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.NON_EDITABLE_ALIASES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ORGANIZATIONS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.ORG_UNIT_PATH_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.PHONES_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.PHOTO_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.PRIMARY_EMAIL_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.RELATIONS_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.SHOW_DELETED_PARAM;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.SUSPENDED_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.SUSPENSION_REASON_ATTR;
+import static com.evolveum.polygon.connector.googleapps.GoogleAppsConstants.THUMBNAIL_PHOTO_URL_ATTR;
 import static org.identityconnectors.framework.common.objects.OperationalAttributes.ENABLE_NAME;
 
 /**
@@ -648,7 +718,10 @@ public class UserHandler {
         if (valuesToAdd != null) {
             for (Object value : valuesToAdd) {
                 if (value instanceof String) {
-                    newValues.add((String) value);
+                    String addedValue = (String) value;
+                    if (newValues.stream().noneMatch(existing -> matchesJsonValue(existing, addedValue))) {
+                        newValues.add(addedValue);
+                    }
                 }
             }
         }
@@ -695,11 +768,9 @@ public class UserHandler {
      */
     private static boolean matchesJsonValue(String currentJsonValue, String valueToRemove) {
         try {
-            Gson gson = new GsonBuilder().create();
-            
             // Parse both JSON strings into generic objects for structural comparison
-            Object currentObj = gson.fromJson(currentJsonValue, Object.class);
-            Object removeObj = gson.fromJson(valueToRemove, Object.class);
+            Object currentObj = GoogleAppsUtil.parseJson(currentJsonValue);
+            Object removeObj = GoogleAppsUtil.parseJson(valueToRemove);
             
             // Compare the parsed objects (handles field ordering and null differences)
             return Objects.equals(currentObj, removeObj);
@@ -915,7 +986,9 @@ public class UserHandler {
 
         } catch (Exception e) {
             logger.warn(e, "Failed to process special attributes during user creation: {0}", uid.getUidValue());
-            // Note: In a production system, you might want to clean up the partially created user
+            RetryableException partial = RetryableException.wrap("User created but requested attributes could not be applied: " + uid.getUidValue(), uid);
+            partial.addSuppressed(e);
+            throw partial;
         }
 
         return uid;
@@ -952,7 +1025,7 @@ public class UserHandler {
         try {
             executor.execute(createDeleteUserPhoto(executor.getDirectory().users().photos(),
                             uid.getUidValue()),
-                    new RequestResultHandler.NoOp<Directory.Users.Photos.Delete, Void>());
+                    new RequestResultHandler.IgnoreMissing<Directory.Users.Photos.Delete, Void>());
         } catch (Exception e) {
             logger.warn(e, "Failed to delete photo for user: {0}", uid.getUidValue());
             throw ConnectorException.wrap(e);
@@ -982,7 +1055,7 @@ public class UserHandler {
         for (Object groupId : groups) {
             if (groupId instanceof String) {
                 executor.execute(createMemberById(service, (String) groupId, uid.getUidValue(), "MEMBER"),
-                        new RequestResultHandler.NoOp<Directory.Members.Insert, Member>());
+                        new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
             }
         }
     }
@@ -1007,8 +1080,7 @@ public class UserHandler {
 
                         @Override
                         public Uid handleNotFound(IOException e) {
-                            logger.warn("License assignment not found: {0}", e.getMessage());
-                            return null;
+                            throw new UnknownUidException(e.getMessage(), e);
                         }
 
                         @Override
@@ -1019,7 +1091,7 @@ public class UserHandler {
                     });
         } catch (Exception e) {
             logger.warn(e, "Failed to assign license to user: {0}", uid.getUidValue());
-            // License assignment failure shouldn't prevent user creation
+            throw ConnectorException.wrap(e);
         }
     }
 
@@ -1044,7 +1116,7 @@ public class UserHandler {
                 for (String currentAlias : currentAliases) {
                     if (!newAliases.contains(currentAlias)) {
                         executor.execute(deleteUserAlias(aliasesService, uid.getUidValue(), currentAlias),
-                                new RequestResultHandler.NoOp<Directory.Users.Aliases.Delete, Alias>());
+                                new RequestResultHandler.IgnoreMissing<Directory.Users.Aliases.Delete, Void>());
                     }
                 }
                 
@@ -1077,7 +1149,7 @@ public class UserHandler {
                 for (Object alias : valuesToRemove) {
                     if (alias instanceof String) {
                         executor.execute(deleteUserAlias(aliasesService, uid.getUidValue(), (String) alias),
-                                new RequestResultHandler.NoOp<Directory.Users.Aliases.Delete, Alias>());
+                                new RequestResultHandler.IgnoreMissing<Directory.Users.Aliases.Delete, Void>());
                     }
                 }
             }
@@ -1110,9 +1182,10 @@ public class UserHandler {
                     if (!newGroups.contains(currentGroup)) {
                         try {
                             executor.execute(service.delete(currentGroup, uid.getUidValue()),
-                                    new RequestResultHandler.NoOp<Directory.Members.Delete, Void>());
+                                    new RequestResultHandler.IgnoreMissing<Directory.Members.Delete, Void>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to remove user {0} from group {1}", uid.getUidValue(), currentGroup);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }
@@ -1122,9 +1195,10 @@ public class UserHandler {
                     if (!currentGroups.contains(newGroup)) {
                         try {
                             executor.execute(createMemberById(service, newGroup, uid.getUidValue(), "MEMBER"),
-                                    new RequestResultHandler.NoOp<Directory.Members.Insert, Member>());
+                                    new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to add user {0} to group {1}", uid.getUidValue(), newGroup);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }
@@ -1142,9 +1216,10 @@ public class UserHandler {
                         try {
                             executor.execute(createMemberById(service, (String) groupId, 
                                     uid.getUidValue(), "MEMBER"),
-                                    new RequestResultHandler.NoOp<Directory.Members.Insert, Member>());
+                                    new RequestResultHandler.IgnoreDuplicate<Directory.Members.Insert, Member>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to add user {0} to group {1}", uid.getUidValue(), groupId);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }
@@ -1156,9 +1231,10 @@ public class UserHandler {
                     if (groupId instanceof String) {
                         try {
                             executor.execute(service.delete((String) groupId, uid.getUidValue()),
-                                    new RequestResultHandler.NoOp<Directory.Members.Delete, Void>());
+                                    new RequestResultHandler.IgnoreMissing<Directory.Members.Delete, Void>());
                         } catch (Exception e) {
                             logger.warn(e, "Failed to remove user {0} from group {1}", uid.getUidValue(), groupId);
+                            throw ConnectorException.wrap(e);
                         }
                     }
                 }

@@ -91,9 +91,9 @@ public class ConnectorQuerySupportTest {
         Set<String> attributes = schema.createFullAttributesToGet(options);
         String fields = schema.createGoogleApiFieldsString(attributes, "id");
 
-        // Then: Leave both projection representations absent
-        assertNull(attributes);
-        assertNull(fields);
+        // Then: Return only mandatory identity fields
+        assertEquals(attributes, Set.of());
+        assertEquals(fields, "id");
     }
 
     @Test

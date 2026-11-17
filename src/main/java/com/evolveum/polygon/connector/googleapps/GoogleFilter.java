@@ -35,7 +35,21 @@ import org.identityconnectors.framework.common.objects.Attribute;
 import org.identityconnectors.framework.common.objects.AttributeUtil;
 import org.identityconnectors.framework.common.objects.Name;
 import org.identityconnectors.framework.common.objects.Uid;
-import org.identityconnectors.framework.common.objects.filter.*;
+import org.identityconnectors.framework.common.objects.filter.AndFilter;
+import org.identityconnectors.framework.common.objects.filter.ContainsAllValuesFilter;
+import org.identityconnectors.framework.common.objects.filter.ContainsFilter;
+import org.identityconnectors.framework.common.objects.filter.EndsWithFilter;
+import org.identityconnectors.framework.common.objects.filter.EqualsFilter;
+import org.identityconnectors.framework.common.objects.filter.EqualsIgnoreCaseFilter;
+import org.identityconnectors.framework.common.objects.filter.Filter;
+import org.identityconnectors.framework.common.objects.filter.FilterVisitor;
+import org.identityconnectors.framework.common.objects.filter.GreaterThanFilter;
+import org.identityconnectors.framework.common.objects.filter.GreaterThanOrEqualFilter;
+import org.identityconnectors.framework.common.objects.filter.LessThanFilter;
+import org.identityconnectors.framework.common.objects.filter.LessThanOrEqualFilter;
+import org.identityconnectors.framework.common.objects.filter.NotFilter;
+import org.identityconnectors.framework.common.objects.filter.OrFilter;
+import org.identityconnectors.framework.common.objects.filter.StartsWithFilter;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -361,10 +375,8 @@ public class GoogleFilter {
         }
 
         /**
-         * Helper method to build query string components.
-         * Surround with single quotes ' if the query contains whitespace. Escape
-         * single quotes in queries with \', for example 'Valentine\'s Day'.
-         */
+        Builds a query term, quoting whitespace and escaping single quotes.
+        */
         protected StringBuilder getStringBuilder(Attribute attribute, char operator, Character postfix, String fieldName) {
             StringBuilder builder = new StringBuilder();
             builder.append(fieldName).append(operator);
@@ -373,10 +385,10 @@ public class GoogleFilter {
                 if (null != postfix) {
                     stringValue = stringValue + postfix;
                 }
-                if (stringValue.contains(" ")) {
+                if (stringValue.chars().anyMatch(Character::isWhitespace)) {
                     builder.append('\'').append(STRING_ESCAPER.escape(stringValue)).append('\'');
                 } else {
-                    builder.append(stringValue);
+                    builder.append(STRING_ESCAPER.escape(stringValue));
                 }
             }
             return builder;
@@ -438,19 +450,6 @@ public class GoogleFilter {
         public Void visitContainsFilter(Directory.Groups.List list, ContainsFilter containsFilter) {
             if (AttributeUtil.namesEqual(containsFilter.getName(), MEMBERS_ATTR)) {
                 list.setUserKey(AttributeUtil.getStringValue(containsFilter.getAttribute()));
-            } else if (AttributeUtil.namesEqual(containsFilter.getName(), Name.NAME)) {
-                // Map contains search to prefix search using query parameter
-                // Google Groups API supports email:prefix* and name:prefix* queries
-                String searchValue = AttributeUtil.getStringValue(containsFilter.getAttribute());
-                if (searchValue != null) {
-                    // Use email prefix search since Group Name maps to email
-                    list.setQuery("email:" + searchValue + "*");
-                    // Customer parameter is required when using query parameter
-                    // Set customer if no scope parameter (customer/domain/userKey) is already set
-                    if (list.getCustomer() == null && list.getDomain() == null && list.getUserKey() == null) {
-                        list.setCustomer("my_customer");
-                    }
-                }
             } else {
                 throw new UnsupportedOperationException(
                         "Only EqualsFilter(['domain','customer','userKey']) and ContainsFilter('members') are supported");
@@ -515,6 +514,18 @@ public class GoogleFilter {
 
         @Override
         public Void visitStartsWithFilter(Directory.Groups.List list, StartsWithFilter filter) {
+            if (AttributeUtil.namesEqual(filter.getName(), Name.NAME)) {
+                String value = AttributeUtil.getStringValue(filter.getAttribute());
+                if (StringUtil.isBlank(value)) {
+                    throw new InvalidAttributeValueException("Group email prefix cannot be blank");
+                }
+                String prefix = value + "*";
+                list.setQuery("email:" + prefix);
+                if (list.getCustomer() == null && list.getDomain() == null && list.getUserKey() == null) {
+                    list.setCustomer("my_customer");
+                }
+                return null;
+            }
             throw new UnsupportedOperationException(
                     "Only EqualsFilter(['domain','customer','userKey']) and ContainsFilter('members') are supported");
         }

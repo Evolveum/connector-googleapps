@@ -11,7 +11,16 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static com.evolveum.polygon.connector.googleapps.GoogleApiMockServer.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.delete;
+import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
 /**
  * Tests for GoogleAppsConnector User groups attribute update operations
@@ -266,8 +275,10 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
                 Arrays.asList("nonexistent@example.com"), // valuesToAdd
                 null)); // valuesToRemove
 
-        // Update user - should not throw exception (error is logged and ignored)
-        connectorFacade.updateDelta(ObjectClass.ACCOUNT, new Uid("user010"), modifications, null);
+        // Adding a membership to a missing group must fail visibly.
+        org.testng.Assert.expectThrows(
+                org.identityconnectors.framework.common.exceptions.UnknownUidException.class,
+                () -> connectorFacade.updateDelta(ObjectClass.ACCOUNT, new Uid("user010"), modifications, null));
 
         // Verify API call was attempted
         GoogleApiMockServer.verifyRequest(postRequestedFor(urlPathEqualTo("/admin/directory/v1/groups/nonexistent@example.com/members")));
@@ -293,7 +304,7 @@ public class GoogleAppsUserUpdateGroupsTest extends GoogleAppsConnectorTestBase 
                 null, // valuesToAdd
                 Arrays.asList("nonexistent@example.com"))); // valuesToRemove
 
-        // Update user - should not throw exception (error is logged and ignored)
+        // Deleting an already absent membership is idempotent.
         connectorFacade.updateDelta(ObjectClass.ACCOUNT, new Uid("user011"), modifications, null);
 
         // Verify API call was attempted
