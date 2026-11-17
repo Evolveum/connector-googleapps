@@ -29,9 +29,11 @@ package com.evolveum.polygon.connector.googleapps;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest;
+import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.directory.Directory;
 import com.google.api.services.licensing.Licensing;
+import org.apache.http.HttpStatus;
 import org.identityconnectors.common.logging.Log;
 import org.identityconnectors.framework.common.exceptions.ConnectorException;
 import org.identityconnectors.framework.common.exceptions.RetryableException;
@@ -134,7 +136,7 @@ public class GoogleApiExecutor {
                 int status = e.getStatusCode();
 
                 switch (status) {
-                    case 403:
+                    case HttpStatusCodes.STATUS_CODE_FORBIDDEN:
                         if (hasReason(e,
                                 "userRateLimitExceeded",
                                 "rateLimitExceeded",
@@ -143,23 +145,23 @@ public class GoogleApiExecutor {
                         }
                         return handler.handleError(e);
 
-                    case 404:
+                    case HttpStatusCodes.STATUS_CODE_NOT_FOUND:
                         // Error details are optional; the HTTP status defines the not-found contract.
                         return handler.handleNotFound(e);
 
-                    case 409:
+                    case HttpStatusCodes.STATUS_CODE_CONFLICT:
                         if (hasReason(e, "duplicate")) {
                             return handler.handleDuplicate(e);
                         }
                         return handler.handleError(e);
 
-                    case 429:
+                    case HttpStatus.SC_TOO_MANY_REQUESTS:
                         throw RetryableException.wrap(e.getMessage(), e);
 
-                    case 500:
-                    case 502:
-                    case 503:
-                    case 504:
+                    case HttpStatusCodes.STATUS_CODE_SERVER_ERROR:
+                    case HttpStatusCodes.STATUS_CODE_BAD_GATEWAY:
+                    case HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE:
+                    case HttpStatus.SC_GATEWAY_TIMEOUT:
                         if (retryIndex >= MAX_RETRY_INDEX) {
                             throw RetryableException.wrap(e.getMessage(), e);
                         }
