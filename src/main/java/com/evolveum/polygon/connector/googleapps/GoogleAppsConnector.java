@@ -54,17 +54,12 @@ import static com.evolveum.polygon.connector.googleapps.UserHandler.getUserClass
 @ConnectorClass(displayNameKey = "GoogleApps.connector.display",
         configurationClass = GoogleAppsConfiguration.class)
 public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, SchemaOp,
-        SearchOp<GoogleFilter>, TestOp, UpdateDeltaOp {
+        SearchOp<GoogleFilter>, TestOp, UpdateDeltaOp, PoolableConnector {
 
     /**
      * Setup logging for the {@link GoogleAppsConnector}.
      */
     private static final Log logger = Log.getLog(GoogleAppsConnector.class);
-
-    // Preserve legacy schema references until the exact source cutover.
-    public static final ObjectClass MEMBER = GoogleAppsConstants.MEMBER;
-    public static final ObjectClass ORG_UNIT = GoogleAppsConstants.ORG_UNIT;
-    public static final ObjectClass LICENSE_ASSIGNMENT = GoogleAppsConstants.LICENSE_ASSIGNMENT;
 
     /**
      * Place holder for the {@link Configuration} passed into the init() method
@@ -274,7 +269,12 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
     public void test() {
         logger.info("Testing connection... ");
         try {
-            Directory.Users.List request = configuration.getDirectory().users().list();
+            // Test connection with minimal data fetch (only 1 user, only id field)
+            Directory.Users.List request = configuration.getDirectory().users().list()
+                    .setCustomer(MY_CUSTOMER_ID)
+                    .setMaxResults(1)
+                    .setFields("users(id)");
+            apiExecutor.execute(request, new RequestResultHandler.NoOp<Directory.Users.List, Users>());
         } catch (IOException e) {
             logger.error("failed: {0}", e);
             throw ConnectorException.wrap(e);
@@ -371,7 +371,10 @@ public class GoogleAppsConnector implements Connector, CreateOp, DeleteOp, Schem
         return null;
     }
 
-
+    @Override
+    public void checkAlive() {
+        // Do nothing
+    }
 
     private String timeFrom(long startTime) {
         return (System.currentTimeMillis() - startTime) + " ms";

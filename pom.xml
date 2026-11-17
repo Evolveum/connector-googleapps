@@ -108,16 +108,13 @@
                     <failIfNoTests>true</failIfNoTests>
                     <includes>
                         <include>**/*Test.java</include>
-                        <include>**/Test*.java</include>
                     </includes>
                 </configuration>
             </plugin>
         </plugins>
     </build>
 
-
     <dependencies>
-        <dependency><groupId>com.google.http-client</groupId><artifactId>google-http-client-apache-v2</artifactId><version>1.47.1</version></dependency>
         <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-admin-directory</artifactId>
@@ -137,6 +134,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.google.http-client</groupId>
+            <artifactId>google-http-client-apache-v2</artifactId>
+            <version>1.47.1</version>
+        </dependency>
+
+        <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
             <version>2.14.0</version>
@@ -152,6 +155,7 @@
         </dependency>
 
         <!-- Test dependencies -->
+        <!-- The inherited contract library brings JUnit engines that select the wrong test provider. -->
         <dependency>
             <groupId>net.tirasa.connid</groupId>
             <artifactId>connector-framework-contract</artifactId>
