@@ -86,6 +86,7 @@ public class GoogleAppsConnectorOperationsTest {
 
     @Test
     public void createsGroupWithMembersAndOtherSupportedObjectClasses() {
+        // Given: Group and standalone membership creation responses
         ScriptedTransport transport = new ScriptedTransport(
                 json("{\"id\":\"engineering@example.com\",\"etag\":\"group-v1\",\"email\":\"engineering@example.com\"}"),
                 json("{\"id\":\"member-id\",\"email\":\"ada@example.com\",\"role\":\"MANAGER\",\"etag\":\"member-v1\"}"),
@@ -100,10 +101,13 @@ public class GoogleAppsConnectorOperationsTest {
         groupMember.put(GoogleAppsConnector.EMAIL_ATTR, "ada@example.com");
         groupMember.put(GoogleAppsConnector.ROLE_ATTR, "MANAGER");
 
-        Uid groupUid = connector.create(ObjectClass.GROUP, attributes(
-                new Name("engineering@example.com"),
-                AttributeBuilder.build(GoogleAppsConnector.MEMBERS_ATTR, List.of(groupMember))),
+        // When: Create the group and related resources
+        Uid groupUid = connector.create(ObjectClass.GROUP, attributes(new Name("engineering@example.com")),
                 new OperationOptionsBuilder().build());
+        Uid managerUid = connector.create(GoogleAppsConnector.MEMBER, attributes(
+                AttributeBuilder.build(GoogleAppsConnector.GROUP_KEY_ATTR, "engineering@example.com"),
+                AttributeBuilder.build(GoogleAppsConnector.EMAIL_ATTR, groupMember.get(GoogleAppsConnector.EMAIL_ATTR)),
+                AttributeBuilder.build(GoogleAppsConnector.ROLE_ATTR, groupMember.get(GoogleAppsConnector.ROLE_ATTR))), new OperationOptionsBuilder().build());
         Uid memberUid = connector.create(GoogleAppsConnector.MEMBER, attributes(
                 AttributeBuilder.build(GoogleAppsConnector.GROUP_KEY_ATTR, "engineering@example.com"),
                 AttributeBuilder.build(GoogleAppsConnector.EMAIL_ATTR, "grace@example.com")),
@@ -118,7 +122,9 @@ public class GoogleAppsConnectorOperationsTest {
                 AttributeBuilder.build(GoogleAppsConnector.USER_ID_ATTR, "ada@example.com")),
                 new OperationOptionsBuilder().build());
 
+        // Then: Preserve resource identities and creation order
         assertEquals(groupUid.getUidValue(), "engineering@example.com");
+        assertEquals(managerUid.getUidValue(), "engineering@example.com/member-id");
         assertEquals(memberUid.getUidValue(), "engineering@example.com/member-id");
         assertEquals(orgUnitUid.getUidValue(), "Engineering");
         assertEquals(orgUnitUid.getRevision(), "ou-v1");
